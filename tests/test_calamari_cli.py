@@ -309,15 +309,50 @@ class CalamariCliTest(unittest.TestCase):
 
         code, out = self.run_helper("clock-out")
 
-        self.assertEqual((code, out), (0, {"ok": True, "running": False}))
+        self.assertEqual((code, out), (0, {"ok": True, "running": False, "stamped": True}))
         self.assertEqual(self.fake.shifts, [("2026-09-22", "09:40:30", "17:30:30")])
 
-    def test_clock_out_without_running_shift_is_an_mcp_error(self):
+    def test_clock_out_without_running_shift_does_not_stamp(self):
+        # A clockOut without a running shift still leaves a seconds-long
+        # entry in the real Calamari (seen 2026-09-22), so it is not sent.
         self.login()
         self.fake.shifts = [("2026-09-22", "08:00:00", "12:00:00")]
 
-        self.assert_error(self.run_helper("clock-out"), "MCP_ERROR")
-        self.assertEqual(self.fake.shifts, [("2026-09-22", "08:00:00", "12:00:00")])
+        code, out = self.run_helper("clock-out")
+
+        self.assertEqual((code, out), (0, {"ok": True, "running": False, "stamped": False}))
+        self.assertNotIn("clockOut", [n for n, _ in self.fake.tool_calls])
+
+    def test_clock_out_does_not_stamp_a_shift_that_ended_a_minute_ago(self):
+        # The status window still sees it; the current minute does not.
+        self.login()
+        self.fake.now = "2026-09-22T14:00:30"
+        self.fake.shifts = [("2026-09-22", "08:00:00", "13:59:10")]
+
+        code, out = self.run_helper("clock-out")
+
+        self.assertEqual((code, out["stamped"]), (0, False))
+        self.assertNotIn("clockOut", [n for n, _ in self.fake.tool_calls])
+
+    def test_clock_out_overnight_stamps_yesterdays_shift(self):
+        self.login()
+        self.fake.now = "2026-09-23T07:30:30"
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+
+        code, out = self.run_helper("clock-out", "--overnight")
+
+        self.assertEqual((code, out), (0, {"ok": True, "running": False, "stamped": True}))
+        self.assertIn("clockOut", [n for n, _ in self.fake.tool_calls])
+
+    def test_clock_out_overnight_without_a_shift_from_yesterday_does_not_stamp(self):
+        self.login()
+        self.fake.now = "2026-09-23T07:30:30"
+        self.fake.shifts = [("2026-09-22", "09:40:30", "18:00:00")]
+
+        code, out = self.run_helper("clock-out", "--overnight")
+
+        self.assertEqual((code, out["stamped"]), (0, False))
+        self.assertNotIn("clockOut", [n for n, _ in self.fake.tool_calls])
 
     def test_clock_in_while_a_shift_runs_is_an_mcp_error(self):
         self.login()

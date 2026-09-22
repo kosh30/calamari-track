@@ -62,7 +62,9 @@ Item {
 
     // After a suspend the last status is old news (a shift may have been
     // stamped on the phone meanwhile): no reminder until a fresh answer.
-    property bool statusStale: false
+    // Also from the start of the shell until the first answer: the saved
+    // state may be hours old (a shift ended in the web meanwhile).
+    property bool statusStale: true
     onDecisionChanged: Qt.callLater(root.runReminders)
 
     // Notification ids per reminder type, so a repetition replaces the last one.
@@ -106,7 +108,7 @@ Item {
         stampProc.action = action
         stampProc.notice = notice || null
         stampProc.pollWhenDone = false
-        stampProc.command = [root.helper, ShiftClock.helperCommand(action)]
+        stampProc.command = [root.helper].concat(ShiftClock.helperCommand(action))
         stampProc.running = true
     }
 
@@ -269,7 +271,8 @@ Item {
             root.errorMessage = ""
         }
         root.setShiftState(result.state)
-        if (out.ok && stampProc.notice)
+        // A close that found no shift stamped nothing, so there is nothing to correct.
+        if (out.ok && out.stamped !== false && stampProc.notice)
             root.notify(Object.assign({ at: Qt.formatTime(root.now, "HH:mm") }, stampProc.notice))
     }
 

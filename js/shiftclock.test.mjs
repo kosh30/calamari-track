@@ -262,10 +262,26 @@ test("eine fehlgeschlagene Pause nennt die Aktion", () => {
   assert.match(fail("break-end"), /^Pause beenden fehlgeschlagen/)
 })
 
-test("Pausen-Aktionen stempeln bei Calamari aus bzw. ein", () => {
-  assert.equal(helperCommand("break-start"), "clock-out")
-  assert.equal(helperCommand("break-end"), "clock-in")
-  assert.equal(helperCommand("clock-in"), "clock-in")
+test("Pausen-Aktionen stempeln bei Calamari aus bzw. ein, der Übernacht-Abschluss auch die Schicht vom Vortag", () => {
+  assert.deepEqual(helperCommand("break-start"), ["clock-out"])
+  assert.deepEqual(helperCommand("break-end"), ["clock-in"])
+  assert.deepEqual(helperCommand("clock-in"), ["clock-in"])
+  assert.deepEqual(helperCommand("overnight-close"), ["clock-out", "--overnight"])
+})
+
+test("lief beim Ausstempeln gar keine Schicht, ist es kein Feierabend und das Panel sagt es", () => {
+  const state = clockIn(emptyState(), "09:00")
+  const r = applyStamp(state, "clock-out", { ok: true, running: false, stamped: false }, at("16:00"))
+  assert.equal(r.state.clockedOutAt, null)
+  assert.deepEqual(view(r.state, "16:00"), { kind: "idle", text: "" })
+  assert.equal(r.error, "Ausstempeln: Calamari meldet keine laufende Schicht.")
+  assert.equal(r.pollNow, true)
+  assert.equal(workedMinutes(r.state, at("16:00")), 0)
+})
+
+test("lief beim Pausenbeginn gar keine Schicht, gibt es keine Pause", () => {
+  const r = applyStamp(clockIn(emptyState(), "09:00"), "break-start", { ok: true, running: false, stamped: false }, at("12:00"))
+  assert.deepEqual(view(r.state, "12:00"), { kind: "idle", text: "" })
 })
 
 test("die Buttons heißen wie die Aktionen", () => {

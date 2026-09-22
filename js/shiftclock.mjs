@@ -237,8 +237,9 @@ export function stampLabel(action) {
 // The helper command behind a stamp action: a Pause is a clock-out plus
 // the local mark, its end a clock-in (ADR 0001).
 export function helperCommand(action) {
-  if (action === "break-start" || action === "overnight-close") return "clock-out"
-  return action === "break-end" ? "clock-in" : action
+  if (action === "overnight-close") return ["clock-out", "--overnight"]
+  if (action === "break-start") return ["clock-out"]
+  return [action === "break-end" ? "clock-in" : action]
 }
 const STAMP_CAUSES = {
   NETWORK: "Calamari nicht erreichbar",
@@ -281,7 +282,16 @@ export function applyStamp(state, action, out, now) {
     const { code, message } = out.error
     return { state, error: stampErrorText(action, code, message), pollNow: code !== "RATE_LIMITED" }
   }
-  if (helperCommand(action) === "clock-out") {
+  if (helperCommand(action)[0] === "clock-out" && out.stamped === false) {
+    // No shift ran, so nothing was stamped: no Feierabend, no Pause, and
+    // nothing to correct; look again.
+    return {
+      state: stopShift(Object.assign({}, state, { running: false }), now),
+      error: `${STAMP_ACTIONS[action]}: Calamari meldet keine laufende Schicht.`,
+      pollNow: true,
+    }
+  }
+  if (helperCommand(action)[0] === "clock-out") {
     // The overnight close ends yesterday's shift; today has no Feierabend yet.
     const next = action === "break-start" ? applyBreakStart(state, now)
       : action === "overnight-close" ? stopShift(state, now) : applyClockOut(state, now)

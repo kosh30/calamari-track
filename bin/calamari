@@ -554,12 +554,26 @@ def clock_in(args):
 
 
 def clock_out(args):
-    """Stamps now. Unlike clock-in there is no check afterwards: the shift
-    just ended still overlaps every window up to now (docs/adr/0001), so no
-    overlap query can tell it apart from a running one. A refused clockOut is
-    an MCP_ERROR."""
-    with_mcp(lambda c: c.call_tool("clockOut", {}))
-    return {"running": False}
+    """Stamps now, but only while a shift runs: a clockOut without one still
+    leaves a seconds-long entry in Calamari (seen 2026-09-22). "Runs" means
+    it reaches into the current minute, which a shift ended a minute ago
+    (still inside the status window) does not. With --overnight yesterday's
+    shift counts too, if it reached midnight. stamped tells whether clockOut
+    was sent. There is no check afterwards: the shift just ended still
+    overlaps every window up to now (docs/adr/0001)."""
+    def work(client):
+        date, minute = today_and_minute()
+        start = min(minute, 24 * 60 - 2)
+        running = overlaps(client, date, start, start + 1)
+        if not running and args.overnight:
+            yesterday = (now().date() - datetime.timedelta(days=1)).isoformat()
+            day_end = 24 * 60 - 1
+            running = overlaps(client, yesterday, day_end - STATUS_WINDOW, day_end)
+        if running:
+            client.call_tool("clockOut", {})
+        return running
+
+    return {"running": False, "stamped": with_mcp(work)}
 
 
 def first_minute(lo, hi, holds):
@@ -670,7 +684,7 @@ def parse_args(argv):
             sub.add_argument("--after", metavar="HH:MM", required=True)
         if name == "day-info":
             sub.add_argument("--date", metavar="YYYY-MM-DD")
-        if name == "status":
+        if name in ("status", "clock-out"):
             sub.add_argument("--overnight", action="store_true")
     return parser.parse_args(argv)
 
