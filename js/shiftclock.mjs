@@ -68,8 +68,12 @@ export function applyStatus(state, running, now) {
 export function restoreState(text) {
   try {
     const saved = JSON.parse(text)
-    if (saved && typeof saved === "object" && !Array.isArray(saved))
-      return Object.assign(emptyState(), saved)
+    if (saved && typeof saved === "object" && !Array.isArray(saved)) {
+      const state = emptyState()
+      for (const key of Object.keys(state))
+        if (key in saved) state[key] = saved[key]
+      return state
+    }
   } catch (e) {
     // First run or a torn file.
   }

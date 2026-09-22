@@ -80,3 +80,9 @@ test("ein fehlender oder kaputter Zustand beginnt leer", () => {
   assert.deepEqual(restoreState("{kaputt"), emptyState())
   assert.deepEqual(restoreState("[]"), emptyState())
 })
+
+test("unbekannte Felder aus älteren Versionen fallen beim Laden weg", () => {
+  const restored = restoreState(JSON.stringify({ date: "2026-09-22", running: true, startedAt: "09:40", idleSince: null }))
+  assert.deepEqual(Object.keys(restored).sort(), Object.keys(emptyState()).sort())
+  assert.equal(restored.startedAt, "09:40")
+})
