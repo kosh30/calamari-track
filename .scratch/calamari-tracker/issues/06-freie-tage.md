@@ -8,8 +8,8 @@
 
 - [x] `day-info` liefert zusätzlich `holiday` (inkl. `halfDay`/`halfdayPeriod`) und `absence`
 - [x] Tests für `decide`: Feiertag, Abwesenheit, „Heute frei“, halber Feiertag (verkürzte Kernzeit), Arbeitsplan-Überschreibung
-- [ ] Der Schalter „Heute frei“ im Panel wird im lokalen Zustand gespeichert und am Folgetag ignoriert
-- [ ] Die Überschreibungen für Arbeitsplan/Kernzeit sind in den Widget-Einstellungen änderbar
+- [x] Der Schalter „Heute frei“ im Panel wird im lokalen Zustand gespeichert und am Folgetag ignoriert
+- [x] Die Überschreibungen für Arbeitsplan/Kernzeit sind in den Widget-Einstellungen änderbar
 - [x] Tests für `day-info` gegen den Fake: Feiertag, halber Feiertag, Abwesenheit, arbeitsfreier Tag
 
 ## Comments
@@ -20,3 +20,9 @@
 - Die Überschreibung läuft über die sieben Einstellungen `coreMonday` … `coreSunday`, z.B. `omarchy bar set kosh.calamari-tracker coreFriday 08:00-13:00`.
 - „Heute frei“ ist ein Schalter im Panel, er wird als `dayOff` im Zustand gespeichert und lässt sich zurücknehmen.
 - Offen ist noch die kurze Abnahme in der Shell.
+
+**2026-09-22 (Agent):** Mit dem Benutzer in der Shell abgenommen:
+- „Heute frei“ im Panel geklickt, im Zustand stand danach `dayOff: true`, und der Button zeigte „Heute frei (zurücknehmen)“.
+- Nach einem Neustart der Shell war der Schalter weiter gesetzt. Zurückgenommen stand im Zustand `dayOff: false`.
+- Dass der Schalter am Folgetag nicht mehr gilt, ist per Test abgedeckt, in der Shell nicht beobachtet.
+- Die Überschreibungen werden wie `stampReminderMinutes` mit `omarchy bar set` gesetzt. Dass die Einstellungen beim Service ankommen, hat Ticket 05 gezeigt. Die Kernzeit-Werte selbst sind per Test abgedeckt.
