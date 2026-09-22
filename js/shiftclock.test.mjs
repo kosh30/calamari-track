@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { applyStatus, applyStartTime, barView, emptyState, restoreState } from "./shiftclock.mjs"
+import { applyStamp, applyStatus, applyStartTime, barView, emptyState, restoreState, stampAction } from "./shiftclock.mjs"
 
 const at = (hhmm, date = "2026-09-22") => new Date(`${date}T${hhmm}:00`)
 
@@ -85,4 +85,99 @@ test("unbekannte Felder aus älteren Versionen fallen beim Laden weg", () => {
   const restored = restoreState(JSON.stringify({ date: "2026-09-22", running: true, startedAt: "09:40", idleSince: null }))
   assert.deepEqual(Object.keys(restored).sort(), Object.keys(emptyState()).sort())
   assert.equal(restored.startedAt, "09:40")
+})
+
+const running = (startedAt, now) => applyStartTime(applyStatus(emptyState(), true, at(now)).state, startedAt)
+const clockOut = (state, now) => applyStamp(state, "clock-out", { ok: true, running: false }, at(now)).state
+const clockIn = (state, now) => applyStamp(state, "clock-in", { ok: true, running: true }, at(now)).state
+const view = (state, now) => barView({ state, now: at(now), authState: "ok", failed: false })
+
+test("nach dem Ausstempeln ist Feierabend und keine Schicht läuft", () => {
+  const state = clockOut(running("09:40", "17:00"), "17:30")
+  assert.equal(state.clockedOutAt, "17:30")
+  assert.deepEqual(view(state, "17:30"), { kind: "idle", text: "" })
+})
+
+test("der Feierabend übersteht einen Neustart der Shell", () => {
+  const state = clockOut(running("09:40", "17:00"), "17:30")
+  assert.equal(restoreState(JSON.stringify(state)).clockedOutAt, "17:30")
+})
+
+test("kurz nach dem Ausstempeln gilt die noch sichtbare Schicht nicht als laufend", () => {
+  const state = clockOut(running("09:40", "17:00"), "17:30")
+  const r = applyStatus(state, true, at("17:32"))
+  assert.equal(r.state.running, false)
+  assert.equal(r.startTimeQuery, null)
+  assert.equal(r.state.clockedOutAt, "17:30")
+})
+
+test("Einstempeln nach dem Feierabend hebt ihn auf und die Dauer zählt ab jetzt", () => {
+  const state = clockIn(clockOut(running("09:40", "17:00"), "17:30"), "20:15")
+  assert.equal(state.clockedOutAt, null)
+  assert.deepEqual(view(state, "20:17"), { kind: "running", text: "0:02" })
+  assert.equal(applyStatus(state, true, at("20:18")).startTimeQuery, null)
+})
+
+test("meldet Calamari nach dem Einstempeln keine laufende Schicht, zählt Calamari", () => {
+  const r = applyStamp(emptyState(), "clock-in", { ok: true, running: false }, at("08:00"))
+  assert.deepEqual(view(r.state, "08:00"), { kind: "idle", text: "" })
+})
+
+test("eine im Web begonnene Schicht nach dem Feierabend hebt ihn auf und wird erst nach dem Ausstempeln gesucht", () => {
+  const state = clockOut(running("09:40", "17:00"), "17:30")
+  const r = applyStatus(state, true, at("17:40"))
+  assert.equal(r.state.running, true)
+  assert.equal(r.state.clockedOutAt, null)
+  // The ended shift reaches into minute 17:30.
+  assert.deepEqual(r.startTimeQuery, { after: "17:31" })
+})
+
+test("eine Abfrage kurz nach dem Ausstempeln lässt die Startzeit-Suche trotzdem erst danach beginnen", () => {
+  let state = clockOut(running("09:40", "17:00"), "17:30")
+  state = applyStatus(state, true, at("17:31")).state
+  const r = applyStatus(state, true, at("17:50"))
+  assert.deepEqual(r.startTimeQuery, { after: "17:31" })
+})
+
+test("der Feierabend von gestern gilt heute nicht mehr", () => {
+  const state = clockOut(running("09:40", "17:00"), "17:30")
+  const yesterday = Object.assign({}, state, { date: "2026-09-21" })
+  assert.equal(applyStatus(yesterday, false, at("08:00")).state.clockedOutAt, null)
+})
+
+test("ein fehlgeschlagenes Stempeln lässt den Status stehen, damit man es erneut versuchen kann", () => {
+  const state = running("09:40", "17:00")
+  const r = applyStamp(state, "clock-out", { ok: false, error: { code: "NETWORK", message: "cannot reach" } }, at("17:30"))
+  assert.deepEqual(r.state, state)
+  assert.equal(stampAction(view(r.state, "17:30")), "clock-out")
+})
+
+test("ein fehlgeschlagenes Stempeln nennt Aktion und Ursache und dass nichts nachgereicht wird", () => {
+  const fail = (action, code, message) => applyStamp(running("09:40", "17:00"), action, { ok: false, error: { code, message } }, at("17:30")).error
+  assert.equal(fail("clock-out", "NETWORK"),
+    "Ausstempeln fehlgeschlagen: Calamari nicht erreichbar. Es wird nichts nachgereicht.")
+  assert.equal(fail("clock-in", "RATE_LIMITED"),
+    "Einstempeln fehlgeschlagen: zu viele Anfragen, bitte gleich erneut versuchen. Es wird nichts nachgereicht.")
+  assert.equal(fail("clock-in", "AUTH_REQUIRED"),
+    "Einstempeln fehlgeschlagen: Anmeldung nötig. Es wird nichts nachgereicht.")
+  assert.equal(fail("clock-out", "MCP_ERROR", "clockOut: no started shift"),
+    "Ausstempeln fehlgeschlagen: clockOut: no started shift. Es wird nichts nachgereicht.")
+})
+
+test("nach einem Fehlschlag wird der echte Status abgefragt, außer Calamari drosselt", () => {
+  const fail = code => applyStamp(emptyState(), "clock-in", { ok: false, error: { code, message: "" } }, at("08:00")).pollNow
+  assert.equal(fail("NETWORK"), true)
+  assert.equal(fail("MCP_ERROR"), true)
+  assert.equal(fail("RATE_LIMITED"), false)
+  assert.equal(applyStamp(emptyState(), "clock-in", { ok: true, running: true }, at("08:00")).pollNow, false)
+})
+
+test("das Panel bietet Ausstempeln bei laufender Schicht und sonst Einstempeln an", () => {
+  assert.equal(stampAction({ kind: "running", text: "1:00" }), "clock-out")
+  assert.equal(stampAction({ kind: "idle", text: "" }), "clock-in")
+})
+
+test("ohne bekannten Status bietet das Panel kein Stempeln an", () => {
+  for (const kind of ["unknown", "error", "auth"])
+    assert.equal(stampAction({ kind, text: "" }), null)
 })

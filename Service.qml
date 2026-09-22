@@ -28,6 +28,13 @@ Item {
         state: root.shiftState, now: root.now, authState: root.authState, failed: root.statusFailed
     })
 
+    // Stamping from the panel; stampError is the panel's line for the last
+    // failed attempt. One helper call at a time, so an answer from before an
+    // action cannot overwrite the action's result.
+    property string stampError: ""
+    readonly property bool stamping: stampProc.running
+    readonly property bool busy: stampProc.running || statusProc.running || startTimeProc.running
+
     readonly property int pollInterval: 3 * 60 * 1000
     readonly property string helper: Qt.resolvedUrl("bin/calamari").toString().replace(/^file:\/\//, "")
     readonly property string stateDir: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/calamari-tracker"
@@ -40,8 +47,19 @@ Item {
     // Polls wait for the persisted state, so an answer cannot be undone by
     // loading an older file afterwards.
     function poll() {
-        if (root.stateLoaded && !statusProc.running && !startTimeProc.running)
+        if (root.stateLoaded && !root.busy)
             statusProc.running = true
+    }
+
+    // "clock-in" or "clock-out", always now. A failure is shown, never queued.
+    function stamp(action) {
+        if (!root.stateLoaded || root.busy)
+            return
+        root.stampError = ""
+        stampProc.action = action
+        stampProc.pollWhenDone = false
+        stampProc.command = [root.helper, action]
+        stampProc.running = true
     }
 
     function login() {
@@ -99,6 +117,18 @@ Item {
         root.setShiftState(ShiftClock.applyStartTime(root.shiftState, out.startedAt))
     }
 
+    function applyStamp(action, out) {
+        root.now = new Date()
+        var result = ShiftClock.applyStamp(root.shiftState, action, out, root.now)
+        root.stampError = result.error
+        stampProc.pollWhenDone = result.pollNow
+        if (out.ok) {
+            root.statusFailed = false
+            root.errorMessage = ""
+        }
+        root.setShiftState(result.state)
+    }
+
     function setShiftState(next) {
         root.shiftState = next
         stateFile.setText(JSON.stringify(next, null, 2) + "\n")
@@ -138,6 +168,18 @@ Item {
         stdout: StdioCollector {
             onStreamFinished: root.applyStartTime(root.parse(text))
         }
+    }
+
+    Process {
+        id: stampProc
+        property string action: ""
+        // Ask Calamari for the real status once the helper has exited
+        // (poll() waits while it runs).
+        property bool pollWhenDone: false
+        stdout: StdioCollector {
+            onStreamFinished: root.applyStamp(stampProc.action, root.parse(text))
+        }
+        onRunningChanged: if (!running && pollWhenDone) root.poll()
     }
 
     Process {

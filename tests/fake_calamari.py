@@ -32,6 +32,7 @@ class FakeCalamari:
         self.token_status = None  # force an HTTP status on the token endpoint, e.g. 503
         self.protocol_version = None  # answer initialize with this version instead of echoing
         self.tool_error = False
+        self.overlap_error = False  # only checkTimesheetOverlap fails
         self.mcp_status = None  # force an HTTP status on MCP calls, e.g. 429
         # Timesheet entries as (date, "HH:MM:SS" start, "HH:MM:SS" end or None
         # while running). A running entry lasts until `now`, which the tests
@@ -215,7 +216,11 @@ class _Handler(BaseHTTPRequestHandler):
             if self.fake.tool_error:
                 return self._reply(msg["id"], {"isError": True, "content": [{"type": "text", "text": "boom"}]})
             if name == "checkTimesheetOverlap":
+                if self.fake.overlap_error:
+                    return self._reply(msg["id"], {"isError": True, "content": [{"type": "text", "text": "boom"}]})
                 return self._overlap(msg["id"], msg["params"]["arguments"])
+            if name in ("clockIn", "clockOut"):
+                return self._clock(msg["id"], name)
             if name == "getMyProfile":
                 return self._reply(msg["id"], {"content": [{"type": "text", "text": json.dumps(self.fake.profile)}]})
             return self._reply(msg["id"], error={"code": -32602, "message": "Unknown tool " + name})
@@ -239,6 +244,22 @@ class _Handler(BaseHTTPRequestHandler):
                     dates.append(date)
         self.fake.overlap_calls += 1
         return self._reply(msg_id, {"content": [{"type": "text", "text": json.dumps(dates)}], "isError": False})
+
+    def _clock(self, msg_id, name):
+        """clockIn opens an entry at now, clockOut ends the running one. Both
+        refuse when there is nothing to do, as a stamp clock would."""
+        today, now = self.fake.now.split("T")
+        running = [i for i, (date, _, end) in enumerate(self.fake.shifts) if date == today and end is None]
+        if (name == "clockIn") == bool(running):
+            text = "shift already started" if running else "no started shift"
+            return self._reply(msg_id, {"isError": True, "content": [{"type": "text", "text": text}]})
+        if name == "clockIn":
+            self.fake.shifts.append((today, now, None))
+        else:
+            date, start, _ = self.fake.shifts[running[0]]
+            self.fake.shifts[running[0]] = (date, start, now)
+        # The real answer's shape is unknown yet; the helper must not rely on it.
+        return self._reply(msg_id, {"content": [{"type": "text", "text": "OK"}], "isError": False})
 
     def _reply(self, msg_id, result=None, headers=None, error=None):
         payload = {"jsonrpc": "2.0", "id": msg_id}

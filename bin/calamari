@@ -498,10 +498,42 @@ def whoami(args):
     return {"name": profile["name"], "email": profile.get("email"), "personUuid": profile.get("personUuid")}
 
 
-def status(args):
+def running_now(client):
     date, minute = today_and_minute()
     end = max(minute, 1)
-    return {"running": with_mcp(lambda c: overlaps(c, date, max(end - STATUS_WINDOW, 0), end))}
+    return overlaps(client, date, max(end - STATUS_WINDOW, 0), end)
+
+
+def status(args):
+    return {"running": with_mcp(running_now)}
+
+
+def clock_in(args):
+    """Stamps now, then asks Calamari whether the shift really runs. The new
+    shift starts inside the current minute, after the end of the `status`
+    window, so this check looks at the current minute instead. Once clockIn
+    was accepted a failing check is no failure: the stamp happened, and like
+    clock-out it counts. (Unauthorized is swallowed too, or with_mcp would
+    stamp a second time.)"""
+    def work(client):
+        client.call_tool("clockIn", {})
+        date, minute = today_and_minute()
+        start = min(minute, 24 * 60 - 2)
+        try:
+            return overlaps(client, date, start, start + 1)
+        except (HelperError, Unauthorized):
+            return True
+
+    return {"running": with_mcp(work)}
+
+
+def clock_out(args):
+    """Stamps now. Unlike clock-in there is no check afterwards: the shift
+    just ended still overlaps every window up to now (docs/adr/0001), so no
+    overlap query can tell it apart from a running one. A refused clockOut is
+    an MCP_ERROR."""
+    with_mcp(lambda c: c.call_tool("clockOut", {}))
+    return {"running": False}
 
 
 def start_time(args):
@@ -543,7 +575,8 @@ def parse_args(argv):
     return parser.parse_args(argv)
 
 
-COMMANDS = {"login": login, "whoami": whoami, "status": status, "start-time": start_time}
+COMMANDS = {"login": login, "whoami": whoami, "status": status, "start-time": start_time,
+            "clock-in": clock_in, "clock-out": clock_out}
 
 
 def main(argv):

@@ -217,6 +217,76 @@ class CalamariCliTest(unittest.TestCase):
     def test_start_time_rejects_a_malformed_after(self):
         self.assert_error(self.run_helper("start-time", "--after", "7 Uhr"), "USAGE")
 
+    # Stempeln
+
+    def test_clock_in_starts_a_shift_and_reports_it_running(self):
+        self.login()
+        # Stamped mid-minute: the new shift lies after the last full minute.
+        self.fake.now = "2026-09-22T14:00:30"
+        self.fake.shifts = [("2026-09-22", "08:00:00", "12:00:00")]
+
+        code, out = self.run_helper("clock-in")
+
+        self.assertEqual((code, out), (0, {"ok": True, "running": True}))
+        self.assertIn(("2026-09-22", "14:00:30", None), self.fake.shifts)
+        # The status came from Calamari, not from the helper's hope.
+        self.assertIn("checkTimesheetOverlap", [n for n, _ in self.fake.tool_calls])
+
+    def test_clock_in_that_calamari_accepted_counts_even_if_the_check_fails(self):
+        self.login()
+        self.fake.now = "2026-09-22T14:00:30"
+        self.fake.overlap_error = True
+
+        code, out = self.run_helper("clock-in")
+
+        self.assertEqual((code, out), (0, {"ok": True, "running": True}))
+        self.assertEqual(self.fake.shifts, [("2026-09-22", "14:00:30", None)])
+
+    def test_clock_out_ends_the_running_shift(self):
+        self.login()
+        self.fake.now = "2026-09-22T17:30:30"
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+
+        code, out = self.run_helper("clock-out")
+
+        self.assertEqual((code, out), (0, {"ok": True, "running": False}))
+        self.assertEqual(self.fake.shifts, [("2026-09-22", "09:40:30", "17:30:30")])
+
+    def test_clock_out_without_running_shift_is_an_mcp_error(self):
+        self.login()
+        self.fake.shifts = [("2026-09-22", "08:00:00", "12:00:00")]
+
+        self.assert_error(self.run_helper("clock-out"), "MCP_ERROR")
+        self.assertEqual(self.fake.shifts, [("2026-09-22", "08:00:00", "12:00:00")])
+
+    def test_clock_in_while_a_shift_runs_is_an_mcp_error(self):
+        self.login()
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+
+        self.assert_error(self.run_helper("clock-in"), "MCP_ERROR")
+        self.assertEqual(len(self.fake.shifts), 1)
+
+    def test_stamping_when_rate_limited_is_reported_and_nothing_is_stamped(self):
+        self.login()
+        self.fake.mcp_status = 429
+
+        for command in ("clock-in", "clock-out"):
+            with self.subTest(command):
+                self.assert_error(self.run_helper(command), "RATE_LIMITED")
+        self.assertEqual(self.fake.shifts, [])
+
+    def test_stamping_without_network_is_a_network_error(self):
+        self.login()
+
+        for command in ("clock-in", "clock-out"):
+            with self.subTest(command):
+                self.assert_error(self.run_helper(command, base_url="http://127.0.0.1:9"), "NETWORK")
+
+    def test_stamping_without_login_needs_auth(self):
+        for command in ("clock-in", "clock-out"):
+            with self.subTest(command):
+                self.assert_error(self.run_helper(command), "AUTH_REQUIRED")
+
     # Other failures
 
     def test_rate_limit_is_reported(self):

@@ -1,9 +1,10 @@
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "js/shiftclock.mjs" as ShiftClock
 
-// Popup panel toggled from the bar icon. Shows the login state; shift
-// status and the stamping actions arrive in later slices.
+// Popup panel toggled from the bar icon: login state, shift status and
+// clocking in/out. Clocking out means Feierabend (js/shiftclock.mjs).
 Panel {
     id: root
     moduleName: "kosh.calamari-tracker"
@@ -14,6 +15,8 @@ Panel {
     property var service: null
     readonly property string authState: service ? service.authState : "unknown"
     readonly property bool loggingIn: service ? service.loggingIn === true : false
+    readonly property var view: service ? service.barView : null
+    readonly property var stampAction: authState === "ok" && view !== null ? ShiftClock.stampAction(view) : null
 
     onOpenedChanged: {
         if (root.opened && root.service)
@@ -79,12 +82,32 @@ Panel {
                     font.family: Style.font.family
                     font.pixelSize: Style.font.body
                     readonly property var shift: root.service ? root.service.shiftState : null
-                    readonly property var view: root.service ? root.service.barView : null
+                    readonly property var view: root.view
                     text: !view || view.kind === "unknown" ? "Schichtstatus wird abgefragt …"
                         : view.kind === "error" ? "Schichtstatus unbekannt"
-                        : view.kind === "idle" ? "Keine laufende Schicht"
+                        : view.kind === "idle" ? (shift.clockedOutAt ? "Feierabend seit " + shift.clockedOutAt : "Keine laufende Schicht")
                         : shift.startedAt ? "Schicht läuft seit " + shift.startedAt + " (" + view.text + ")"
                         : "Schicht läuft"
+                }
+
+                Button {
+                    visible: root.stampAction !== null
+                    enabled: root.service !== null && !root.service.busy
+                    readonly property bool clockOut: root.stampAction === "clock-out"
+                    text: root.service && root.service.stamping ? (clockOut ? "Stemple aus …" : "Stemple ein …")
+                        : clockOut ? "Ausstempeln" : "Einstempeln"
+                    bordered: true
+                    onClicked: root.service.stamp(root.stampAction)
+                }
+
+                Text {
+                    width: parent.width
+                    visible: root.service !== null && root.service.stampError !== ""
+                    wrapMode: Text.Wrap
+                    color: Color.urgent
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.body
+                    text: root.service ? root.service.stampError : ""
                 }
 
                 Text {
