@@ -27,6 +27,7 @@ class CalamariCliTest(unittest.TestCase):
         env = dict(os.environ,
                    CALAMARI_BASE_URL=base_url or self.fake.base_url,
                    CALAMARI_KEYRING_FILE=str(self.keyring),
+                   CALAMARI_NOW=self.fake.now,
                    BROWSER="%s %s %%s" % (sys.executable, FAKE_BROWSER))
         return subprocess.Popen([sys.executable, str(HELPER), *args], env=env,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -157,6 +158,64 @@ class CalamariCliTest(unittest.TestCase):
 
     def test_without_login_auth_is_required(self):
         self.assert_error(self.run_helper("whoami"), "AUTH_REQUIRED")
+
+    # Schichtstatus
+
+    def test_status_sees_a_running_shift(self):
+        self.login()
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+
+        code, out = self.run_helper("status")
+
+        self.assertEqual((code, out), (0, {"ok": True, "running": True}))
+
+    def test_status_without_shift_is_not_running(self):
+        self.login()
+        self.fake.shifts = [("2026-09-22", "08:00:00", "12:00:00")]
+
+        code, out = self.run_helper("status")
+
+        self.assertEqual((code, out), (0, {"ok": True, "running": False}))
+
+    def test_status_still_sees_a_shift_ended_a_minute_ago(self):
+        # Accepted lag of the overlap trick (docs/adr/0001): the window looks
+        # back two minutes.
+        self.login()
+        self.fake.shifts = [("2026-09-22", "08:00:00", "13:59:00")]
+
+        code, out = self.run_helper("status")
+
+        self.assertEqual((code, out), (0, {"ok": True, "running": True}))
+
+    def test_start_time_finds_the_start_minute_of_the_running_shift(self):
+        self.login()
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+
+        code, out = self.run_helper("start-time")
+
+        self.assertEqual((code, out), (0, {"ok": True, "startedAt": "09:40"}))
+        self.assertLessEqual(self.fake.overlap_calls, 12)
+        self.assertEqual(len(self.fake.sessions), 1)
+
+    def test_start_time_after_a_break_finds_the_later_shift(self):
+        self.login()
+        self.fake.shifts = [("2026-09-22", "08:00:10", "12:00:00"),
+                            ("2026-09-22", "12:45:20", None)]
+
+        code, out = self.run_helper("start-time", "--after", "12:30")
+
+        self.assertEqual((code, out), (0, {"ok": True, "startedAt": "12:45"}))
+
+    def test_start_time_without_running_shift_is_null(self):
+        self.login()
+        self.fake.shifts = [("2026-09-22", "08:00:00", "12:00:00")]
+
+        code, out = self.run_helper("start-time", "--after", "12:30")
+
+        self.assertEqual((code, out), (0, {"ok": True, "startedAt": None}))
+
+    def test_start_time_rejects_a_malformed_after(self):
+        self.assert_error(self.run_helper("start-time", "--after", "7 Uhr"), "USAGE")
 
     # Other failures
 

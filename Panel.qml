@@ -17,7 +17,7 @@ Panel {
 
     onOpenedChanged: {
         if (root.opened && root.service)
-            root.service.refreshIdentity()
+            root.service.poll()
     }
     readonly property var barIdentity: hostWidget || root
 
@@ -73,7 +73,23 @@ Panel {
 
                 Text {
                     width: parent.width
-                    visible: root.authState !== "ok" && root.service !== null && root.service.errorMessage !== "" && !root.loggingIn
+                    visible: root.authState === "ok" && root.service !== null
+                    wrapMode: Text.Wrap
+                    color: Color.foreground
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.body
+                    readonly property var shift: root.service ? root.service.shiftState : null
+                    readonly property var view: root.service ? root.service.barView : null
+                    text: !view || view.kind === "unknown" ? "Schichtstatus wird abgefragt …"
+                        : view.kind === "error" ? "Schichtstatus unbekannt"
+                        : view.kind === "idle" ? "Keine laufende Schicht"
+                        : shift.startedAt ? "Schicht läuft seit " + shift.startedAt + " (" + view.text + ")"
+                        : "Schicht läuft"
+                }
+
+                Text {
+                    width: parent.width
+                    visible: root.service !== null && root.service.errorMessage !== "" && !root.loggingIn
                     wrapMode: Text.Wrap
                     color: Color.urgent
                     font.family: Style.font.family

@@ -11,10 +11,14 @@ Environment:
   CALAMARI_BASE_URL      gateway base URL (tests point it at a fake)
   CALAMARI_KEYRING_FILE  keep secrets in this JSON file instead of the
                          Secret Service keyring (tests only)
+  CALAMARI_NOW           local time "YYYY-MM-DDTHH:MM[:SS]" instead of the
+                         clock (tests only)
   BROWSER                command that opens the login URL (default xdg-open)
 """
 
+import argparse
 import base64
+import datetime
 import fcntl
 import hashlib
 import json
@@ -243,7 +247,7 @@ def open_browser(url):
         pass  # the URL is on stderr as a fallback
 
 
-def login():
+def login(args):
     meta = discover()
     if "registration_endpoint" not in meta:
         raise HelperError("LOGIN_FAILED", "the authorization server offers no client registration")
@@ -431,38 +435,121 @@ class McpClient:
             return text
 
 
-def call_tool(name, arguments=None):
-    """One MCP session for one tool call, refreshing the token once on 401."""
+def with_mcp(work):
+    """Runs work(client) in one MCP session, refreshing the token once on 401."""
     session = Session()
     for attempt in range(2):
         try:
             client = McpClient(session)
             client.open()
-            return client.call_tool(name, arguments or {})
+            return work(client)
         except Unauthorized:
             if attempt == 0:
                 session.refresh()
     raise HelperError("AUTH_REQUIRED", "Calamari rejects the refreshed token, run `calamari login`")
 
 
+# Schichtstatus via checkTimesheetOverlap, see docs/adr/0001: a running shift
+# counts as an entry up to now, so an overlap with the last minutes means it
+# runs. Windows are whole minutes; touching ends do not overlap.
+
+STATUS_WINDOW = 2
+
+
+def now():
+    fixed = os.environ.get("CALAMARI_NOW")
+    return datetime.datetime.fromisoformat(fixed) if fixed else datetime.datetime.now()
+
+
+def hhmm(minute):
+    return "%02d:%02d" % divmod(minute, 60)
+
+
+def parse_hhmm(text):
+    try:
+        t = datetime.datetime.strptime(text, "%H:%M")
+    except ValueError:
+        raise HelperError("USAGE", "expected HH:MM, got %r" % text)
+    return t.hour * 60 + t.minute
+
+
+def overlaps(client, date, start, end):
+    dates = client.call_tool("checkTimesheetOverlap", {
+        "entries": [{"date": date, "fromTime": hhmm(start), "toTime": hhmm(end)}],
+        "skipNotEligibleDays": False,
+    })
+    if not isinstance(dates, list):
+        raise HelperError("MCP_ERROR", "checkTimesheetOverlap: unexpected answer %r" % (dates,))
+    return date in dates
+
+
+def today_and_minute():
+    t = now()
+    return t.strftime("%Y-%m-%d"), t.hour * 60 + t.minute
+
+
 # Commands
 
 
-def whoami():
-    profile = call_tool("getMyProfile")
+def whoami(args):
+    profile = with_mcp(lambda c: c.call_tool("getMyProfile", {}))
     if not isinstance(profile, dict) or not profile.get("name"):
         raise HelperError("MCP_ERROR", "getMyProfile: unexpected answer %r" % (profile,))
     return {"name": profile["name"], "email": profile.get("email"), "personUuid": profile.get("personUuid")}
 
 
-COMMANDS = {"login": login, "whoami": whoami}
+def status(args):
+    date, minute = today_and_minute()
+    end = max(minute, 1)
+    return {"running": with_mcp(lambda c: overlaps(c, date, max(end - STATUS_WINDOW, 0), end))}
+
+
+def start_time(args):
+    """Bisects the first minute x after --after where [after, x] overlaps. The
+    shift began during minute x - 1 (verified against a real shift)."""
+    date, minute = today_and_minute()
+    after = parse_hhmm(args.after) if args.after else 0
+    if after >= minute:
+        return {"startedAt": None}
+
+    def search(client):
+        if not overlaps(client, date, after, minute):
+            return None
+        lo, hi = after + 1, minute
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if overlaps(client, date, after, mid):
+                hi = mid
+            else:
+                lo = mid + 1
+        return hhmm(lo - 1)
+
+    return {"startedAt": with_mcp(search)}
+
+
+class _Parser(argparse.ArgumentParser):
+    def error(self, message):
+        raise HelperError("USAGE", message)
+
+
+def parse_args(argv):
+    parser = _Parser(prog="calamari", add_help=False)
+    commands = parser.add_subparsers(dest="command", required=True, parser_class=_Parser)
+    for name, run in COMMANDS.items():
+        sub = commands.add_parser(name, add_help=False)
+        sub.set_defaults(run=run)
+        if name == "start-time":
+            sub.add_argument("--after", metavar="HH:MM")
+    return parser.parse_args(argv)
+
+
+COMMANDS = {"login": login, "whoami": whoami, "status": status, "start-time": start_time}
 
 
 def main(argv):
     try:
-        if len(argv) != 1 or argv[0] not in COMMANDS:
-            raise HelperError("USAGE", "usage: calamari {%s}" % ",".join(COMMANDS))
-        out = dict(ok=True, **COMMANDS[argv[0]]())
+        args = parse_args(argv)
+        out = dict(ok=True, **args.run(args))
         code = 0
     except HelperError as e:
         out, code = {"ok": False, "error": {"code": e.code, "message": e.message}}, 1

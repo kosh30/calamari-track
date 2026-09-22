@@ -33,6 +33,11 @@ class FakeCalamari:
         self.protocol_version = None  # answer initialize with this version instead of echoing
         self.tool_error = False
         self.mcp_status = None  # force an HTTP status on MCP calls, e.g. 429
+        # Timesheet entries as (date, "HH:MM:SS" start, "HH:MM:SS" end or None
+        # while running). A running entry lasts until `now`, which the tests
+        # also hand to the helper (CALAMARI_NOW).
+        self.now = "2026-09-22T14:00:00"
+        self.shifts = []
         # Shape of the real getMyProfile answer (trimmed).
         self.profile = {"personUuid": "00000000-0000-4000-8000-000000000001", "legacyId": 1,
                         "name": "Erika Mustermann", "email": "erika@example.com",
@@ -50,6 +55,7 @@ class FakeCalamari:
         self.session_versions = {}
         self.token_requests = []
         self.tool_calls = []
+        self.overlap_calls = 0
 
     def __enter__(self):
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
@@ -208,10 +214,31 @@ class _Handler(BaseHTTPRequestHandler):
             self.fake.tool_calls.append((name, msg["params"].get("arguments")))
             if self.fake.tool_error:
                 return self._reply(msg["id"], {"isError": True, "content": [{"type": "text", "text": "boom"}]})
+            if name == "checkTimesheetOverlap":
+                return self._overlap(msg["id"], msg["params"]["arguments"])
             if name == "getMyProfile":
                 return self._reply(msg["id"], {"content": [{"type": "text", "text": json.dumps(self.fake.profile)}]})
             return self._reply(msg["id"], error={"code": -32602, "message": "Unknown tool " + name})
         self._reply(msg.get("id"), error={"code": -32601, "message": "Method not found"})
+
+    def _overlap(self, msg_id, args):
+        """Mimics Calamari: an entry overlaps a window if they share any instant
+        (touching ends do not count), a running entry reaches up to now."""
+        def secs(hms):
+            h, m, *s = (int(p) for p in hms.split(":"))
+            return h * 3600 + m * 60 + (s[0] if s else 0)
+        today, now = self.fake.now.split("T")
+        dates = []
+        for e in args["entries"]:
+            a, b = secs(e["fromTime"]), secs(e["toTime"])
+            if len(e["fromTime"]) != 5 or len(e["toTime"]) != 5 or a >= b:
+                return self._reply(msg_id, {"isError": True, "content": [{"type": "text", "text": "bad entry %r" % e}]})
+            for date, start, end in self.fake.shifts:
+                end_s = secs(end) if end else (secs(now) if date == today else 86400)
+                if date == e["date"] and a < end_s and secs(start) < b and date not in dates:
+                    dates.append(date)
+        self.fake.overlap_calls += 1
+        return self._reply(msg_id, {"content": [{"type": "text", "text": json.dumps(dates)}], "isError": False})
 
     def _reply(self, msg_id, result=None, headers=None, error=None):
         payload = {"jsonrpc": "2.0", "id": msg_id}

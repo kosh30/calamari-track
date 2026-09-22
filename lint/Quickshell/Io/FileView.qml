@@ -6,16 +6,24 @@ QtObject {
     property string path: ""
     property bool printErrors: false
     property bool atomicWrites: false
+    property bool watchChanges: true
     default property FileViewAdapter adapter
 
     signal adapterUpdated
     signal loaded
-    signal loadFailed
+    signal loadFailed(var error)
     signal saveFailed(var error)
 
     function reload() {
     }
 
     function writeAdapter() {
+    }
+
+    function text(): string {
+        return ""
+    }
+
+    function setText(text: string) {
     }
 }
