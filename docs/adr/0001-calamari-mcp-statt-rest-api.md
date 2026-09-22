@@ -12,3 +12,9 @@ Der MCP-Server bietet (Stand 2026-09-22) weniger als die REST-API. Daraus folgen
 - `createTimesheetEntries` (nachträgliches Eintragen) wurde als Hauptweg verworfen. Tagsüber sähe man in Calamari keinen Live-Status, beim Stempeln per Handy oder Web entstünden Duplikate, und Einträge könnten eine Manager-Genehmigung brauchen.
 
 Sobald der MCP-Server Status-, Pausen- oder Zeitparameter nachliefert, sollten diese Umwege ersetzt werden.
+
+Der Stand der Tools vom 2026-09-22 liegt in `docs/mcp-tools.json`: 17 Tools, keins davon kennt Pausen, `clockIn` und `clockOut` nehmen keine Argumente, und kein Tool liest Timesheet-Einträge. Ob Calamari etwas geändert hat, zeigt:
+
+```
+diff <(bin/calamari tools | python3 -m json.tool --sort-keys --no-ensure-ascii) docs/mcp-tools.json
+```

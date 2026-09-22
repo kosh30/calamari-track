@@ -439,6 +439,18 @@ class CalamariCliTest(unittest.TestCase):
     def test_day_info_rejects_a_malformed_date(self):
         self.assert_error(self.run_helper("day-info", "--date", "22.09.2026"), "USAGE")
 
+    # Tool-Liste
+
+    def test_tools_lists_the_mcp_tools_sorted_by_name(self):
+        self.login()
+
+        code, out = self.run_helper("tools")
+
+        self.assertEqual(code, 0)
+        self.assertEqual([t["name"] for t in out["tools"]],
+                         ["checkTimesheetOverlap", "clockIn", "clockOut", "getMyProfile"])
+        self.assertEqual(out["tools"][1]["description"], "fake clockIn")
+
     # Other failures
 
     def test_rate_limit_is_reported(self):

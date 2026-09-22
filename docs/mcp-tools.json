@@ -1,0 +1,542 @@
+{
+    "ok": true,
+    "tools": [
+        {
+            "annotations": {
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": true,
+                "readOnlyHint": false,
+                "title": ""
+            },
+            "description": "Checks warnings for a planned absence request BEFORE creating it. Call this tool before createAbsenceRequest to verify if there are any issues (e.g. insufficient leave balance, overlapping requests, policy violations). If warnings are returned, present them to the user and ask for explicit confirmation before proceeding.",
+            "inputSchema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "properties": {
+                    "absenceTypeId": {
+                        "format": "int32",
+                        "type": "integer"
+                    },
+                    "endDate": {
+                        "type": "string"
+                    },
+                    "fromPart": {
+                        "type": "string"
+                    },
+                    "startDate": {
+                        "type": "string"
+                    },
+                    "substituteEmployeeId": {
+                        "format": "int64",
+                        "type": "integer"
+                    },
+                    "toPart": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "absenceTypeId",
+                    "startDate",
+                    "endDate"
+                ],
+                "type": "object"
+            },
+            "name": "checkAbsenceRequestRestrictions",
+            "title": "checkAbsenceRequestRestrictions"
+        },
+        {
+            "annotations": {
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": true,
+                "readOnlyHint": false,
+                "title": ""
+            },
+            "description": "Checks if the requested timesheet entries would overlap with existing entries.\n\n        This tool should be called BEFORE creating timesheet entries to detect potential duplicates.\n        It validates whether the proposed entries would overlap with any existing timesheet\n        entries for the authenticated user.\n\n        IMPORTANT: Use the same skipNotEligibleDays value when calling createTimesheetEntries.\n\n        If overlaps are found:\n        - Alert the user with the exact list of overlapping dates\n        - Ask the user to confirm whether they want to create duplicate entries anyway\n        - The user can choose to proceed with creation despite the overlaps\n\n        Parameters:\n        - entries: List of timesheet entries to check, each containing:\n          * date (YYYY-MM-DD): The work date\n          * from (HH:mm): Start time (e.g., 09:00)\n          * to (HH:mm): End time (e.g., 17:00), must be after 'from'\n          * description (optional): Work description or notes\n        - skipNotEligibleDays (optional, default: true): When true, fills in attendance only\n          for working days based on the established work schedule, skipping:\n          * non-working days\n          * planned absences\n          * days with previously added attendance\n          * holidays\n          * days before the employment start date\n          * days after the termination date\n          Set to false to check all dates.\n\n        Returns: List of dates (YYYY-MM-DD format) that have overlapping entries.\n        An empty list means no overlaps were found and it's safe to create the entries.\n\n        Example: Check if entries for a work week would overlap with existing entries.",
+            "inputSchema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "properties": {
+                    "entries": {
+                        "items": {
+                            "properties": {
+                                "date": {
+                                    "type": "string"
+                                },
+                                "description": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "fromTime": {
+                                    "type": "string"
+                                },
+                                "toTime": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "date",
+                                "fromTime",
+                                "toTime"
+                            ],
+                            "type": "object"
+                        },
+                        "type": "array"
+                    },
+                    "skipNotEligibleDays": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "entries"
+                ],
+                "type": "object"
+            },
+            "name": "checkTimesheetOverlap",
+            "title": "checkTimesheetOverlap"
+        },
+        {
+            "annotations": {
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": true,
+                "readOnlyHint": false,
+                "title": ""
+            },
+            "description": "Clock in to start new shift",
+            "inputSchema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "properties": {},
+                "required": [],
+                "type": "object"
+            },
+            "name": "clockIn",
+            "title": "clockIn"
+        },
+        {
+            "annotations": {
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": true,
+                "readOnlyHint": false,
+                "title": ""
+            },
+            "description": "Clock out to finish started shift",
+            "inputSchema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "properties": {},
+                "required": [],
+                "type": "object"
+            },
+            "name": "clockOut",
+            "title": "clockOut"
+        },
+        {
+            "annotations": {
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": true,
+                "readOnlyHint": false,
+                "title": ""
+            },
+            "description": "Creates a new absence request for the current user. Before calling this, call getAbsenceTypes to learn the absence type's configuration: substituteRequirement (DISABLED/OPTIONAL/REQUIRED), reasonRequirement (DISABLED/OPTIONAL/REQUIRED), commentRequirement (DISABLED/OPTIONAL/REQUIRED), predefinedReasons, unit (DAYS or HOURS) and minDuration (WHOLE_DAY, HALF_DAY, HALF, QUARTER, TWO or WHOLE). IMPORTANT: After gathering parameters, you MUST call checkAbsenceRequestRestrictions with the same absenceTypeId, startDate, endDate, substituteEmployeeId, fromPart and toPart (if applicable) BEFORE creating the request. If it returns any warnings, present them to the user and ask for explicit confirmation before proceeding. Parameters: absenceTypeId (from getAbsenceTypes), startDate and endDate in YYYY-MM-DD format, reason (respect reasonRequirement; when predefinedReasons is non-empty, prefer one of its values; MUST be provided when reasonRequirement is REQUIRED, MAY be provided when OPTIONAL, MUST be omitted when DISABLED), comment (free text; respect commentRequirement: MUST be provided when commentRequirement is REQUIRED (ask the user for a comment if not given), MAY be provided when OPTIONAL, MUST be omitted when DISABLED), substituteEmployeeId (the legacyId of the substitute, obtained via searchPeople; MUST be provided when substituteRequirement is REQUIRED, MAY be provided when OPTIONAL, MUST be omitted when DISABLED), fromPart and toPart for half-day or hourly absences. When the user wants a part-day or hourly absence, FIRST call getPartDayPossibility to discover allowed values, then pass them here. Pass MORNING, AFTERNOON or END_OF_DAY for half-day presets, or HH:mm (e.g. 09:30) for specific hours. Hours are allowed only when startDate == endDate (single-day requests). CRITICAL: If the user explicitly requests a part-day or hourly absence, but the absence type's minDuration is WHOLE_DAY or WHOLE, DO NOT automatically submit a whole-day request. You MUST stop, inform the user that partial requests are not allowed for this type, and ask for their permission before submitting a whole-day request. Skip getPartDayPossibility and omit fromPart/toPart ONLY when the user explicitly wants a whole-day absence. Returns confirmation of the created absence request.",
+            "inputSchema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "properties": {
+                    "absenceTypeId": {
+                        "format": "int32",
+                        "type": "integer"
+                    },
+                    "comment": {
+                        "type": "string"
+                    },
+                    "endDate": {
+                        "type": "string"
+                    },
+                    "fromPart": {
+                        "type": "string"
+                    },
+                    "reason": {
+                        "type": "string"
+                    },
+                    "startDate": {
+                        "type": "string"
+                    },
+                    "substituteEmployeeId": {
+                        "format": "int64",
+                        "type": "integer"
+                    },
+                    "toPart": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "absenceTypeId",
+                    "startDate",
+                    "endDate"
+                ],
+                "type": "object"
+            },
+            "name": "createAbsenceRequest",
+            "title": "createAbsenceRequest"
+        },
+        {
+            "annotations": {
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": true,
+                "readOnlyHint": false,
+                "title": ""
+            },
+            "description": "Creates multiple timesheet entries in bulk for the authenticated user.\n\n        IMPORTANT: Before creating entries, you MUST first call checkTimesheetOverlap to verify\n        that the requested entries do not overlap with existing timesheet entries.\n        The skipNotEligibleDays value MUST be the same in both calls.\n\n        If checkTimesheetOverlap returns any overlapping dates:\n        - Alert the user with the exact list of overlapping dates\n        - Ask the user to confirm whether they want to create duplicate entries anyway\n        - Only proceed with creation if the user explicitly confirms\n\n        Parameters:\n        - entries: List of timesheet entries, each containing:\n          * date (YYYY-MM-DD): The work date\n          * from (HH:mm): Start time (e.g., 09:00)\n          * to (HH:mm): End time (e.g., 17:00), must be after 'from'\n          * description (optional): Work description or notes\n        - skipNotEligibleDays (optional, default: true): When true, fills in attendance only\n          for working days based on the established work schedule, skipping:\n          * non-working days\n          * planned absences\n          * days with previously added attendance\n          * holidays\n          * days before the employment start date\n          * days after the termination date\n          Set to false to attempt creating entries on all dates.\n\n        Returns: Change mode indicating how the entries were processed:\n        - IMMEDIATE: Entries were created immediately\n        - CHANGE_REQUEST: Entries require approval (e.g. by manager) before being applied\n\n        Example: Create entries for a work week with 9:00-17:00 hours each day,\n        automatically skipping non-eligible days.",
+            "inputSchema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "properties": {
+                    "entries": {
+                        "items": {
+                            "properties": {
+                                "date": {
+                                    "type": "string"
+                                },
+                                "description": {
+                                    "type": [
+                                        "string",
+                                        "null"
+                                    ]
+                                },
+                                "fromTime": {
+                                    "type": "string"
+                                },
+                                "toTime": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "date",
+                                "fromTime",
+                                "toTime"
+                            ],
+                            "type": "object"
+                        },
+                        "type": "array"
+                    },
+                    "skipNotEligibleDays": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "entries"
+                ],
+                "type": "object"
+            },
+            "name": "createTimesheetEntries",
+            "title": "createTimesheetEntries"
+        },
+        {
+            "annotations": {
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": true,
+                "readOnlyHint": false,
+                "title": ""
+            },
+            "description": "Gets absence allowances (entitlements) for the authenticated user, grouped by\n        calendar year and absence type.\n\n        Use this to answer questions like \"how many vacation days do I have left\" or\n        \"what is my sick leave allowance this year\".\n\n        Returns: A list of yearly allowances, each containing:\n        - calendarYear: The calendar year the allowances apply to\n        - typeAllowances: List of allowances per absence type, each containing:\n            * absenceTypeId / absenceTypeName: The absence type\n            * firstDayOfAbsenceYear / lastDayOfAbsenceYear: The absence year period boundaries\n            (may differ from the calendar year, e.g. for anniversary-based allowances). May be null\n            (e.g. for hire-date based allowances if the hire date is unknown).\n            * unit: The unit the allowance is measured in (e.g. DAYS, HOURS)\n            * entitlementType: ACCRUED (a numeric allowance builds up over time), UNLIMITED\n            (no fixed allowance), or UNDEFINED (not specified)\n            * earned: The total entitlement for the absence year.\n            * used: Only counts approved, confirmed absences. Does not include pending requests.\n            * pending: Absences that have been submitted but not yet approved.\n            * allowed: The effective remaining balance—what the user can actually request now without exceeding their entitlement.\n          ",
+            "inputSchema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "properties": {},
+                "required": [],
+                "type": "object"
+            },
+            "name": "getAbsenceAllowances",
+            "title": "getAbsenceAllowances"
+        },
+        {
+            "annotations": {
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": true,
+                "readOnlyHint": false,
+                "title": ""
+            },
+            "description": "Gets absence allowances (entitlements) for a specific employee identified by\n        employeeId, grouped by calendar year and absence type. Same response shape as\n        getAbsenceAllowances, but for another employee instead of the authenticated user.\n\n        The caller must be an admin, the employee themselves, or (if enabled) their manager;\n        otherwise the call is rejected.\n\n        Use this to answer questions like \"how many vacation days does <employee> have left\".\n\n        Returns: A list of yearly allowances, each containing:\n        - calendarYear: The calendar year the allowances apply to\n        - typeAllowances: List of allowances per absence type, each containing:\n            * absenceTypeId / absenceTypeName: The absence type\n            * firstDayOfAbsenceYear / lastDayOfAbsenceYear: The absence year period boundaries\n            (may differ from the calendar year, e.g. for anniversary-based allowances). May be null\n            (e.g. for hire-date based allowances if the hire date is unknown).\n            * unit: The unit the allowance is measured in (e.g. DAYS, HOURS)\n            * entitlementType: ACCRUED (a numeric allowance builds up over time), UNLIMITED\n            (no fixed allowance), or UNDEFINED (not specified)\n            * earned: The total entitlement for the absence year.\n            * used: Only counts approved, confirmed absences. Does not include pending requests.\n            * pending: Absences that have been submitted but not yet approved.\n            * allowed: The effective remaining balance—what the employee can actually request now\n            without exceeding their entitlement.\n          ",
+            "inputSchema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "properties": {
+                    "employeeId": {
+                        "format": "int64",
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "employeeId"
+                ],
+                "type": "object"
+            },
+            "name": "getAbsenceAllowancesForEmployee",
+            "title": "getAbsenceAllowancesForEmployee"
+        },
+        {
+            "annotations": {
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": true,
+                "readOnlyHint": false,
+                "title": ""
+            },
+            "description": "Retrieves absence types available to the current user when creating an absence request. For each absence type the response includes: ID, name, substituteRequirement, reasonRequirement, commentRequirement, predefinedReasons, unit and minDuration. substituteRequirement, reasonRequirement and commentRequirement are each one of DISABLED, OPTIONAL or REQUIRED and MUST be respected when calling createAbsenceRequest: REQUIRED means the field must be provided, OPTIONAL means it may be provided, DISABLED means the field must be omitted. When substituteRequirement is REQUIRED or OPTIONAL, use the searchPeople tool to find a substitute and pass their legacyId as substituteEmployeeId in createAbsenceRequest. When commentRequirement is REQUIRED, you MUST ask the user for a comment and pass it as the 'comment' parameter of createAbsenceRequest. When predefinedReasons is non-empty, prefer asking the user to pick one of those values as the reason; if the user wants something else, a free-text reason is still accepted (unless predefinedReasons is exhaustive per the user's intent). unit is DAYS or HOURS and indicates the absence type's natural duration unit. minDuration is one of WHOLE_DAY, HALF_DAY, HALF, QUARTER, TWO or WHOLE and indicates the smallest part of the day that can be requested. If minDuration is WHOLE_DAY or WHOLE the type does NOT support partial requests — skip getPartDayPossibility and call createAbsenceRequest WITHOUT fromPart and toPart. Otherwise, when the user wants a part-day or hourly absence, first call getPartDayPossibility to discover allowed fromPart/toPart values.",
+            "inputSchema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "properties": {},
+                "required": [],
+                "type": "object"
+            },
+            "name": "getAbsenceTypes",
+            "title": "getAbsenceTypes"
+        },
+        {
+            "annotations": {
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": true,
+                "readOnlyHint": false,
+                "title": ""
+            },
+            "description": "Returns the authenticated user's own profile: identity (personUuid, legacyId, name, email), work info (position, contract type, hire date, probation end date, termination date, time zone), direct manager, team membership (id + name) and roles. Use this to answer 'who am I', 'what is my contract', 'who is my manager', 'when was I hired', 'what teams do I belong to' and similar self-referential queries. Does not accept any parameters — always returns the profile of the user who initiated the MCP session.",
+            "inputSchema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "properties": {},
+                "required": [],
+                "type": "object"
+            },
+            "name": "getMyProfile",
+            "title": "getMyProfile"
+        },
+        {
+            "annotations": {
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": true,
+                "readOnlyHint": false,
+                "title": ""
+            },
+            "description": "Discovers which half-day presets and concrete hours can be used as fromPart and toPart when calling createAbsenceRequest for a part-day or hourly absence. Call this BEFORE createAbsenceRequest only when the user wants part of the day or specific hours. Skip this tool when the absence type's minDuration (from getAbsenceTypes) is WHOLE_DAY or WHOLE — such types do not support partial requests. Parameters: absenceTypeId (from getAbsenceTypes), startDate and endDate in YYYY-MM-DD format. Hours are returned only for single-day requests (startDate == endDate); for multi-day requests only presets are returned. Response semantics: canRequestParts=false means the absence type does not allow partial requests for this date range — fall back to createAbsenceRequest WITHOUT fromPart and toPart. Each entry in fromValues/toValues has type, value and label. When type is MORNING, AFTERNOON or END_OF_DAY, pass that type literal as fromPart/toPart in createAbsenceRequest (e.g. \"MORNING\"). When type is HOUR, pass the value (HH:mm string, e.g. \"09:30\") as fromPart/toPart. The label is localized text for display only — do NOT use it to make decisions or pass to createAbsenceRequest, always use type or value. Optional parameters fromPart and toPart: when the user has already indicated the start and/or end of the absence — either a half-day preset (MORNING, AFTERNOON, END_OF_DAY) or a concrete hour (HH:mm, e.g. \"12:15\") — pass them here so the returned toValues (and fromValues) are narrowed to the values that are actually valid given that choice. Use the same value format as for createAbsenceRequest: the type literal for presets, or the HH:mm string for hours.",
+            "inputSchema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "properties": {
+                    "absenceTypeId": {
+                        "format": "int32",
+                        "type": "integer"
+                    },
+                    "endDate": {
+                        "type": "string"
+                    },
+                    "fromPart": {
+                        "type": "string"
+                    },
+                    "startDate": {
+                        "type": "string"
+                    },
+                    "toPart": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "absenceTypeId",
+                    "startDate",
+                    "endDate"
+                ],
+                "type": "object"
+            },
+            "name": "getPartDayPossibility",
+            "title": "getPartDayPossibility"
+        },
+        {
+            "annotations": {
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": true,
+                "readOnlyHint": false,
+                "title": ""
+            },
+            "description": "Returns the user's public holidays in [from, to] (YYYY-MM-DD), based on the holiday calendar assigned to the user. A day listed here is non-working: submitting an absence request that overlaps such a day does NOT reduce the user's leave balance for that day. Each entry has: name, start, end, halfDay and halfdayPeriod (AM or PM when halfDay=true). Use this tool when planning absences (to identify days that don't consume the leave balance) or when answering questions like 'is X a public holiday?'. Combine with getWorkPlan to also account for the user's non-working days according to their schedule.",
+            "inputSchema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "properties": {
+                    "from": {
+                        "type": "string"
+                    },
+                    "to": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "from",
+                    "to"
+                ],
+                "type": "object"
+            },
+            "name": "getPublicHolidays",
+            "title": "getPublicHolidays"
+        },
+        {
+            "annotations": {
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": true,
+                "readOnlyHint": false,
+                "title": ""
+            },
+            "description": "Lists members of a single team identified by teamId, returning each member's personUuid, name, email and position. The team's name is included in the response as a header for context. Use listTeams first to find the teamId. Members are paginated via offset (default 0) and limit (default 50). The response includes totalCount and, when there are more members, a nextOffset hint — call the tool again with that offset to get the next page. Use the returned personUuids with searchAbsenceRequests to find absences of specific team members, or pass the teamId directly to searchAbsenceRequests/searchPeople via their teamIds parameter.",
+            "inputSchema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "properties": {
+                    "limit": {
+                        "format": "int32",
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "format": "int32",
+                        "type": "integer"
+                    },
+                    "teamId": {
+                        "format": "int64",
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "teamId"
+                ],
+                "type": "object"
+            },
+            "name": "getTeamMembers",
+            "title": "getTeamMembers"
+        },
+        {
+            "annotations": {
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": true,
+                "readOnlyHint": false,
+                "title": ""
+            },
+            "description": "Returns the user's static weekly work schedule (same every week). For each day MONDAY..SUNDAY: workingDay flag, startTime, finishTime (both null on non-working days), and durationSeconds (null on non-working days). A day with workingDay=false is a non-working day according to the user's schedule: submitting an absence request that overlaps such a day does NOT reduce the user's leave balance for that day. Combine with getPublicHolidays to identify all days in a range that don't consume the leave balance, which is essential when planning the cheapest absence.",
+            "inputSchema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "properties": {},
+                "required": [],
+                "type": "object"
+            },
+            "name": "getWorkPlan",
+            "title": "getWorkPlan"
+        },
+        {
+            "annotations": {
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": true,
+                "readOnlyHint": false,
+                "title": ""
+            },
+            "description": "Lists teams accessible to the authenticated user as a flat list of (teamId, teamName). Each team the authenticated user personally belongs to is marked with the literal `[member]` suffix; other accessible teams have no suffix — useful to answer 'what are MY teams' by reading the marker. Results are paginated via offset (default 0) and limit (default 50). The response includes totalCount and, when there are more results, a nextOffset hint — call the tool again with that offset to get the next page. Use the returned teamIds with getTeamMembers to list members of a team, or with searchAbsenceRequests/searchPeople to filter by team.",
+            "inputSchema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "properties": {
+                    "limit": {
+                        "format": "int32",
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "format": "int32",
+                        "type": "integer"
+                    }
+                },
+                "required": [],
+                "type": "object"
+            },
+            "name": "listTeams",
+            "title": "listTeams"
+        },
+        {
+            "annotations": {
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": true,
+                "readOnlyHint": false,
+                "title": ""
+            },
+            "description": "Searches for absence requests by given time range, optionally narrowed to a list of peopleUuids, a list of teamIds, or both. Returns a list of matching absence requests with their data: user id, avatar URL, first and last name, category (either TIMEOFF or WORK), whether the request is for full day and start and end of this request. When peopleUuids is provided, only absences of those people are returned. When teamIds is provided, only absences of members of those teams are returned (obtain teamIds via listTeams). When both peopleUuids and teamIds are provided, the filters are intersected: only absences of people who are both in peopleUuids AND members of at least one of the listed teams are returned. When both are omitted, all company absences visible to the user are returned. Results are paginated. If there are more results, the response will include a cursor value. To load the next page, call this tool again with the same from/to (and the same peopleUuids/teamIds, if used) and the returned cursor. If the user does not ask for more, suggest reviewing the full list in the Calamari web or mobile app.",
+            "inputSchema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "properties": {
+                    "cursor": {
+                        "type": "string"
+                    },
+                    "from": {
+                        "type": "string"
+                    },
+                    "peopleUuids": {
+                        "items": {
+                            "type": "string"
+                        },
+                        "type": "array"
+                    },
+                    "teamIds": {
+                        "items": {
+                            "format": "int64",
+                            "type": "integer"
+                        },
+                        "type": "array"
+                    },
+                    "to": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "from",
+                    "to"
+                ],
+                "type": "object"
+            },
+            "name": "search",
+            "title": "search"
+        },
+        {
+            "annotations": {
+                "destructiveHint": true,
+                "idempotentHint": false,
+                "openWorldHint": true,
+                "readOnlyHint": false,
+                "title": ""
+            },
+            "description": "Searches non-archived people in the current tenant. Filters are combined with AND: pass 'query' for a free-text match on first name, last name or email; pass 'teamIds' to limit results to members of the given teams (obtain teamIds via listTeams). When both are omitted, all non-archived people in the tenant are returned (paginated). Use this tool to find a substitute when creating an absence request whose absence type has substituteRequirement equal to REQUIRED or OPTIONAL — pass the legacyId from the result as the substituteEmployeeId parameter of createAbsenceRequest. Results are paginated via offset (default 0) and limit (default 20, max 50). The response includes totalCount and, when there are more results, a nextOffset hint — call the tool again with that offset to get the next page. Only people with a legacyId are returned.",
+            "inputSchema": {
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "properties": {
+                    "limit": {
+                        "format": "int32",
+                        "type": "integer"
+                    },
+                    "offset": {
+                        "format": "int32",
+                        "type": "integer"
+                    },
+                    "query": {
+                        "type": "string"
+                    },
+                    "teamIds": {
+                        "items": {
+                            "format": "int64",
+                            "type": "integer"
+                        },
+                        "type": "array"
+                    }
+                },
+                "required": [],
+                "type": "object"
+            },
+            "name": "searchPeople",
+            "title": "searchPeople"
+        }
+    ]
+}

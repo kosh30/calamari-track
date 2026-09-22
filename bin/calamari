@@ -504,6 +504,14 @@ def running_now(client):
     return overlaps(client, date, max(end - STATUS_WINDOW, 0), end)
 
 
+def tools(args):
+    """The MCP server's tool list, sorted by name. docs/mcp-tools.json holds
+    a snapshot; a diff against it shows when Calamari changes the tools
+    this plugin works around (docs/adr/0001)."""
+    result = with_mcp(lambda c: c.request("tools/list", {})[0])
+    return {"tools": sorted(result.get("tools", []), key=lambda t: t.get("name", ""))}
+
+
 def status(args):
     """With --overnight also asks whether yesterday's shift still runs: it
     reaches past midnight, and whether Calamari counts it for today is
@@ -667,7 +675,7 @@ def parse_args(argv):
     return parser.parse_args(argv)
 
 
-COMMANDS = {"login": login, "whoami": whoami, "status": status, "start-time": start_time,
+COMMANDS = {"login": login, "whoami": whoami, "tools": tools, "status": status, "start-time": start_time,
             "end-time": end_time, "clock-in": clock_in, "clock-out": clock_out, "day-info": day_info}
 
 

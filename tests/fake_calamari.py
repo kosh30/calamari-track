@@ -230,6 +230,10 @@ class _Handler(BaseHTTPRequestHandler):
             return self._send(202)
         if session not in self.fake.initialized_sessions:
             return self._send(400, {"error": "not initialized"})
+        if method == "tools/list":
+            tools = [{"name": n, "description": "fake " + n, "inputSchema": {"type": "object", "properties": {}}}
+                     for n in ("getMyProfile", "clockIn", "clockOut", "checkTimesheetOverlap")]
+            return self._reply(msg["id"], {"tools": tools})
         if method == "tools/call":
             name = msg["params"]["name"]
             self.fake.tool_calls.append((name, msg["params"].get("arguments")))
