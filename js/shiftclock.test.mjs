@@ -181,3 +181,11 @@ test("ohne bekannten Status bietet das Panel kein Stempeln an", () => {
   for (const kind of ["unknown", "error", "auth"])
     assert.equal(stampAction({ kind, text: "" }), null)
 })
+
+test("in der Minute des Einstempelns gilt die eben begonnene Schicht weiter als laufend", () => {
+  // `status` looks at full minutes and cannot see a shift begun in the current one yet.
+  const state = clockIn(emptyState(), "11:21")
+  const r = applyStatus(state, false, at("11:21"))
+  assert.deepEqual(view(r.state, "11:21"), { kind: "running", text: "0:00" })
+  assert.equal(view(applyStatus(r.state, false, at("11:24")).state, "11:24").kind, "idle")
+})

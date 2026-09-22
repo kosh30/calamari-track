@@ -60,6 +60,11 @@ export function applyStatus(state, running, now) {
   // status window; the clock-out is the newer truth.
   if (running && next.clockedOutAt && minuteOfDay(now) - toMinutes(next.clockedOutAt) <= STATUS_WINDOW)
     running = false
+  // In the minute of the own clock-in the status window, which ends at the
+  // full minute, cannot see the new shift yet. (A start found by start-time
+  // always lies in an earlier minute.)
+  if (!running && next.running && next.startedAt && minuteOfDay(now) === toMinutes(next.startedAt))
+    running = true
   next.running = running
   if (!running) {
     next.startedAt = null

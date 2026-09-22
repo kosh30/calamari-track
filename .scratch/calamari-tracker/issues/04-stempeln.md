@@ -22,3 +22,9 @@
 - Nach `clock-out` gibt es keine Abfrage, sie könnte wegen des Nachlaufs von 2 Min nichts entscheiden. Der Service ignoriert in dieser Zeit „läuft“ und sucht eine Folgeschicht erst ab der Minute nach dem Ausstempeln. Das Feld `noShiftSince` im Zustand heißt dafür jetzt `searchAfter`.
 - Nach einem Fehlschlag bleiben Status und Button stehen, damit man es erneut versuchen kann. Danach wird sofort der echte Status abgefragt, außer bei `RATE_LIMITED`.
 - Eine laufend gemeldete Schicht hebt den Feierabend auf, auch wenn sie im Web gestempelt wurde.
+
+**2026-09-22 (Agent):** Mit dem Benutzer gegen echtes Calamari abgenommen, Teil 1:
+- Ausstempeln um 11:17: Das Panel zeigt „Feierabend seit 11:17“, die Bar bleibt auch nach Ablauf der 2 Min Nachlauf grau.
+- Wieder eingestempelt um 11:21: Die Bar ist grün und zeigt `0:00`, der Feierabend ist aufgehoben.
+- `clockOut` ohne laufende Schicht wird mit `isError: true` abgelehnt. Der Text ist nur allgemein („Error has occurred. We are working to solve it.“, doppelt) und lässt sich nicht von einer Serverstörung unterscheiden. Der Helfer meldet `MCP_ERROR`.
+- Gefunden und behoben: `status` meldete um 11:21:45 „läuft nicht“, erst ab 11:22:00 „läuft“. Eine Abfrage in der Minute des Einstempelns (z.B. beim Öffnen des Panels) hätte die Bar bis zur nächsten Abfrage grau gemacht. Der Service ignoriert das jetzt in dieser Minute.
