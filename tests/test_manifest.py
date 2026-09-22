@@ -17,6 +17,8 @@ class ManifestTest(unittest.TestCase):
         self.assertEqual(schema, widget["defaults"])
         self.assertIn("stampReminderMinutes", schema)
         self.assertIn("pollIntervalMinutes", schema)
+        self.assertIn("breakLimitMinutes", schema)
+        self.assertIn("breakReminderMinutes", schema)
 
 
 if __name__ == "__main__":

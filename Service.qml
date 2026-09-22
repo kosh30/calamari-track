@@ -40,7 +40,9 @@ Item {
     // The settings as js/reminders.mjs reads them (coreMonday .. coreSunday
     // pass through as they are).
     readonly property var config: Object.assign({}, root.settings, {
-        stampReminderMinutes: root.setting("stampReminderMinutes", 5)
+        stampReminderMinutes: root.setting("stampReminderMinutes", 5),
+        breakLimitMinutes: root.setting("breakLimitMinutes", 30),
+        breakReminderMinutes: root.setting("breakReminderMinutes", 5)
     })
 
     // Today's `day-info`, fetched once per date; null until then.
@@ -65,6 +67,7 @@ Item {
     // action cannot overwrite the action's result.
     property string stampError: ""
     readonly property bool stamping: stampProc.running
+    readonly property string stampingAction: stampProc.running ? stampProc.action : ""
     readonly property bool busy: stampProc.running || statusProc.running || startTimeProc.running
 
     readonly property int pollInterval: root.setting("pollIntervalMinutes", 3) * 60 * 1000
@@ -83,15 +86,22 @@ Item {
             statusProc.running = true
     }
 
-    // "clock-in" or "clock-out", always now. A failure is shown, never queued.
+    // "clock-in", "clock-out", "break-start" or "break-end", always now. A
+    // failure is shown, never queued.
     function stamp(action) {
         if (!root.stateLoaded || root.busy)
             return
         root.stampError = ""
         stampProc.action = action
         stampProc.pollWhenDone = false
-        stampProc.command = [root.helper, action]
+        stampProc.command = [root.helper, ShiftClock.helperCommand(action)]
         stampProc.running = true
+    }
+
+    // From a Pause straight into the Feierabend; nothing to stamp.
+    function endBreakAsFeierabend() {
+        if (root.stateLoaded)
+            root.setShiftState(ShiftClock.endBreakAsFeierabend(root.shiftState, new Date()))
     }
 
     // The panel switch "Heute frei".
@@ -120,7 +130,7 @@ Item {
     }
 
     function notify(action) {
-        var text = Reminders.notification(action, root.dayInfo)
+        var text = Reminders.notification(action, root.dayInfo, root.shiftState)
         var id = root.notificationIds[action.type]
         var command = ["omarchy-notification-send", "-p", "-u", "normal", "-g", "󰔟"]
         if (id)

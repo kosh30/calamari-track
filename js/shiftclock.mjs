@@ -10,6 +10,7 @@
 //              the --after of the next start-time search. Set by a poll
 //              that saw no shift and by the own clock-out.
 //   clockedOutAt  HH:MM of the own clock-out that began the Feierabend today
+//   breakSince HH:MM of the own clock-out that began the running Pause
 //   stampedToday  true once a shift of today was seen running
 //   dayOff     true after the panel switch "Heute frei" (today only)
 //   sent       { reminder type: HH:MM last sent today }, see js/reminders.mjs
@@ -25,7 +26,7 @@ import { minuteOfDay, pad, toHhmm, toMinutes, ymd } from "./daytime.mjs"
 const STATUS_WINDOW = 2
 
 export function emptyState() {
-  return { date: "", running: null, startedAt: null, searchAfter: null, clockedOutAt: null, stampedToday: false, dayOff: false, sent: {} }
+  return { date: "", running: null, startedAt: null, searchAfter: null, clockedOutAt: null, breakSince: null, stampedToday: false, dayOff: false, sent: {} }
 }
 
 function forToday(state, now) {
@@ -40,9 +41,10 @@ function forToday(state, now) {
 // for `start-time` when the start of the running shift is unknown.
 export function applyStatus(state, running, now) {
   const next = forToday(state, now)
-  // Right after the own clock-out the ended shift still overlaps the
-  // status window; the clock-out is the newer truth.
-  if (running && next.clockedOutAt && minuteOfDay(now) - toMinutes(next.clockedOutAt) <= STATUS_WINDOW)
+  // Right after the own clock-out (Feierabend or Pause) the ended shift
+  // still overlaps the status window; the clock-out is the newer truth.
+  const stoppedAt = next.clockedOutAt || next.breakSince
+  if (running && stoppedAt && minuteOfDay(now) - toMinutes(stoppedAt) <= STATUS_WINDOW)
     running = false
   // In the minute of the own clock-in the status window, which ends at the
   // full minute, cannot see the new shift yet. (A start found by start-time
@@ -57,8 +59,9 @@ export function applyStatus(state, running, now) {
     return { state: next, startTimeQuery: null }
   }
   // A shift runs again (stamped in the web or on the phone): the
-  // Feierabend is over.
+  // Feierabend or the Pause is over.
   next.clockedOutAt = null
+  next.breakSince = null
   next.stampedToday = true
   if (next.startedAt) return { state: next, startTimeQuery: null }
   return { state: next, startTimeQuery: { after: next.searchAfter } }
@@ -89,18 +92,37 @@ export function restoreState(text) {
 function applyClockIn(state, now) {
   const next = forToday(state, now)
   const minute = toHhmm(minuteOfDay(now))
-  return Object.assign(next, { running: true, startedAt: minute, clockedOutAt: null, stampedToday: true })
+  return Object.assign(next, { running: true, startedAt: minute, clockedOutAt: null, breakSince: null, stampedToday: true })
 }
 
-// The own clock-out succeeded: no shift runs, and it is Feierabend.
-function applyClockOut(state, now) {
+// The own clock-out succeeded: no shift runs.
+function stopShift(state, now) {
   const next = forToday(state, now)
   const minute = minuteOfDay(now)
   // The ended shift reaches into the minute of the clock-out.
   return Object.assign(next, {
-    running: false, startedAt: null, clockedOutAt: toHhmm(minute),
+    running: false, startedAt: null, clockedOutAt: null, breakSince: null,
     searchAfter: toHhmm(Math.min(minute + 1, 24 * 60 - 1)),
   })
+}
+
+// Ausstempeln: it is Feierabend.
+function applyClockOut(state, now) {
+  return Object.assign(stopShift(state, now), { clockedOutAt: toHhmm(minuteOfDay(now)) })
+}
+
+// Pause beginnen: a clock-out that is no Feierabend (ADR 0001: Calamari
+// only sees the gap).
+function applyBreakStart(state, now) {
+  return Object.assign(stopShift(state, now), { breakSince: toHhmm(minuteOfDay(now)) })
+}
+
+// Going home straight from a Pause: nothing to stamp (the shift already
+// ended when the Pause began), so the Feierabend starts back then.
+export function endBreakAsFeierabend(state, now) {
+  const next = forToday(state, now)
+  if (!next.breakSince || next.running) return state
+  return Object.assign(next, { clockedOutAt: next.breakSince, breakSince: null })
 }
 
 // The panel switch "Heute frei". Like everything in the state it belongs
@@ -119,20 +141,40 @@ export function applyStartTime(state, startedAt) {
   return Object.assign({}, state, { startedAt })
 }
 
-// kind: "auth" (login needed), "error", "unknown", "running", "reminder"
-// (a stamp reminder is due, see js/reminders.mjs) or "idle"; text: the
-// shift duration H:MM while running and its start is known.
+// kind: "auth" (login needed), "error", "unknown", "running", "break",
+// "reminder" (a stamp reminder is due, see js/reminders.mjs) or "idle";
+// text: the duration H:MM of the running shift (once its start is known)
+// or of the Pause.
 export function barView({ state, now, authState, failed, reminding }) {
   if (authState === "required") return { kind: "auth", text: "" }
   if (failed) return { kind: "error", text: "" }
   if (!state || state.running === null) return { kind: "unknown", text: "" }
+  if (!state.running && state.breakSince) return { kind: "break", text: duration(state.breakSince, now) }
   if (!state.running) return { kind: reminding ? "reminder" : "idle", text: "" }
   if (!state.startedAt) return { kind: "running", text: "" }
-  const minutes = Math.max(minuteOfDay(now) - toMinutes(state.startedAt), 0)
-  return { kind: "running", text: `${Math.floor(minutes / 60)}:${pad(minutes % 60)}` }
+  return { kind: "running", text: duration(state.startedAt, now) }
 }
 
-const STAMP_ACTIONS = { "clock-in": "Einstempeln", "clock-out": "Ausstempeln" }
+function duration(since, now) {
+  const minutes = Math.max(minuteOfDay(now) - toMinutes(since), 0)
+  return `${Math.floor(minutes / 60)}:${pad(minutes % 60)}`
+}
+
+const STAMP_ACTIONS = {
+  "clock-in": "Einstempeln", "clock-out": "Ausstempeln",
+  "break-start": "Pause beginnen", "break-end": "Pause beenden",
+}
+
+// The panel's button text for a stamp action.
+export function stampLabel(action) {
+  return STAMP_ACTIONS[action]
+}
+
+// The helper command behind a stamp action: a Pause is a clock-out plus
+// the local mark, its end a clock-in (ADR 0001).
+export function helperCommand(action) {
+  return action === "break-start" ? "clock-out" : action === "break-end" ? "clock-in" : action
+}
 const STAMP_CAUSES = {
   NETWORK: "Calamari nicht erreichbar",
   RATE_LIMITED: "zu viele Anfragen, bitte gleich erneut versuchen",
@@ -145,27 +187,44 @@ function stampErrorText(action, code, message) {
 }
 
 // The stamp action the panel offers for a bar view: "clock-out" while a
-// shift runs, "clock-in" without one (reminded or not), null while the
-// status is not known.
+// shift runs, "break-end" in a Pause, "clock-in" without a shift (reminded
+// or not), null while the status is not known.
 export function stampAction(view) {
   if (view.kind === "running") return "clock-out"
+  if (view.kind === "break") return "break-end"
   if (view.kind === "idle" || view.kind === "reminder") return "clock-in"
   return null
 }
 
-// Applies an answer of `clock-in` / `clock-out`. Returns { state, error,
-// pollNow }: error is the panel's line for a failure ("" on success). A
-// failure keeps the state, so the user can retry; nothing is queued. Its
-// outcome is unknown (a timeout may have stamped anyway), so pollNow asks
-// Calamari right away, unless it is throttling us.
+// The Pause the panel offers beside stampAction(): only during a shift.
+export function breakAction(view) {
+  return view.kind === "running" ? "break-start" : null
+}
+
+// "end-break" (endBreakAsFeierabend) the panel offers during a Pause.
+export function feierabendAction(view) {
+  return view.kind === "break" ? "end-break" : null
+}
+
+// Applies an answer of `clock-in` / `clock-out` for a stamp action.
+// Returns { state, error, pollNow }: error is the panel's line ("" when
+// all is well). A failure keeps the state, so the user can retry; nothing
+// is queued. Its outcome is unknown (a timeout may have stamped anyway),
+// so pollNow asks Calamari right away, unless it is throttling us.
 export function applyStamp(state, action, out, now) {
   if (!out.ok) {
     const { code, message } = out.error
     return { state, error: stampErrorText(action, code, message), pollNow: code !== "RATE_LIMITED" }
   }
-  let next
-  if (action === "clock-out") next = applyClockOut(state, now)
-  else if (out.running) next = applyClockIn(state, now)
-  else next = applyStatus(state, false, now).state
-  return { state: next, error: "", pollNow: false }
+  if (helperCommand(action) === "clock-out") {
+    const next = action === "break-start" ? applyBreakStart(state, now) : applyClockOut(state, now)
+    return { state: next, error: "", pollNow: false }
+  }
+  if (out.running) return { state: applyClockIn(state, now), error: "", pollNow: false }
+  // Calamari took the clock-in but shows no shift: say so, and look again.
+  return {
+    state: applyStatus(state, false, now).state,
+    error: `${STAMP_ACTIONS[action]}: Calamari meldet keine laufende Schicht. Bitte im Web prüfen.`,
+    pollNow: true,
+  }
 }

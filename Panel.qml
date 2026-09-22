@@ -17,6 +17,14 @@ Panel {
     readonly property bool loggingIn: service ? service.loggingIn === true : false
     readonly property var view: service ? service.barView : null
     readonly property var stampAction: authState === "ok" && view !== null ? ShiftClock.stampAction(view) : null
+    readonly property var breakAction: authState === "ok" && view !== null ? ShiftClock.breakAction(view) : null
+    readonly property var feierabendAction: authState === "ok" && view !== null ? ShiftClock.feierabendAction(view) : null
+
+    // A button's text, with "…" while its own action runs.
+    function actionText(action) {
+        var busy = root.service !== null && root.service.stampingAction === action
+        return ShiftClock.stampLabel(action) + (busy ? " …" : "")
+    }
 
     onOpenedChanged: {
         if (root.opened && root.service)
@@ -86,6 +94,7 @@ Panel {
                     text: !view || view.kind === "unknown" ? "Schichtstatus wird abgefragt …"
                         : view.kind === "error" ? "Schichtstatus unbekannt"
                         : view.kind === "reminder" ? "Noch nicht eingestempelt, die Kernzeit läuft"
+                        : view.kind === "break" ? "Pause seit " + shift.breakSince + " (" + view.text + ")"
                         : view.kind === "idle" ? (shift.clockedOutAt ? "Feierabend seit " + shift.clockedOutAt : "Keine laufende Schicht")
                         : shift.startedAt ? "Schicht läuft seit " + shift.startedAt + " (" + view.text + ")"
                         : "Schicht läuft"
@@ -94,11 +103,26 @@ Panel {
                 Button {
                     visible: root.stampAction !== null
                     enabled: root.service !== null && !root.service.busy
-                    readonly property bool clockOut: root.stampAction === "clock-out"
-                    text: root.service && root.service.stamping ? (clockOut ? "Stemple aus …" : "Stemple ein …")
-                        : clockOut ? "Ausstempeln" : "Einstempeln"
+                    text: root.actionText(root.stampAction)
                     bordered: true
                     onClicked: root.service.stamp(root.stampAction)
+                }
+
+                Button {
+                    visible: root.breakAction !== null
+                    enabled: root.service !== null && !root.service.busy
+                    text: root.actionText(root.breakAction)
+                    bordered: true
+                    onClicked: root.service.stamp(root.breakAction)
+                }
+
+                Button {
+                    visible: root.feierabendAction !== null
+                    enabled: root.service !== null && !root.service.busy
+                    text: "Feierabend"
+                    tooltipText: "Die Pause wird zum Feierabend, gestempelt wird nichts"
+                    bordered: true
+                    onClicked: root.service.endBreakAsFeierabend()
                 }
 
                 Button {

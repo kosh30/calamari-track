@@ -12,22 +12,27 @@ BarWidget {
 
     property var panelItem: null
     readonly property var service: bar && bar.shell ? bar.shell.serviceFor(moduleName) : null
-    // kind: auth | error | unknown | running | reminder | idle (js/shiftclock.mjs barView)
+    // kind: auth | error | unknown | running | break | reminder | idle (js/shiftclock.mjs barView)
     readonly property var view: service && service.barView ? service.barView : ({ kind: "unknown", text: "" })
     readonly property bool alerting: view.kind === "auth" || view.kind === "error"
     readonly property color barForeground: bar ? bar.barForeground : Color.foreground
 
-    // The theme's green from colors.toml; the shell palette has none.
+    // The theme's green and yellow from colors.toml; the shell palette has none.
     property color themeGreen: "#5faf5f"
+    property color themeYellow: "#d7af5f"
 
     FileView {
         path: Color.currentThemePath + "/colors.toml"
         printErrors: false
         onLoaded: {
-            var match = /^green\s*=\s*"(#[0-9a-fA-F]{6})"/m.exec(text())
-            if (match)
-                root.themeGreen = match[1]
+            root.themeGreen = root.themeColor(text(), "green", root.themeGreen)
+            root.themeYellow = root.themeColor(text(), "yellow", root.themeYellow)
         }
+    }
+
+    function themeColor(toml, name, fallback) {
+        var match = new RegExp("^" + name + "\\s*=\\s*\"(#[0-9a-fA-F]{6})\"", "m").exec(toml)
+        return match ? match[1] : fallback
     }
 
     readonly property bool opened: panelItem ? panelItem.opened === true : false
@@ -96,9 +101,11 @@ BarWidget {
         id: button
         anchors.fill: parent
         bar: root.bar
-        text: root.alerting ? "󰀦" : (root.view.text ? "󰔟 " + root.view.text : "󰔟")
+        readonly property string glyph: root.view.kind === "break" ? "󰅶" : "󰔟"
+        text: root.alerting ? "󰀦" : (root.view.text ? glyph + " " + root.view.text : glyph)
         active: root.alerting
         foreground: root.view.kind === "running" ? root.themeGreen
+            : root.view.kind === "break" ? root.themeYellow
             : root.view.kind === "reminder" ? Color.urgent
             : root.view.kind === "idle" ? Color.muted : root.barForeground
         dimmed: root.view.kind === "unknown"
@@ -106,6 +113,7 @@ BarWidget {
             : root.view.kind === "error" ? "Calamari: Fehler"
             : root.view.kind === "running" ? "Calamari: Schicht läuft"
             : root.view.kind === "reminder" ? "Calamari: noch nicht eingestempelt"
+            : root.view.kind === "break" ? "Calamari: Pause"
             : root.view.kind === "idle" ? "Calamari: keine laufende Schicht" : "Calamari Tracker"
 
         onPressed: function (b) {

@@ -21,6 +21,8 @@
     "defaults": {
       "pollIntervalMinutes": 3,
       "stampReminderMinutes": 5,
+      "breakLimitMinutes": 30,
+      "breakReminderMinutes": 5,
       "coreMonday": "",
       "coreTuesday": "",
       "coreWednesday": "",
@@ -42,6 +44,22 @@
         "key": "stampReminderMinutes",
         "type": "integer",
         "label": "Stempel-Erinnerung wiederholen alle (Minuten)",
+        "min": 1,
+        "max": 60,
+        "defaultValue": 5
+      },
+      {
+        "key": "breakLimitMinutes",
+        "type": "integer",
+        "label": "Pausen-Erinnerung nach (Minuten)",
+        "min": 1,
+        "max": 240,
+        "defaultValue": 30
+      },
+      {
+        "key": "breakReminderMinutes",
+        "type": "integer",
+        "label": "Pausen-Erinnerung wiederholen alle (Minuten)",
         "min": 1,
         "max": 60,
         "defaultValue": 5

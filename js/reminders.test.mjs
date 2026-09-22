@@ -46,7 +46,7 @@ test("vor der Kernzeit wird zu ihrem Beginn wieder geprüft", () => {
 })
 
 const stamp = (state, action, now) =>
-  applyStamp(state, action, { ok: true, running: action === "clock-in" }, at(now)).state
+  applyStamp(state, action, { ok: true, running: action === "clock-in" || action === "break-end" }, at(now)).state
 
 test("nach einem Feierabend vor Ende der Kernzeit kommt keine Stempel-Erinnerung mehr", () => {
   const state = stamp(stamp(noShift("08:55"), "clock-in", "09:00"), "clock-out", "15:30")
@@ -201,4 +201,52 @@ test("ein Feiertag gilt auch an einem überschriebenen Wochentag", () => {
 test("eine Arbeitsplan-Überschreibung darf die Stunde einstellig schreiben", () => {
   const own = Object.assign({}, config, { coreTuesday: "8:00-13:00" })
   assert.deepEqual(types(decide(at("08:00"), withDay({}), noShift("08:00"), own)), ["stamp-reminder"])
+})
+
+// Pause
+
+const breakConfig = Object.assign({}, config, { breakLimitMinutes: 30, breakReminderMinutes: 5 })
+const onBreak = (since, begun = "09:00") => stamp(stamp(noShift("08:55"), "clock-in", begun), "break-start", since)
+
+test("während einer Pause kommt keine Stempel-Erinnerung", () => {
+  const r = decide(at("12:10"), workday, onBreak("12:00"), breakConfig)
+  assert.deepEqual(types(r), [])
+  assert.notEqual(r.barState, "reminder")
+  assert.deepEqual(r.nextCheckAt, at("12:30"))
+})
+
+test("nach 30 Minuten Pause kommt eine Pausen-Erinnerung, danach alle 5 Minuten", () => {
+  let state = onBreak("12:00")
+  assert.deepEqual(types(decide(at("12:29"), workday, state, breakConfig)), [])
+  assert.deepEqual(types(decide(at("12:30"), workday, state, breakConfig)), ["break-reminder"])
+  state = markSent(state, "break-reminder", at("12:30"))
+  const again = decide(at("12:30"), workday, state, breakConfig)
+  assert.deepEqual(types(again), [])
+  assert.deepEqual(again.nextCheckAt, at("12:35"))
+  assert.deepEqual(types(decide(at("12:35"), workday, state, breakConfig)), ["break-reminder"])
+})
+
+test("die Pausen-Erinnerung einer früheren Pause zählt bei der nächsten nicht", () => {
+  let state = markSent(onBreak("10:00"), "break-reminder", at("10:30"))
+  state = stamp(state, "break-end", "10:40")
+  state = stamp(state, "break-start", "15:00")
+  assert.deepEqual(types(decide(at("15:30"), workday, state, breakConfig)), ["break-reminder"])
+})
+
+test("auch am Wochenende erinnert eine lange Pause", () => {
+  const saturday = { date: "2026-09-26", workingDay: false, coreStart: null, coreEnd: null, holiday: null, absence: null }
+  let state = applyStatus(emptyState(), false, at("09:55", "2026-09-26")).state
+  state = applyStamp(state, "clock-in", { ok: true, running: true }, at("10:00", "2026-09-26")).state
+  state = applyStamp(state, "break-start", { ok: true, running: false }, at("11:00", "2026-09-26")).state
+  assert.deepEqual(types(decide(at("11:30", "2026-09-26"), saturday, state, breakConfig)), ["break-reminder"])
+})
+
+test("nach dem Pausenende kommt keine Pausen-Erinnerung mehr", () => {
+  const state = stamp(onBreak("12:00"), "break-end", "12:45")
+  assert.deepEqual(types(decide(at("12:50"), workday, state, breakConfig)), [])
+})
+
+test("die Pausen-Erinnerung nennt den Beginn der Pause", () => {
+  assert.deepEqual(notification({ type: "break-reminder" }, workday, onBreak("12:00")),
+    { headline: "Pause läuft noch", body: "Die Pause läuft seit 12:00." })
 })
