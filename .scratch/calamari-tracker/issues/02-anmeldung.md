@@ -1,0 +1,17 @@
+# 02: Anmeldung bei Calamari
+
+**What to build:** Der Benutzer meldet sich einmalig per Microsoft-SSO im Browser bei Calamari an. Der Calamari-Helfer entdeckt den Authorization-Server über die Protected-Resource-Metadaten des MCP-Servers, registriert sich per Dynamic Client Registration (Loopback-Redirect auf 127.0.0.1), führt Authorization Code + PKCE S256 mit `resource` = MCP-URL durch und legt Client-Daten und Tokens im System-Keyring ab. `whoami` ruft über eine MCP-Session `getMyProfile` auf. Abgelaufene Tokens werden automatisch erneuert. Scheitert der Refresh, antwortet der Helfer mit `AUTH_REQUIRED`. Das Panel zeigt „Angemeldet als …“ oder einen Button „Neu anmelden“, der den Login startet. Bei nötiger Anmeldung zeigt die Bar ein Warnsymbol. Siehe ADR 0001.
+
+**Blocked by:** 01
+
+**Status:** ready-for-agent
+
+**Risiko:** Die Registrierung mit einem eigenen Client ist noch nicht erprobt. Scheitert sie, wird das Ticket gestoppt und mit dem Benutzer neu entschieden.
+
+- [ ] `login` führt den kompletten Browser-Login durch (manuell mit dem Benutzer abgenommen)
+- [ ] `whoami` liefert den Namen des Benutzers als JSON (`{"ok": true, ...}`)
+- [ ] Tokens und Client-Daten liegen im Keyring, nicht auf der Platte
+- [ ] Automatischer Refresh bei abgelaufenem Token bzw. 401. Scheitert der Refresh, gibt es `{"ok": false, "error": {"code": "AUTH_REQUIRED"}}` mit Exit-Code ≠ 0
+- [ ] Das Panel zeigt den Anmeldestatus, „Neu anmelden“ startet den Login
+- [ ] Die Bar zeigt ein Warnsymbol, solange eine Anmeldung nötig ist
+- [ ] Tests gegen einen Fake-OAuth/MCP-Server (JSON- und SSE-Antworten): Login inkl. PKCE-Prüfung, Refresh, `AUTH_REQUIRED`. Keyring und Basis-URL per Umgebungsvariable ersetzbar
