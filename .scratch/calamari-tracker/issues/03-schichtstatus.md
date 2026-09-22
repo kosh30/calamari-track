@@ -11,7 +11,7 @@
 - [x] Die Bar ist grau ohne Schicht und grün mit tickender Dauer bei laufender Schicht
 - [ ] Eine im Web begonnene Schicht erscheint spätestens nach einem Abfrage-Intervall
 - [x] Beim Öffnen des Panels wird sofort abgefragt
-- [ ] Netz- oder Anmeldefehler zeigen einen Fehlerzustand in der Bar
+- [x] Netz- oder Anmeldefehler zeigen einen Fehlerzustand in der Bar
 - [x] Tests gegen den Fake: Status ja/nein und Intervallhalbierung findet die im Fake hinterlegte Startzeit
 
 ## Comments
@@ -26,3 +26,5 @@
 - Die Bar zeigt `󰔟 1:18` für die laufende Schicht seit 09:40.
 - Das Panel zeigt Start und Dauer.
 - Der graue Zustand ohne Schicht ist per Test abgedeckt, in der Shell aber erst mit Ticket 04 zu sehen (Ausstempeln).
+
+**2026-09-22 (Agent):** Fehlerzustand abgenommen: Ohne Netz zeigt die Bar das rote 󰀦. Den Anmeldefehler hat Ticket 02 schon gezeigt. Offen bleibt nur noch „eine Web-Schicht erscheint nach spätestens einem Intervall“. Das wird zusammen mit Ticket 04 geprüft, weil es echte Stempelungen braucht.
