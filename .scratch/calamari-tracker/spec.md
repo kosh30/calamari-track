@@ -153,7 +153,7 @@ Mit Calamari spricht das Plugin ausschließlich über den offiziellen MCP-Server
   | Obergrenze | 23:00 |
   | Überschreibungen für Arbeitsplan/Kernzeit | leer |
 
-  Gepflegt werden die Werte über das Einstellungsschema des Bar-Widgets im Plugin-Manifest.
+  Gepflegt werden die Werte über das Einstellungsschema des Bar-Widgets im Plugin-Manifest. Die installierte omarchy-shell zeigt dieses Schema noch nicht grafisch an. Bis dahin werden die Werte mit `omarchy bar set kosh.calamari-tracker <key> <wert> --json` gesetzt.
 - **Benachrichtigungen:** Versand über den Sender von omarchy-shell mit ausgegebener ID. Eine Erinnerung ersetzt die vorige desselben Typs. Die Notifications haben keine Buttons, nur eine Klick-Aktion: Sie öffnet das Panel über IPC, beim Korrektur-Hinweis stattdessen Calamari im Browser.
 - **Letzte Aktivität:** Leerlauf-Erkennung über den Idle-Monitor von Quickshell mit dem Lock-Timeout aus der omarchy-shell-Idle-Config, dazu ein minütlicher Heartbeat. Eine Heartbeat-Lücke über 5 Min gilt als Suspend, die letzte Aktivität ist dann der letzte Heartbeat davor.
 - **Plugin-Identität:** ID `kosh.calamari-tracker`, Kinds `service` + `bar-widget`, bleibt dauerhaft geladen. Installation per Symlink aus dem Repo in das Plugin-Verzeichnis von omarchy-shell.

@@ -9,10 +9,10 @@
 - [x] `day-info --date` liefert `workingDay`, `coreStart`, `coreEnd` aus dem Arbeitsplan
 - [x] `decide` ist ein reines JS-Modul ohne Qt-Abhängigkeit
 - [x] Tests für `decide`: Kernzeit ohne Schicht (sofort, dann alle 5 Min, Ende mit der Kernzeit), Feierabend vor Ende der Kernzeit, Wiedereinstempeln nach dem Feierabend, Start mitten in der Kernzeit, Wochenende ohne Erinnerung, Idempotenz
-- [ ] Die Notification wird über den omarchy-shell-Sender verschickt, eine Wiederholung ersetzt die vorige
-- [ ] Ein Klick auf die Notification öffnet das Panel (IPC-Ziel des Plugins)
-- [ ] Das Bar-Icon ist rot, solange eine Stempel-Erinnerung fällig ist
-- [ ] Die Config-Werte sind über die Widget-Einstellungen änderbar, mit verkürzten Werten manuell abgenommen
+- [x] Die Notification wird über den omarchy-shell-Sender verschickt, eine Wiederholung ersetzt die vorige
+- [x] Ein Klick auf die Notification öffnet das Panel (IPC-Ziel des Plugins)
+- [x] Das Bar-Icon ist rot, solange eine Stempel-Erinnerung fällig ist
+- [x] Die Config-Werte sind über die Widget-Einstellungen änderbar, mit verkürzten Werten manuell abgenommen
 - [x] Test für `day-info` gegen den Fake
 
 ## Comments
@@ -24,3 +24,9 @@
 - Die Notification kommt von `omarchy-notification-send -p`, die ID wird mit `-r` wiederverwendet, der Klick führt `omarchy-shell shell summon kosh.calamari-tracker` aus. Ein eigener `IpcHandler` ist nicht nötig, weil der Bar-Widget-Pfad der Shell `open()` des Widgets aufruft.
 - Nach einem Suspend (Lücke im 15-s-Takt) wird sofort abgefragt. Erinnert wird erst mit einem frischen Status.
 - Config: `pollIntervalMinutes` und `stampReminderMinutes` in `barWidget.defaults` und `schema`. Das Widget reicht seine `settings` an den Service weiter.
+
+**2026-09-22 (Agent):** Mit dem Benutzer in der Shell abgenommen:
+- `stampReminderMinutes` per `omarchy bar set kosh.calamari-tracker stampReminderMinutes 1 --json` auf 1 gesetzt. Eine grafische Einstellungsseite für Bar-Widgets gibt es in der installierten omarchy-shell nicht, das Schema wird nur gespeichert. Story 53 läuft deshalb vorerst über `omarchy bar set`.
+- Im Web um 12:33 ausgestempelt, ab 12:36 meldete `status` keine Schicht mehr. Danach `stampedToday` und `sent` im Zustand zurückgesetzt und die Shell neu gestartet.
+- Um 12:36 kam sofort die Notification, die Bar war rot. Danach kam jede Minute eine neue, die die vorige ersetzte, im Benachrichtigungscenter lag immer nur eine. Ein Klick öffnete das Panel.
+- Um 12:39 im Panel eingestempelt, danach kamen keine Erinnerungen mehr. Anschließend den Wert wieder auf 5 gesetzt.
