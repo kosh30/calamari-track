@@ -2,6 +2,7 @@ import QtQuick
 import qs.Commons
 import qs.Ui
 import "js/shiftclock.mjs" as ShiftClock
+import "js/reminders.mjs" as Reminders
 
 // Popup panel toggled from the bar icon: login state, shift status and
 // clocking in/out. Clocking out means Feierabend (js/shiftclock.mjs).
@@ -18,12 +19,16 @@ Panel {
     readonly property var view: service ? service.barView : null
     readonly property var stampAction: authState === "ok" && view !== null ? ShiftClock.stampAction(view) : null
     readonly property var breakAction: authState === "ok" && view !== null ? ShiftClock.breakAction(view) : null
+    // After the final warning: the countdown to the auto-close.
+    readonly property string countdown: service ? Reminders.countdownText(service.decision, service.now) : ""
     readonly property var feierabendAction: authState === "ok" && view !== null ? ShiftClock.feierabendAction(view) : null
 
     // A button's text, with "…" while its own action runs.
+    // During the countdown clocking out is "Jetzt ausstempeln".
     function actionText(action) {
         var busy = root.service !== null && root.service.stampingAction === action
-        return ShiftClock.stampLabel(action) + (busy ? " …" : "")
+        var label = action === "clock-out" && root.countdown !== "" ? "Jetzt ausstempeln" : ShiftClock.stampLabel(action)
+        return label + (busy ? " …" : "")
     }
 
     onOpenedChanged: {
@@ -98,6 +103,24 @@ Panel {
                         : view.kind === "idle" ? (shift.clockedOutAt ? "Feierabend seit " + shift.clockedOutAt : "Keine laufende Schicht")
                         : shift.startedAt ? "Schicht läuft seit " + shift.startedAt + " (" + view.text + ")"
                         : "Schicht läuft"
+                }
+
+                Text {
+                    width: parent.width
+                    visible: root.countdown !== ""
+                    wrapMode: Text.Wrap
+                    color: Color.urgent
+                    font.family: Style.font.family
+                    font.pixelSize: Style.font.body
+                    font.bold: true
+                    text: root.countdown
+                }
+
+                Button {
+                    visible: root.service !== null && root.service.decision.canExtend === true
+                    text: Reminders.extendLabel(root.service ? root.service.config : null)
+                    bordered: true
+                    onClicked: root.service.postpone()
                 }
 
                 Button {

@@ -23,6 +23,12 @@
       "stampReminderMinutes": 5,
       "breakLimitMinutes": 30,
       "breakReminderMinutes": 5,
+      "softHintMinutes": 30,
+      "finalWarningTime": "19:00",
+      "autoCloseMinutes": 15,
+      "extendMinutes": 60,
+      "hardLimitTime": "23:00",
+      "webUrl": "",
       "coreMonday": "",
       "coreTuesday": "",
       "coreWednesday": "",
@@ -63,6 +69,48 @@
         "min": 1,
         "max": 60,
         "defaultValue": 5
+      },
+      {
+        "key": "softHintMinutes",
+        "type": "integer",
+        "label": "Sanfter Hinweis nach Ende der Kernzeit (Minuten)",
+        "min": 0,
+        "max": 240,
+        "defaultValue": 30
+      },
+      {
+        "key": "finalWarningTime",
+        "type": "string",
+        "label": "Uhrzeit der letzten Warnung (HH:MM)",
+        "defaultValue": "19:00"
+      },
+      {
+        "key": "autoCloseMinutes",
+        "type": "integer",
+        "label": "Auto-Abschluss nach der letzten Warnung (Minuten)",
+        "min": 1,
+        "max": 120,
+        "defaultValue": 15
+      },
+      {
+        "key": "extendMinutes",
+        "type": "integer",
+        "label": "Verschiebung durch „+1 h“ (Minuten)",
+        "min": 5,
+        "max": 240,
+        "defaultValue": 60
+      },
+      {
+        "key": "hardLimitTime",
+        "type": "string",
+        "label": "Obergrenze für den Auto-Abschluss (HH:MM)",
+        "defaultValue": "23:00"
+      },
+      {
+        "key": "webUrl",
+        "type": "string",
+        "label": "Calamari im Browser (z.B. https://firma.calamari.io)",
+        "defaultValue": ""
       },
       {
         "key": "coreMonday",

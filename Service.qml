@@ -37,13 +37,8 @@ Item {
         var value = root.settings ? root.settings[name] : undefined
         return value === undefined || value === null ? fallback : value
     }
-    // The settings as js/reminders.mjs reads them (coreMonday .. coreSunday
-    // pass through as they are).
-    readonly property var config: Object.assign({}, root.settings, {
-        stampReminderMinutes: root.setting("stampReminderMinutes", 5),
-        breakLimitMinutes: root.setting("breakLimitMinutes", 30),
-        breakReminderMinutes: root.setting("breakReminderMinutes", 5)
-    })
+    // The settings as they are; js/reminders.mjs fills in the defaults.
+    readonly property var config: root.settings || ({})
 
     // Today's `day-info`, fetched once per date; null until then.
     property var dayInfo: null
@@ -88,11 +83,14 @@ Item {
 
     // "clock-in", "clock-out", "break-start" or "break-end", always now. A
     // failure is shown, never queued.
-    function stamp(action) {
+    // autoClose: the auto-close of js/reminders.mjs, which tells the user
+    // to correct the end time afterwards.
+    function stamp(action, autoClose) {
         if (!root.stateLoaded || root.busy)
             return
         root.stampError = ""
         stampProc.action = action
+        stampProc.autoClose = autoClose === true
         stampProc.pollWhenDone = false
         stampProc.command = [root.helper, ShiftClock.helperCommand(action)]
         stampProc.running = true
@@ -118,25 +116,51 @@ Item {
     }
 
     function runReminders() {
-        // A reminder still on its way: retry once it is out (notifyProc),
-        // rather than record one that was never shown.
-        if (notifyProc.running)
-            return
         var actions = root.decision.actions
         for (var i = 0; i < actions.length; i++) {
+            // The clock-out waits for a free helper; recorded once it starts.
+            if (actions[i].type === "auto-close" && root.busy)
+                continue
             root.setShiftState(Reminders.markSent(root.shiftState, actions[i].type, root.now))
-            root.notify(actions[i])
+            if (actions[i].type === "auto-close")
+                root.stamp("clock-out", true)
+            else
+                root.notify(actions[i])
         }
     }
 
+    // "+1 h weiterarbeiten" in the panel.
+    function postpone() {
+        if (root.stateLoaded)
+            root.setShiftState(Reminders.postpone(root.shiftState, root.config, new Date()))
+    }
+
+    // Notifications go out one at a time, in order; the queue only holds
+    // what is due right now (nothing is sent to Calamari from here).
+    property var noticeQueue: []
+
     function notify(action) {
-        var text = Reminders.notification(action, root.dayInfo, root.shiftState)
-        var id = root.notificationIds[action.type]
+        var text = Reminders.notification(action, root.dayInfo, root.shiftState, root.config)
+        var webUrl = root.setting("webUrl", "")
+        var click = text.click === "panel" ? ["omarchy-shell", "shell", "summon", "kosh.calamari-tracker"]
+            : webUrl ? ["xdg-open", webUrl] : []
+        root.noticeQueue = root.noticeQueue.concat([{ type: action.type, text: text, click: click }])
+        root.sendNextNotice()
+    }
+
+    function sendNextNotice() {
+        if (notifyProc.running || root.noticeQueue.length === 0)
+            return
+        var notice = root.noticeQueue[0]
+        root.noticeQueue = root.noticeQueue.slice(1)
+        var id = root.notificationIds[notice.type]
         var command = ["omarchy-notification-send", "-p", "-u", "normal", "-g", "󰔟"]
         if (id)
             command.push("-r", String(id))
-        command.push(text.headline, text.body, "--exec", "omarchy-shell", "shell", "summon", "kosh.calamari-tracker")
-        notifyProc.type = action.type
+        command.push(notice.text.headline, notice.text.body)
+        if (notice.click.length > 0)
+            command = command.concat(["--exec"], notice.click)
+        notifyProc.type = notice.type
         notifyProc.command = command
         notifyProc.running = true
     }
@@ -208,6 +232,8 @@ Item {
             root.errorMessage = ""
         }
         root.setShiftState(result.state)
+        if (out.ok && stampProc.autoClose)
+            root.notify({ type: "auto-closed", at: Qt.formatTime(root.now, "HH:mm") })
     }
 
     function setShiftState(next) {
@@ -254,6 +280,7 @@ Item {
     Process {
         id: stampProc
         property string action: ""
+        property bool autoClose: false
         // Ask Calamari for the real status once the helper has exited
         // (poll() waits while it runs).
         property bool pollWhenDone: false
@@ -279,7 +306,7 @@ Item {
     Process {
         id: notifyProc
         property string type: ""
-        onRunningChanged: if (!running) Qt.callLater(root.runReminders)
+        onRunningChanged: if (!running) Qt.callLater(root.sendNextNotice)
         stdout: StdioCollector {
             onStreamFinished: {
                 var id = parseInt(text, 10)

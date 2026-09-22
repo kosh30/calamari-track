@@ -13,6 +13,8 @@
 //   breakSince HH:MM of the own clock-out that began the running Pause
 //   stampedToday  true once a shift of today was seen running
 //   dayOff     true after the panel switch "Heute frei" (today only)
+//   postponedTo  HH:MM the next final warning was moved to by "+1 h"
+//              (js/reminders.mjs postpone)
 //   sent       { reminder type: HH:MM last sent today }, see js/reminders.mjs
 //
 // Known limit: the start of a follow-up shift is only found if the plugin
@@ -26,7 +28,7 @@ import { minuteOfDay, pad, toHhmm, toMinutes, ymd } from "./daytime.mjs"
 const STATUS_WINDOW = 2
 
 export function emptyState() {
-  return { date: "", running: null, startedAt: null, searchAfter: null, clockedOutAt: null, breakSince: null, stampedToday: false, dayOff: false, sent: {} }
+  return { date: "", running: null, startedAt: null, searchAfter: null, clockedOutAt: null, breakSince: null, stampedToday: false, dayOff: false, postponedTo: null, sent: {} }
 }
 
 function forToday(state, now) {
