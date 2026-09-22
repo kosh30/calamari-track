@@ -1,0 +1,478 @@
+#!/usr/bin/env python3
+"""Calamari helper: the only part of the plugin that talks to Calamari.
+
+Speaks OAuth (Dynamic Client Registration, Authorization Code + PKCE,
+refresh) and MCP (Streamable HTTP, JSON-RPC) against the official Calamari
+MCP server, see docs/adr/0001. Every command prints exactly one JSON object
+on stdout: {"ok": true, ...} or {"ok": false, "error": {"code", "message"}}
+with a non-zero exit code.
+
+Environment:
+  CALAMARI_BASE_URL      gateway base URL (tests point it at a fake)
+  CALAMARI_KEYRING_FILE  keep secrets in this JSON file instead of the
+                         Secret Service keyring (tests only)
+  BROWSER                command that opens the login URL (default xdg-open)
+"""
+
+import base64
+import fcntl
+import hashlib
+import json
+import os
+import secrets
+import shlex
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from urllib.parse import parse_qs, quote, urlencode, urlsplit, urlunsplit
+
+DEFAULT_BASE_URL = "https://gateway.eu-west-1.calamari.io"
+MCP_PATH = "/mcp-server/mcp"
+SCOPE = "mcp"
+KEYRING_SERVICE = "kosh.calamari-tracker"
+MCP_PROTOCOL_VERSION = "2025-06-18"
+CLIENT_NAME = "Calamari Tracker (Omarchy)"
+VERSION = "0.1.0"
+HTTP_TIMEOUT = 20
+LOGIN_TIMEOUT = 300
+# Refresh a little before the server would reject the token.
+EXPIRY_MARGIN = 60
+
+
+class HelperError(Exception):
+    def __init__(self, code, message):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+class Unauthorized(Exception):
+    """The MCP server rejected the access token (HTTP 401)."""
+
+
+def base_url():
+    return os.environ.get("CALAMARI_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
+
+
+def mcp_url():
+    return base_url() + MCP_PATH
+
+
+def well_known(url, name):
+    """RFC 8414/9728: insert /.well-known/<name> between host and path."""
+    parts = urlsplit(url)
+    path = "/.well-known/" + name + parts.path.rstrip("/")
+    return urlunsplit((parts.scheme, parts.netloc, path, "", ""))
+
+
+# Keyring
+
+
+class SecretToolKeyring:
+    def get(self, key):
+        try:
+            proc = subprocess.run(["secret-tool", "lookup", "service", KEYRING_SERVICE, "key", key],
+                                  capture_output=True, text=True)
+        except FileNotFoundError:
+            raise HelperError("KEYRING", "secret-tool is not installed")
+        if proc.returncode != 0 and proc.stderr.strip():
+            # A missing entry exits non-zero silently; anything else is a keyring problem.
+            raise HelperError("KEYRING", "secret-tool lookup failed: " + proc.stderr.strip())
+        return json.loads(proc.stdout) if proc.returncode == 0 and proc.stdout else None
+
+    def set(self, key, value):
+        try:
+            proc = subprocess.run(["secret-tool", "store", "--label", "Calamari Tracker (%s)" % key,
+                                   "service", KEYRING_SERVICE, "key", key],
+                                  input=json.dumps(value), capture_output=True, text=True)
+        except FileNotFoundError:
+            raise HelperError("KEYRING", "secret-tool is not installed")
+        if proc.returncode != 0:
+            raise HelperError("KEYRING", "secret-tool store failed: " + proc.stderr.strip())
+
+
+class FileKeyring:
+    """Test stand-in: {key: json-string} in one file, like the keyring stores strings."""
+
+    def __init__(self, path):
+        self.path = path
+
+    def _load(self):
+        try:
+            with open(self.path) as f:
+                return json.load(f)
+        except FileNotFoundError:
+            return {}
+
+    def get(self, key):
+        raw = self._load().get(key)
+        return json.loads(raw) if raw else None
+
+    def set(self, key, value):
+        data = self._load()
+        data[key] = json.dumps(value)
+        tmp = self.path + ".tmp"
+        with open(os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), "w") as f:
+            json.dump(data, f)
+        os.replace(tmp, self.path)
+
+
+def keyring():
+    path = os.environ.get("CALAMARI_KEYRING_FILE")
+    return FileKeyring(path) if path else SecretToolKeyring()
+
+
+def lock_path():
+    path = os.environ.get("CALAMARI_KEYRING_FILE")
+    if path:
+        return path + ".lock"
+    runtime = os.environ.get("XDG_RUNTIME_DIR") or "/tmp"
+    return os.path.join(runtime, "%s-%d.lock" % (KEYRING_SERVICE, os.getuid()))
+
+
+# HTTP
+
+
+def http(url, data=None, headers=None, method=None):
+    """Returns (status, headers, body bytes). HTTP errors are returned, not raised."""
+    req = urllib.request.Request(url, data=data, headers=headers or {}, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
+            return resp.status, resp.headers, resp.read()
+    except urllib.error.HTTPError as e:
+        return e.code, e.headers, e.read()
+    except (urllib.error.URLError, OSError) as e:
+        raise HelperError("NETWORK", "cannot reach %s: %s" % (urlsplit(url).netloc, getattr(e, "reason", e)))
+
+
+def check_status(status, body, what):
+    if status == 429:
+        raise HelperError("RATE_LIMITED", "%s: rate limited by Calamari" % what)
+    if not 200 <= status < 300:
+        raise HelperError("MCP_ERROR", "%s: HTTP %d %s" % (what, status, body[:200].decode(errors="replace")))
+
+
+def get_json(url, what):
+    status, _, body = http(url, headers={"Accept": "application/json"})
+    check_status(status, body, what)
+    return json.loads(body)
+
+
+# OAuth
+
+
+def discover():
+    resource = get_json(well_known(mcp_url(), "oauth-protected-resource"), "resource metadata")
+    issuer = resource["authorization_servers"][0]
+    return get_json(well_known(issuer, "oauth-authorization-server"), "authorization server metadata")
+
+
+def pkce_pair():
+    verifier = secrets.token_urlsafe(48)
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    return verifier, challenge
+
+
+def token_request(client, form):
+    """POST to the token endpoint with client authentication. Returns (status, json)."""
+    headers = {"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"}
+    form = dict(form, resource=client["resource"])
+    method = client.get("token_endpoint_auth_method", "client_secret_basic")
+    if method == "client_secret_basic" and client.get("client_secret"):
+        pair = "%s:%s" % (quote(client["client_id"], safe=""), quote(client["client_secret"], safe=""))
+        headers["Authorization"] = "Basic " + base64.b64encode(pair.encode()).decode()
+    else:
+        form["client_id"] = client["client_id"]
+        if method == "client_secret_post":
+            form["client_secret"] = client["client_secret"]
+    status, _, body = http(client["token_endpoint"], urlencode(form).encode(), headers)
+    try:
+        payload = json.loads(body) if body else {}
+    except json.JSONDecodeError:
+        payload = {}
+    return status, payload
+
+
+def stored_tokens(payload, previous=None):
+    return {
+        "access_token": payload["access_token"],
+        # Servers without rotation omit the refresh token on refresh.
+        "refresh_token": payload.get("refresh_token") or (previous or {}).get("refresh_token"),
+        "expires_at": time.time() + int(payload.get("expires_in", 3600)),
+    }
+
+
+class _CallbackHandler(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        url = urlsplit(self.path)
+        if url.path != "/callback":
+            self.send_response(404)
+            self.end_headers()
+            return
+        result = {k: v[0] for k, v in parse_qs(url.query).items()}
+        if result.get("state") != self.server.state:
+            # Not the answer to this login (stale tab, stray request): keep waiting.
+            self.send_response(400)
+            self.end_headers()
+            return
+        self.server.result = result
+        ok = "code" in result
+        body = ("<!doctype html><meta charset=utf-8><title>Calamari Tracker</title><p>%s</p>"
+                % ("Anmeldung abgeschlossen. Dieses Fenster kann geschlossen werden." if ok
+                   else "Anmeldung fehlgeschlagen.")).encode()
+        self.send_response(200 if ok else 400)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+
+def open_browser(url):
+    command = shlex.split(os.environ.get("BROWSER") or "xdg-open")
+    command = [a.replace("%s", url) for a in command] if any("%s" in a for a in command) else command + [url]
+    try:
+        subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+    except OSError:
+        pass  # the URL is on stderr as a fallback
+
+
+def login():
+    meta = discover()
+    if "registration_endpoint" not in meta:
+        raise HelperError("LOGIN_FAILED", "the authorization server offers no client registration")
+
+    server = HTTPServer(("127.0.0.1", 0), _CallbackHandler)
+    server.result = None
+    server.state = state = secrets.token_urlsafe(16)
+    server.timeout = 1
+    redirect_uri = "http://127.0.0.1:%d/callback" % server.server_port
+    try:
+        # A fresh registration per login: the redirect URI carries this run's port.
+        status, _, body = http(meta["registration_endpoint"], json.dumps({
+            "client_name": CLIENT_NAME,
+            "redirect_uris": [redirect_uri],
+            "grant_types": ["authorization_code", "refresh_token"],
+            "response_types": ["code"],
+            "scope": SCOPE,
+            "token_endpoint_auth_method": "client_secret_basic",
+        }).encode(), {"Content-Type": "application/json", "Accept": "application/json"})
+        if status not in (200, 201):
+            raise HelperError("LOGIN_FAILED", "client registration refused: HTTP %d %s"
+                              % (status, body[:300].decode(errors="replace")))
+        registered = json.loads(body)
+        client = {
+            "client_id": registered["client_id"],
+            "client_secret": registered.get("client_secret"),
+            "token_endpoint_auth_method": registered.get("token_endpoint_auth_method", "client_secret_basic"),
+            "token_endpoint": meta["token_endpoint"],
+            "resource": mcp_url(),
+        }
+
+        verifier, challenge = pkce_pair()
+        authorize_url = meta["authorization_endpoint"] + "?" + urlencode({
+            "response_type": "code",
+            "client_id": client["client_id"],
+            "redirect_uri": redirect_uri,
+            "scope": SCOPE,
+            "state": state,
+            "code_challenge": challenge,
+            "code_challenge_method": "S256",
+            "resource": client["resource"],
+        })
+        print("Öffne im Browser: " + authorize_url, file=sys.stderr)
+        open_browser(authorize_url)
+
+        deadline = time.monotonic() + LOGIN_TIMEOUT
+        while server.result is None and time.monotonic() < deadline:
+            server.handle_request()
+        result = server.result
+    finally:
+        server.server_close()
+
+    if result is None:
+        raise HelperError("LOGIN_FAILED", "no answer from the browser within %d s" % LOGIN_TIMEOUT)
+    if "code" not in result:
+        raise HelperError("LOGIN_FAILED", "login refused: %s %s"
+                          % (result.get("error", "?"), result.get("error_description", "")))
+
+    status, payload = token_request(client, {
+        "grant_type": "authorization_code",
+        "code": result["code"],
+        "redirect_uri": redirect_uri,
+        "code_verifier": verifier,
+    })
+    if status != 200 or "access_token" not in payload:
+        raise HelperError("LOGIN_FAILED", "token exchange failed: HTTP %d %s" % (status, payload.get("error", "")))
+
+    store = keyring()
+    store.set("client", client)
+    store.set("tokens", stored_tokens(payload))
+    return {}
+
+
+class Session:
+    """Holds the credentials of one helper run and refreshes them when needed."""
+
+    def __init__(self):
+        self.store = keyring()
+        self.client = self.store.get("client")
+        self.tokens = self.store.get("tokens")
+        if not self.client or not self.tokens:
+            raise HelperError("AUTH_REQUIRED", "not logged in, run `calamari login`")
+
+        self.refreshed = False
+
+    def access_token(self):
+        if not self.refreshed and time.time() > self.tokens.get("expires_at", 0) - EXPIRY_MARGIN:
+            self.refresh()
+        return self.tokens["access_token"]
+
+    def refresh(self):
+        """Refresh under a lock: the refresh token rotates, so concurrent runs
+        must not spend the same one. A run that waited picks up the winner's."""
+        with open(lock_path(), "w") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            latest = self.store.get("tokens") or {}
+            if latest.get("access_token") not in (None, self.tokens["access_token"]):
+                self.tokens, self.refreshed = latest, True
+                return
+            if not self.tokens.get("refresh_token"):
+                raise HelperError("AUTH_REQUIRED", "no refresh token, run `calamari login`")
+            status, payload = token_request(self.client, {
+                "grant_type": "refresh_token",
+                "refresh_token": self.tokens["refresh_token"],
+            })
+            if status in (400, 401):  # invalid_grant / invalid_client: the login is gone
+                raise HelperError("AUTH_REQUIRED", "token refresh refused (%s), run `calamari login`"
+                                  % (payload.get("error") or "HTTP %d" % status))
+            check_status(status, json.dumps(payload).encode(), "token refresh")
+            if "access_token" not in payload:
+                raise HelperError("MCP_ERROR", "token refresh: no access token in the answer")
+            self.tokens = stored_tokens(payload, self.tokens)
+            self.store.set("tokens", self.tokens)
+            self.refreshed = True
+
+
+# MCP
+
+
+def parse_sse(body):
+    """Yields the JSON payload of each event in a text/event-stream body."""
+    for event in body.decode().replace("\r\n", "\n").split("\n\n"):
+        data = "\n".join(line[5:].lstrip(" ") for line in event.split("\n") if line.startswith("data:"))
+        if data:
+            yield json.loads(data)
+
+
+class McpClient:
+    def __init__(self, session):
+        self.session = session
+        self.session_id = None
+        self.protocol_version = MCP_PROTOCOL_VERSION
+        self.next_id = 1
+
+    def post(self, message):
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+            "Authorization": "Bearer " + self.session.access_token(),
+            "MCP-Protocol-Version": self.protocol_version,
+        }
+        if self.session_id:
+            headers["Mcp-Session-Id"] = self.session_id
+        status, resp_headers, body = http(mcp_url(), json.dumps(message).encode(), headers)
+        if status == 401:
+            raise Unauthorized()
+        check_status(status, body, "MCP " + message["method"])
+        if "id" not in message:
+            return None, resp_headers
+        if (resp_headers.get("Content-Type") or "").startswith("text/event-stream"):
+            reply = next((m for m in parse_sse(body) if m.get("id") == message["id"]), None)
+        else:
+            reply = json.loads(body)
+        if reply is None:
+            raise HelperError("MCP_ERROR", "MCP %s: no reply in the event stream" % message["method"])
+        if "error" in reply:
+            raise HelperError("MCP_ERROR", "MCP %s: %s" % (message["method"], reply["error"].get("message")))
+        return reply["result"], resp_headers
+
+    def request(self, method, params):
+        message = {"jsonrpc": "2.0", "id": self.next_id, "method": method, "params": params}
+        self.next_id += 1
+        return self.post(message)
+
+    def open(self):
+        result, headers = self.request("initialize", {
+            "protocolVersion": MCP_PROTOCOL_VERSION,
+            "capabilities": {},
+            "clientInfo": {"name": "calamari-tracker", "version": VERSION},
+        })
+        self.session_id = headers.get("Mcp-Session-Id")
+        self.protocol_version = result.get("protocolVersion") or self.protocol_version
+        self.post({"jsonrpc": "2.0", "method": "notifications/initialized"})
+
+    def call_tool(self, name, arguments):
+        result, _ = self.request("tools/call", {"name": name, "arguments": arguments})
+        text = "\n".join(c.get("text", "") for c in result.get("content", []) if c.get("type") == "text")
+        if result.get("isError"):
+            raise HelperError("MCP_ERROR", "%s: %s" % (name, text or "tool error"))
+        if "structuredContent" in result:
+            return result["structuredContent"]
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            return text
+
+
+def call_tool(name, arguments=None):
+    """One MCP session for one tool call, refreshing the token once on 401."""
+    session = Session()
+    for attempt in range(2):
+        try:
+            client = McpClient(session)
+            client.open()
+            return client.call_tool(name, arguments or {})
+        except Unauthorized:
+            if attempt == 0:
+                session.refresh()
+    raise HelperError("AUTH_REQUIRED", "Calamari rejects the refreshed token, run `calamari login`")
+
+
+# Commands
+
+
+def whoami():
+    profile = call_tool("getMyProfile")
+    if not isinstance(profile, dict):
+        return {"name": str(profile), "email": None, "profile": profile}
+    name = (profile.get("name") or profile.get("fullName")
+            or " ".join(p for p in (profile.get("firstName"), profile.get("lastName")) if p))
+    return {"name": name, "email": profile.get("email"), "profile": profile}
+
+
+COMMANDS = {"login": login, "whoami": whoami}
+
+
+def main(argv):
+    try:
+        if len(argv) != 1 or argv[0] not in COMMANDS:
+            raise HelperError("USAGE", "usage: calamari {%s}" % ",".join(COMMANDS))
+        out = dict(ok=True, **COMMANDS[argv[0]]())
+        code = 0
+    except HelperError as e:
+        out, code = {"ok": False, "error": {"code": e.code, "message": e.message}}, 1
+    except Exception as e:  # never break the one-JSON-object contract
+        out, code = {"ok": False, "error": {"code": "INTERNAL", "message": "%s: %s" % (type(e).__name__, e)}}, 1
+    print(json.dumps(out, ensure_ascii=False))
+    return code
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

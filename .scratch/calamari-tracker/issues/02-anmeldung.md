@@ -11,7 +11,16 @@
 - [ ] `login` führt den kompletten Browser-Login durch (manuell mit dem Benutzer abgenommen)
 - [ ] `whoami` liefert den Namen des Benutzers als JSON (`{"ok": true, ...}`)
 - [ ] Tokens und Client-Daten liegen im Keyring, nicht auf der Platte
-- [ ] Automatischer Refresh bei abgelaufenem Token bzw. 401. Scheitert der Refresh, gibt es `{"ok": false, "error": {"code": "AUTH_REQUIRED"}}` mit Exit-Code ≠ 0
+- [x] Automatischer Refresh bei abgelaufenem Token bzw. 401. Scheitert der Refresh, gibt es `{"ok": false, "error": {"code": "AUTH_REQUIRED"}}` mit Exit-Code ≠ 0
 - [ ] Das Panel zeigt den Anmeldestatus, „Neu anmelden“ startet den Login
 - [ ] Die Bar zeigt ein Warnsymbol, solange eine Anmeldung nötig ist
-- [ ] Tests gegen einen Fake-OAuth/MCP-Server (JSON- und SSE-Antworten): Login inkl. PKCE-Prüfung, Refresh, `AUTH_REQUIRED`. Keyring und Basis-URL per Umgebungsvariable ersetzbar
+- [x] Tests gegen einen Fake-OAuth/MCP-Server (JSON- und SSE-Antworten): Login inkl. PKCE-Prüfung, Refresh, `AUTH_REQUIRED`. Keyring und Basis-URL per Umgebungsvariable ersetzbar
+
+## Comments
+
+**2026-09-22 (Agent):** Helfer `bin/calamari` (`login`, `whoami`), Fake-Gateway-Tests (`tests/test_calamari_cli.py`), Anmeldestatus in Service, Panel und Bar sind umgesetzt.
+- Gegen den echten Server geprüft: Die Metadaten-Discovery funktioniert. Die Dynamic Client Registration ist offen (kein Initial-Token nötig) und hat eine `client_id` ausgestellt. Der Token-Endpoint kennt keine Auth-Methode `none`, deshalb authentifiziert sich der Client mit `client_secret_basic`.
+- `login` registriert bei jedem Aufruf einen neuen Client, weil die Redirect-URI den freien Port des Laufs enthält. Da ein Login selten ist, ist das bewusst so.
+- Zusätzlich zu Keyring und Basis-URL gibt es `$BROWSER` als dritte Naht. Das ist die übliche Konvention, und der Test-Browser folgt damit dem Redirect.
+- Ein Refresh läuft unter einer Dateisperre, weil Calamari Refresh-Tokens rotiert und parallele Läufe sich sonst gegenseitig abmelden.
+- Noch offen ist die manuelle Abnahme. Der erste echte Login lief nach 300 s ohne Browser-Rückmeldung ab. Ungeprüft sind außerdem das Feldformat von `getMyProfile` (`whoami` gibt dafür `profile` roh mit aus) sowie Panel und Bar in der laufenden Shell (`omarchy-restart-shell` für `Service.qml`).

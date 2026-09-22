@@ -10,6 +10,8 @@ BarWidget {
     moduleName: "kosh.calamari-tracker"
 
     property var panelItem: null
+    readonly property var service: bar && bar.shell ? bar.shell.serviceFor(moduleName) : null
+    readonly property bool authRequired: service ? service.authRequired === true : false
 
     readonly property bool opened: panelItem ? panelItem.opened === true : false
     readonly property bool popoutSwitchClosing: panelItem ? panelItem.popoutSwitchClosing === true : false
@@ -40,6 +42,7 @@ BarWidget {
         target.settings = root.settings
         target.anchorItem = button
         target.hostWidget = root
+        target.service = root.service
     }
 
     implicitWidth: button.implicitWidth
@@ -47,6 +50,7 @@ BarWidget {
 
     onBarChanged: injectPanel()
     onSettingsChanged: injectPanel()
+    onServiceChanged: injectPanel()
 
     Loader {
         id: panelLoader
@@ -63,9 +67,10 @@ BarWidget {
         id: button
         anchors.fill: parent
         bar: root.bar
-        text: "󰔟"
+        text: root.authRequired ? "󰀦" : "󰔟"
+        active: root.authRequired
         slotSize: Style.bar.statusSlot
-        tooltipText: root.opened ? "" : "Calamari Tracker"
+        tooltipText: root.opened ? "" : (root.authRequired ? "Calamari: Anmeldung nötig" : "Calamari Tracker")
 
         onPressed: function (b) {
             if (b === Qt.LeftButton)

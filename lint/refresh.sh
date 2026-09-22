@@ -9,6 +9,6 @@ dst="$(cd "$(dirname "$0")" && pwd)/qs"
 rm -rf "$dst/Commons"
 cp -r "$src/Commons" "$dst/Commons"
 
-for f in BarWidget BarIconButton WidgetButton OpticalGlyph Panel PanelController PanelKeyCatcher; do
+for f in BarWidget BarIconButton WidgetButton OpticalGlyph Panel PanelController PanelKeyCatcher Button BorderSurface; do
   cp "$src/Ui/$f.qml" "$dst/Ui/$f.qml"
 done
