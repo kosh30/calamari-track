@@ -50,6 +50,18 @@ BarWidget {
         if (panelItem)
             panelItem.toggle()
     }
+    // Left click: the stamping page; right click: the menu with the settings.
+    function openPage(page) {
+        if (!panelItem)
+            return
+        if (panelItem.opened && panelItem.page === page) {
+            panelItem.close()
+            return
+        }
+        panelItem.showPage(page)
+        if (!panelItem.opened)
+            panelItem.open()
+    }
     function closeForPopoutSwitch() {
         if (panelItem)
             panelItem.closeForPopoutSwitch()
@@ -118,7 +130,9 @@ BarWidget {
 
         onPressed: function (b) {
             if (b === Qt.LeftButton)
-                root.togglePanel()
+                root.openPage("main")
+            else if (b === Qt.RightButton)
+                root.openPage("menu")
         }
     }
 }

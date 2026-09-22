@@ -39,6 +39,15 @@ Item {
         var value = root.settings ? root.settings[name] : undefined
         return value === undefined || value === null ? fallback : value
     }
+    // Saves the settings form (SettingsForm.qml) into this plugin's bar
+    // entry of shell.json, as `omarchy bar set` would; the shell hands them
+    // back through Widget.qml.
+    function saveSettings(values) {
+        if (!root.shell || typeof root.shell.updateEntryInline !== "function")
+            return false
+        return root.shell.updateEntryInline("kosh.calamari-tracker", Object.assign({}, root.settings, values)) !== false
+    }
+
     // The settings as they are; js/reminders.mjs fills in the defaults.
     readonly property var config: root.settings || ({})
 

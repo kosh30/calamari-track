@@ -5,7 +5,9 @@ import "js/shiftclock.mjs" as ShiftClock
 import "js/reminders.mjs" as Reminders
 
 // Popup panel toggled from the bar icon: login state, shift status and
-// clocking in/out. Clocking out means Feierabend (js/shiftclock.mjs).
+// clocking in/out (page "main"); on right-click a small menu (page "menu")
+// leading to the settings (page "settings", SettingsForm.qml). Clocking
+// out means Feierabend (js/shiftclock.mjs).
 Panel {
     id: root
     moduleName: "kosh.calamari-tracker"
@@ -31,8 +33,18 @@ Panel {
         return label + (busy ? " …" : "")
     }
 
+    property string page: "main"
+
+    function showPage(name) {
+        root.page = name
+        if (name === "settings")
+            settingsForm.load()
+    }
+
     onOpenedChanged: {
-        if (root.opened && root.service)
+        if (!root.opened)
+            root.page = "main"
+        else if (root.page === "main" && root.service)
             root.service.poll()
     }
     readonly property var barIdentity: hostWidget || root
@@ -50,7 +62,7 @@ Panel {
         bar: root.bar
         open: root.opened
         focusTarget: keyCatcher
-        contentWidth: panel.fittedContentWidth(Style.space(320))
+        contentWidth: panel.fittedContentWidth(Style.space(root.page === "settings" ? 420 : 320))
         contentHeight: panel.fittedContentHeight(content.implicitHeight)
 
         PanelKeyCatcher {
@@ -64,125 +76,147 @@ Panel {
             Column {
                 id: content
                 width: parent.width
-                spacing: Style.space(8)
 
-                Text {
-                    text: "Calamari Tracker"
-                    color: Color.foreground
-                    font.family: Style.font.family
-                    font.pixelSize: Style.font.body
-                    font.bold: true
+                Button {
+                    visible: root.page === "menu"
+                    text: "Einstellungen"
+                    iconText: "󰒓"
+                    bordered: true
+                    onClicked: root.showPage("settings")
                 }
 
-                Text {
+                SettingsForm {
+                    id: settingsForm
+                    visible: root.page === "settings"
                     width: parent.width
-                    wrapMode: Text.Wrap
-                    color: Color.foreground
-                    font.family: Style.font.family
-                    font.pixelSize: Style.font.body
-                    text: root.loggingIn ? "Anmeldung im Browser läuft …"
-                        : root.authState === "ok" ? (root.service.userName ? "Angemeldet als " + root.service.userName : "Angemeldet")
-                        : root.authState === "required" ? "Anmeldung nötig"
-                        : root.authState === "error" ? "Calamari nicht erreichbar"
-                        : "Verbinde …"
+                    service: root.service
+                    onDone: root.close()
                 }
 
-                Text {
+                Column {
+                    id: mainPage
+                    visible: root.page === "main"
                     width: parent.width
-                    visible: root.authState === "ok" && root.service !== null
-                    wrapMode: Text.Wrap
-                    color: Color.foreground
-                    font.family: Style.font.family
-                    font.pixelSize: Style.font.body
-                    readonly property var shift: root.service ? root.service.shiftState : null
-                    readonly property var view: root.view
-                    text: !view || view.kind === "unknown" ? "Schichtstatus wird abgefragt …"
-                        : view.kind === "error" ? "Schichtstatus unbekannt"
-                        : view.kind === "reminder" ? "Noch nicht eingestempelt, die Kernzeit läuft"
-                        : view.kind === "break" ? "Pause seit " + shift.breakSince + " (" + view.text + ")"
-                        : view.kind === "idle" ? (shift.clockedOutAt ? "Feierabend seit " + shift.clockedOutAt : "Keine laufende Schicht")
-                        : shift.startedAt ? "Schicht läuft seit " + shift.startedAt + " (" + view.text + ")"
-                        : "Schicht läuft"
-                }
+                    spacing: Style.space(8)
 
-                Text {
-                    width: parent.width
-                    visible: root.countdown !== ""
-                    wrapMode: Text.Wrap
-                    color: Color.urgent
-                    font.family: Style.font.family
-                    font.pixelSize: Style.font.body
-                    font.bold: true
-                    text: root.countdown
-                }
+                    Text {
+                        text: "Calamari Tracker"
+                        color: Color.foreground
+                        font.family: Style.font.family
+                        font.pixelSize: Style.font.body
+                        font.bold: true
+                    }
 
-                Button {
-                    visible: root.service !== null && root.service.decision.canExtend === true
-                    text: Reminders.extendLabel(root.service ? root.service.config : null)
-                    bordered: true
-                    onClicked: root.service.postpone()
-                }
+                    Text {
+                        width: parent.width
+                        wrapMode: Text.Wrap
+                        color: Color.foreground
+                        font.family: Style.font.family
+                        font.pixelSize: Style.font.body
+                        text: root.loggingIn ? "Anmeldung im Browser läuft …"
+                            : root.authState === "ok" ? (root.service.userName ? "Angemeldet als " + root.service.userName : "Angemeldet")
+                            : root.authState === "required" ? "Anmeldung nötig"
+                            : root.authState === "error" ? "Calamari nicht erreichbar"
+                            : "Verbinde …"
+                    }
 
-                Button {
-                    visible: root.stampAction !== null
-                    enabled: root.service !== null && !root.service.busy
-                    text: root.actionText(root.stampAction)
-                    bordered: true
-                    onClicked: root.service.stamp(root.stampAction)
-                }
+                    Text {
+                        width: parent.width
+                        visible: root.authState === "ok" && root.service !== null
+                        wrapMode: Text.Wrap
+                        color: Color.foreground
+                        font.family: Style.font.family
+                        font.pixelSize: Style.font.body
+                        readonly property var shift: root.service ? root.service.shiftState : null
+                        readonly property var view: root.view
+                        text: !view || view.kind === "unknown" ? "Schichtstatus wird abgefragt …"
+                            : view.kind === "error" ? "Schichtstatus unbekannt"
+                            : view.kind === "reminder" ? "Noch nicht eingestempelt, die Kernzeit läuft"
+                            : view.kind === "break" ? "Pause seit " + shift.breakSince + " (" + view.text + ")"
+                            : view.kind === "idle" ? (shift.clockedOutAt ? "Feierabend seit " + shift.clockedOutAt : "Keine laufende Schicht")
+                            : shift.startedAt ? "Schicht läuft seit " + shift.startedAt + " (" + view.text + ")"
+                            : "Schicht läuft"
+                    }
 
-                Button {
-                    visible: root.breakAction !== null
-                    enabled: root.service !== null && !root.service.busy
-                    text: root.actionText(root.breakAction)
-                    bordered: true
-                    onClicked: root.service.stamp(root.breakAction)
-                }
+                    Text {
+                        width: parent.width
+                        visible: root.countdown !== ""
+                        wrapMode: Text.Wrap
+                        color: Color.urgent
+                        font.family: Style.font.family
+                        font.pixelSize: Style.font.body
+                        font.bold: true
+                        text: root.countdown
+                    }
 
-                Button {
-                    visible: root.feierabendAction !== null
-                    enabled: root.service !== null && !root.service.busy
-                    text: "Feierabend"
-                    tooltipText: "Die Pause wird zum Feierabend, gestempelt wird nichts"
-                    bordered: true
-                    onClicked: root.service.endBreakAsFeierabend()
-                }
+                    Button {
+                        visible: root.service !== null && root.service.decision.canExtend === true
+                        text: Reminders.extendLabel(root.service ? root.service.config : null)
+                        bordered: true
+                        onClicked: root.service.postpone()
+                    }
 
-                Button {
-                    visible: root.service !== null && root.authState === "ok"
-                    readonly property bool dayOff: root.service !== null && root.service.dayOff
-                    text: dayOff ? "Heute frei (zurücknehmen)" : "Heute frei"
-                    tooltipText: "Keine Stempel-Erinnerungen bis morgen"
-                    selected: dayOff
-                    bordered: true
-                    onClicked: root.service.setDayOff(!dayOff)
-                }
+                    Button {
+                        visible: root.stampAction !== null
+                        enabled: root.service !== null && !root.service.busy
+                        text: root.actionText(root.stampAction)
+                        bordered: true
+                        onClicked: root.service.stamp(root.stampAction)
+                    }
 
-                Text {
-                    width: parent.width
-                    visible: root.service !== null && root.service.stampError !== ""
-                    wrapMode: Text.Wrap
-                    color: Color.urgent
-                    font.family: Style.font.family
-                    font.pixelSize: Style.font.body
-                    text: root.service ? root.service.stampError : ""
-                }
+                    Button {
+                        visible: root.breakAction !== null
+                        enabled: root.service !== null && !root.service.busy
+                        text: root.actionText(root.breakAction)
+                        bordered: true
+                        onClicked: root.service.stamp(root.breakAction)
+                    }
 
-                Text {
-                    width: parent.width
-                    visible: root.service !== null && root.service.errorMessage !== "" && !root.loggingIn
-                    wrapMode: Text.Wrap
-                    color: Color.urgent
-                    font.family: Style.font.family
-                    font.pixelSize: Style.font.body
-                    text: root.service ? root.service.errorMessage : ""
-                }
+                    Button {
+                        visible: root.feierabendAction !== null
+                        enabled: root.service !== null && !root.service.busy
+                        text: "Feierabend"
+                        tooltipText: "Die Pause wird zum Feierabend, gestempelt wird nichts"
+                        bordered: true
+                        onClicked: root.service.endBreakAsFeierabend()
+                    }
 
-                Button {
-                    visible: root.service !== null && root.authState !== "ok" && !root.loggingIn
-                    text: "Neu anmelden"
-                    bordered: true
-                    onClicked: root.service.login()
+                    Button {
+                        visible: root.service !== null && root.authState === "ok"
+                        readonly property bool dayOff: root.service !== null && root.service.dayOff
+                        text: dayOff ? "Heute frei (zurücknehmen)" : "Heute frei"
+                        tooltipText: "Keine Stempel-Erinnerungen bis morgen"
+                        selected: dayOff
+                        bordered: true
+                        onClicked: root.service.setDayOff(!dayOff)
+                    }
+
+                    Text {
+                        width: parent.width
+                        visible: root.service !== null && root.service.stampError !== ""
+                        wrapMode: Text.Wrap
+                        color: Color.urgent
+                        font.family: Style.font.family
+                        font.pixelSize: Style.font.body
+                        text: root.service ? root.service.stampError : ""
+                    }
+
+                    Text {
+                        width: parent.width
+                        visible: root.service !== null && root.service.errorMessage !== "" && !root.loggingIn
+                        wrapMode: Text.Wrap
+                        color: Color.urgent
+                        font.family: Style.font.family
+                        font.pixelSize: Style.font.body
+                        text: root.service ? root.service.errorMessage : ""
+                    }
+
+                    Button {
+                        visible: root.service !== null && root.authState !== "ok" && !root.loggingIn
+                        text: "Neu anmelden"
+                        bordered: true
+                        onClicked: root.service.login()
+                    }
                 }
             }
         }

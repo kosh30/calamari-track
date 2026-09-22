@@ -82,6 +82,7 @@
         "key": "finalWarningTime",
         "type": "string",
         "label": "Uhrzeit der letzten Warnung (HH:MM)",
+        "format": "time",
         "defaultValue": "19:00"
       },
       {
@@ -104,54 +105,63 @@
         "key": "hardLimitTime",
         "type": "string",
         "label": "Obergrenze für den Auto-Abschluss (HH:MM)",
+        "format": "time",
         "defaultValue": "23:00"
       },
       {
         "key": "webUrl",
         "type": "string",
         "label": "Calamari im Browser (z.B. https://firma.calamari.io)",
+        "format": "url",
         "defaultValue": ""
       },
       {
         "key": "coreMonday",
         "type": "string",
         "label": "Kernzeit Montag (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "format": "coreTime",
         "defaultValue": ""
       },
       {
         "key": "coreTuesday",
         "type": "string",
         "label": "Kernzeit Dienstag (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "format": "coreTime",
         "defaultValue": ""
       },
       {
         "key": "coreWednesday",
         "type": "string",
         "label": "Kernzeit Mittwoch (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "format": "coreTime",
         "defaultValue": ""
       },
       {
         "key": "coreThursday",
         "type": "string",
         "label": "Kernzeit Donnerstag (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "format": "coreTime",
         "defaultValue": ""
       },
       {
         "key": "coreFriday",
         "type": "string",
         "label": "Kernzeit Freitag (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "format": "coreTime",
         "defaultValue": ""
       },
       {
         "key": "coreSaturday",
         "type": "string",
         "label": "Kernzeit Samstag (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "format": "coreTime",
         "defaultValue": ""
       },
       {
         "key": "coreSunday",
         "type": "string",
         "label": "Kernzeit Sonntag (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "format": "coreTime",
         "defaultValue": ""
       }
     ]
