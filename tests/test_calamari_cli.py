@@ -254,6 +254,26 @@ class CalamariCliTest(unittest.TestCase):
 
         self.assertEqual((code, out), (0, {"ok": True, "startedAt": None}))
 
+    def test_end_time_finds_the_end_minute_of_the_last_shift_since_after(self):
+        self.login()
+        self.fake.shifts = [("2026-09-22", "08:00:10", "10:15:20"), ("2026-09-22", "10:30:40", "12:00:30")]
+
+        code, out = self.run_helper("end-time", "--after", "10:30")
+
+        self.assertEqual((code, out), (0, {"ok": True, "endedAt": "12:00"}))
+        self.assertLessEqual(self.fake.overlap_calls, 12)
+
+    def test_end_time_without_a_shift_since_after_is_null(self):
+        self.login()
+        self.fake.shifts = [("2026-09-22", "08:00:10", "10:15:20")]
+
+        code, out = self.run_helper("end-time", "--after", "11:00")
+
+        self.assertEqual((code, out), (0, {"ok": True, "endedAt": None}))
+
+    def test_end_time_needs_after(self):
+        self.assert_error(self.run_helper("end-time"), "USAGE")
+
     def test_start_time_rejects_a_malformed_after(self):
         self.assert_error(self.run_helper("start-time", "--after", "7 Uhr"), "USAGE")
 

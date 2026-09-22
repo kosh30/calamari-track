@@ -482,3 +482,22 @@ test("Auto-Abschluss und Übernacht-Abschluss stempeln aus und kündigen ihren K
     { stamp: "overnight-close", notice: { type: "overnight-closed", lastActivity: null } })
   assert.equal(closeFor({ type: "stamp-reminder" }), null)
 })
+
+test("nach einem Auto-Abschluss bekommt eine neue Schicht ihre eigene letzte Warnung, auch nach „+1 h“", () => {
+  // Warned 19:00, "+1 h" to 20:00, warned again, auto-closed 20:15; back at work 20:30.
+  let state = markSent(hinted(), "final-warning", at("19:00"))
+  state = markSent(postpone(state, eveningConfig, at("19:00")), "final-warning", at("20:00"))
+  state = markSent(state, "auto-close", at("20:15"))
+  state = stamp(stamp(state, "clock-out", "20:15"), "clock-in", "20:30")
+  const r = decide(at("20:35"), workday, state, eveningConfig)
+  assert.deepEqual(types(r), [])
+  assert.deepEqual(r.nextCheckAt, at("22:45"))
+})
+
+test("solange der Beginn einer im Web begonnenen Schicht unbekannt ist, wird nicht ausgestempelt", () => {
+  let state = markSent(postpone(markSent(hinted(), "final-warning", at("19:00")), eveningConfig, at("19:00")), "final-warning", at("20:00"))
+  state = stamp(markSent(state, "auto-close", at("20:15")), "clock-out", "20:15")
+  // Clocked in on the phone; the poll sees it, start-time has not answered yet.
+  state = applyStatus(state, true, at("20:40")).state
+  assert.deepEqual(types(decide(at("20:40"), workday, state, eveningConfig)), [])
+})

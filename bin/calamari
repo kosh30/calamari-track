@@ -554,6 +554,17 @@ def clock_out(args):
     return {"running": False}
 
 
+def first_minute(lo, hi, holds):
+    """The first minute in [lo, hi] where holds (monotone, true at hi) is true."""
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if holds(mid):
+            hi = mid
+        else:
+            lo = mid + 1
+    return lo
+
+
 def start_time(args):
     """Bisects the first minute x after --after where [after, x] overlaps. The
     shift began during minute x - 1 (verified against a real shift)."""
@@ -565,14 +576,7 @@ def start_time(args):
     def search(client):
         if not overlaps(client, date, after, minute):
             return None
-        lo, hi = after + 1, minute
-        while lo < hi:
-            mid = (lo + hi) // 2
-            if overlaps(client, date, after, mid):
-                hi = mid
-            else:
-                lo = mid + 1
-        return hhmm(lo - 1)
+        return hhmm(first_minute(after + 1, minute, lambda m: overlaps(client, date, after, m)) - 1)
 
     return {"startedAt": with_mcp(search)}
 
@@ -624,6 +628,23 @@ def day_info(args):
                                     "fullDay": absence.get("fullDayRequest") is True}}
 
 
+def end_time(args):
+    """The end minute of the last shift since --after: bisects the first
+    minute y where [y, now] no longer overlaps; the shift ended during
+    minute y - 1. Asked once a shift is seen gone, so none runs now."""
+    date, minute = today_and_minute()
+    after = parse_hhmm(args.after)
+    if after >= minute:
+        return {"endedAt": None}
+
+    def search(client):
+        if not overlaps(client, date, after, minute):
+            return None
+        return hhmm(first_minute(after + 1, minute, lambda m: not overlaps(client, date, m, minute)) - 1)
+
+    return {"endedAt": with_mcp(search)}
+
+
 class _Parser(argparse.ArgumentParser):
     def error(self, message):
         raise HelperError("USAGE", message)
@@ -637,6 +658,8 @@ def parse_args(argv):
         sub.set_defaults(run=run)
         if name == "start-time":
             sub.add_argument("--after", metavar="HH:MM")
+        if name == "end-time":
+            sub.add_argument("--after", metavar="HH:MM", required=True)
         if name == "day-info":
             sub.add_argument("--date", metavar="YYYY-MM-DD")
         if name == "status":
@@ -645,7 +668,7 @@ def parse_args(argv):
 
 
 COMMANDS = {"login": login, "whoami": whoami, "status": status, "start-time": start_time,
-            "clock-in": clock_in, "clock-out": clock_out, "day-info": day_info}
+            "end-time": end_time, "clock-in": clock_in, "clock-out": clock_out, "day-info": day_info}
 
 
 def main(argv):

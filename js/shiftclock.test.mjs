@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { applyStamp, applyStatus, applyStartTime, barView, breakAction, dayOffToday, emptyState, endBreakAsFeierabend, feierabendAction, helperCommand, needsOvernightCheck, restoreState, setDayOff, stampAction, stampLabel } from "./shiftclock.mjs"
+import { applyStamp, applyStatus, applyStartTime, barView, breakAction, dayOffToday, emptyState, endBreakAsFeierabend, feierabendAction, helperCommand, needsOvernightCheck, applyEndTime, restoreState, setDayOff, stampAction, stampLabel, workedMinutes, workedText } from "./shiftclock.mjs"
 
 const at = (hhmm, date = "2026-09-22") => new Date(`${date}T${hhmm}:00`)
 
@@ -301,4 +301,77 @@ test("solange die Schicht vom Vortag offen ist, fragt jede Abfrage auch nach dem
   const gone = applyStatus(overnight, false, at("07:36"), false).state
   assert.equal(gone.overnight, false)
   assert.equal(needsOvernightCheck(gone, at("07:40")), false)
+})
+
+// Gesamtzeit heute (beobachtet)
+
+test("die Gesamtzeit heute zählt beendete und laufende Schichten, auch vor einer Pause", () => {
+  let state = clockIn(applyStatus(emptyState(), false, at("08:55")).state, "09:00")
+  state = breakStart(state, "12:00")
+  state = applyStamp(state, "break-end", { ok: true, running: true }, at("12:30")).state
+  assert.equal(workedMinutes(state, at("13:00")), 180 + 30)
+  state = clockOut(state, "16:30")
+  assert.equal(workedMinutes(state, at("18:00")), 180 + 240)
+})
+
+test("eine im Web beendete Schicht wird mit ihrem Ende nachgetragen", () => {
+  let state = applyStartTime(applyStatus(emptyState(), true, at("10:00")).state, "09:40")
+  const r = applyStatus(state, false, at("12:03"))
+  assert.deepEqual(r.endTimeQuery, { after: "09:40" })
+  state = applyEndTime(r.state, "09:40", "12:00")
+  assert.equal(workedMinutes(state, at("12:05")), 140)
+})
+
+test("ohne bekannten Beginn wird kein Ende gesucht", () => {
+  const state = applyStatus(emptyState(), true, at("10:00")).state
+  assert.equal(applyStatus(state, false, at("12:03")).endTimeQuery, null)
+})
+
+test("eine eigene Stempelung braucht keine Suche nach dem Ende", () => {
+  const state = clockOut(clockIn(emptyState(), "09:00"), "12:00")
+  assert.equal(applyStatus(state, false, at("12:05")).endTimeQuery, null)
+})
+
+test("die Gesamtzeit übersteht einen Neustart und beginnt am nächsten Tag neu", () => {
+  const state = restoreState(JSON.stringify(clockOut(clockIn(emptyState(), "09:00"), "12:00")))
+  assert.equal(workedMinutes(state, at("13:00")), 180)
+  const tomorrow = applyStatus(state, false, at("08:00", "2026-09-23")).state
+  assert.equal(workedMinutes(tomorrow, at("08:00", "2026-09-23")), 0)
+})
+
+test("die Schicht vom Vortag zählt nicht zur Gesamtzeit heute", () => {
+  let state = applyStatus(emptyState(), true, at("22:00", "2026-09-21")).state
+  state = applyStatus(state, true, at("07:30"), true).state
+  state = applyStamp(state, "overnight-close", { ok: true, running: false }, at("07:31")).state
+  assert.equal(workedMinutes(state, at("08:00")), 0)
+})
+
+test("das Panel nennt die beobachtete Gesamtzeit heute, sobald es eine gibt", () => {
+  assert.equal(workedText(clockIn(emptyState(), "09:00"), at("09:00")), "")
+  assert.equal(workedText(clockOut(clockIn(emptyState(), "09:00"), "12:05"), at("13:00")), "Heute gearbeitet (beobachtet): 3:05")
+})
+
+test("scheitert die Suche nach dem Ende, versucht es die nächste Abfrage erneut", () => {
+  const state = applyStartTime(applyStatus(emptyState(), true, at("10:00")).state, "09:40")
+  const first = applyStatus(state, false, at("12:03"))
+  // end-time failed: nothing applied; the next poll asks again.
+  const again = applyStatus(first.state, false, at("12:06"))
+  assert.deepEqual(again.endTimeQuery, { after: "09:40" })
+  const done = applyEndTime(again.state, "09:40", "12:00")
+  assert.equal(applyStatus(done, false, at("12:09")).endTimeQuery, null)
+  assert.equal(workedMinutes(done, at("12:10")), 140)
+})
+
+test("findet die Suche kein Ende, wird nicht weiter gesucht", () => {
+  const state = applyStartTime(applyStatus(emptyState(), true, at("10:00")).state, "09:40")
+  const r = applyStatus(state, false, at("12:03"))
+  const none = applyEndTime(r.state, "09:40", null)
+  assert.equal(applyStatus(none, false, at("12:06")).endTimeQuery, null)
+})
+
+test("eine Antwort auf die Suche vom Vortag ändert den neuen Tag nicht", () => {
+  const state = applyStartTime(applyStatus(emptyState(), true, at("22:00", "2026-09-21")).state, "21:40")
+  const r = applyStatus(state, false, at("23:59", "2026-09-21"))
+  const tomorrow = applyStatus(r.state, false, at("00:05")).state
+  assert.equal(workedMinutes(applyEndTime(tomorrow, "21:40", "23:50"), at("00:10")), 0)
 })

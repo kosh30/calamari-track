@@ -156,6 +156,16 @@ Panel {
                         onClicked: root.service.postpone()
                     }
 
+                    Text {
+                        width: parent.width
+                        visible: text !== "" && root.authState === "ok"
+                        wrapMode: Text.Wrap
+                        color: Color.foreground
+                        font.family: Style.font.family
+                        font.pixelSize: Style.font.body
+                        text: root.service ? ShiftClock.workedText(root.service.shiftState, root.service.now) : ""
+                    }
+
                     Button {
                         visible: root.stampAction !== null
                         enabled: root.service !== null && !root.service.busy

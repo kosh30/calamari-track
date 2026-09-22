@@ -97,15 +97,20 @@ function decideSoftHint(now, day, state, config) {
 // at its start and closed a wait later.
 function decideEvening(now, state, config) {
   const r = quiet()
+  // The start of a shift begun in the web is looked up right away; until
+  // then nothing of an earlier shift (warning, "+1 h") may apply to it.
+  if (!state.startedAt) return r
   const minute = minuteOfDay(now)
   const wait = config.autoCloseMinutes
-  const started = state.startedAt ? toMinutes(state.startedAt) : null
+  const started = toMinutes(state.startedAt)
   let limit = clockSetting(config.hardLimitTime, DEFAULTS.hardLimitTime)
-  if (started !== null && started > limit - wait) limit = Math.min(started + wait, LAST_MINUTE)
+  if (started > limit - wait) limit = Math.min(started + wait, LAST_MINUTE)
   const lastWarning = limit - wait
   let warnAt = clockSetting(config.finalWarningTime, DEFAULTS.finalWarningTime)
-  if (state.postponedTo) warnAt = toMinutes(state.postponedTo)
-  else if (started !== null && started >= warnAt) warnAt = lastWarning
+  // A "+1 h" belongs to the shift it was clicked in, not to a later one.
+  const postponed = state.postponedTo ? toMinutes(state.postponedTo) : null
+  if (postponed !== null && postponed > started) warnAt = postponed
+  else if (started >= warnAt) warnAt = lastWarning
   warnAt = Math.min(warnAt, lastWarning)
 
   const sent = state.sent && state.sent["final-warning"]

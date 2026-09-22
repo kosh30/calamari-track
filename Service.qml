@@ -74,7 +74,7 @@ Item {
     property string stampError: ""
     readonly property bool stamping: stampProc.running
     readonly property string stampingAction: stampProc.running ? stampProc.action : ""
-    readonly property bool busy: stampProc.running || statusProc.running || startTimeProc.running
+    readonly property bool busy: stampProc.running || statusProc.running || startTimeProc.running || endTimeProc.running
 
     readonly property int pollInterval: root.setting("pollIntervalMinutes", 3) * 60 * 1000
     readonly property string helper: Qt.resolvedUrl("bin/calamari").toString().replace(/^file:\/\//, "")
@@ -237,6 +237,18 @@ Item {
             startTimeProc.command = after ? [root.helper, "start-time", "--after", after] : [root.helper, "start-time"]
             startTimeProc.running = true
         }
+        if (result.endTimeQuery) {
+            endTimeProc.after = result.endTimeQuery.after
+            endTimeProc.command = [root.helper, "end-time", "--after", result.endTimeQuery.after]
+            endTimeProc.running = true
+        }
+    }
+
+    // The end of a shift that ended outside the plugin, for today's total.
+    // A failure is asked again with the next poll (pendingEnd).
+    function applyEndTime(start, out) {
+        if (out.ok)
+            root.setShiftState(ShiftClock.applyEndTime(root.shiftState, start, out.endedAt))
     }
 
     function applyStartTime(out) {
@@ -293,6 +305,14 @@ Item {
         command: [root.helper, "status"]
         stdout: StdioCollector {
             onStreamFinished: root.applyStatus(root.parse(text))
+        }
+    }
+
+    Process {
+        id: endTimeProc
+        property string after: ""
+        stdout: StdioCollector {
+            onStreamFinished: root.applyEndTime(endTimeProc.after, root.parse(text))
         }
     }
 
