@@ -1,8 +1,9 @@
 import { test } from "node:test"
 import { readFileSync } from "node:fs"
 import assert from "node:assert/strict"
-import { DEFAULTS, countdownText, decide, extendLabel, markSent, notification, postpone } from "./reminders.mjs"
+import { DEFAULTS, closeFor, countdownText, decide, extendLabel, markSent, notification, postpone } from "./reminders.mjs"
 import { applyStamp, applyStatus, emptyState, restoreState, setDayOff } from "./shiftclock.mjs"
+import { heartbeat, setIdle } from "./activity.mjs"
 
 const at = (hhmm, date = "2026-09-22") => new Date(`${date}T${hhmm}:00`)
 const workday = { date: "2026-09-22", workingDay: true, coreStart: "09:00", coreEnd: "16:45" }
@@ -393,7 +394,7 @@ test("sanfter Hinweis, letzte Warnung und Korrektur-Hinweis nennen ihre Uhrzeite
   const warning = decide(at("19:00"), workday, hinted(), eveningConfig).actions[0]
   assert.deepEqual(notification(warning, workday, hinted()),
     { headline: "Letzte Warnung", body: "Auto-Abschluss um 19:15. Im Panel: +1 h weiterarbeiten oder jetzt ausstempeln.", click: "panel" })
-  assert.deepEqual(notification({ type: "auto-closed", at: "19:15" }, workday, hinted()),
+  assert.deepEqual(notification({ type: "auto-closed", at: "19:15", lastActivity: null }, workday, hinted()),
     { headline: "Schicht automatisch beendet", body: "Um 19:15 ausgestempelt. Bitte die Endzeit in Calamari korrigieren.", click: "calamari" })
 })
 
@@ -413,4 +414,71 @@ test("die letzte Warnung nennt die eingestellte Verschiebung", () => {
   const own = Object.assign({}, eveningConfig, { extendMinutes: 90 })
   const warning = decide(at("19:00"), workday, hinted(), own).actions[0]
   assert.match(notification(warning, workday, hinted(), own).body, /Im Panel: \+90 Min weiterarbeiten oder jetzt ausstempeln\.$/)
+})
+
+// Letzte Aktivität und Übernacht-Fall
+
+const wednesday = { date: "2026-09-23", workingDay: true, coreStart: "09:00", coreEnd: "16:45", holiday: null, absence: null }
+// Shift since 09:00 on Tuesday, lid closed at 17:59, opened Wednesday 07:30.
+const overnight = () => {
+  let state = heartbeat(heartbeat(working(), at("17:58")), at("17:59"))
+  state = heartbeat(state, at("07:30", "2026-09-23"))
+  return applyStatus(state, true, at("07:30", "2026-09-23"), true).state
+}
+
+test("läuft morgens noch die Schicht vom Vortag, wird sie sofort mit der letzten Aktivität beendet", () => {
+  const r = decide(at("07:30", "2026-09-23"), wednesday, overnight(), eveningConfig)
+  assert.deepEqual(r.actions, [{ type: "overnight-close", lastActivity: "2026-09-22T17:59" }])
+})
+
+test("nach dem Übernacht-Abschluss beginnt der neue Tag normal", () => {
+  const state = applyStamp(overnight(), "overnight-close", { ok: true, running: false }, at("07:31", "2026-09-23")).state
+  assert.equal(state.clockedOutAt, null)
+  // The ended shift may still look running for two minutes.
+  const lag = applyStatus(state, true, at("07:33", "2026-09-23")).state
+  assert.deepEqual(types(decide(at("07:33", "2026-09-23"), wednesday, lag, eveningConfig)), [])
+  const later = applyStatus(lag, false, at("09:00", "2026-09-23")).state
+  assert.deepEqual(types(decide(at("09:00", "2026-09-23"), wednesday, later, eveningConfig)), ["stamp-reminder"])
+})
+
+test("eine letzte Aktivität von heute ist keine vom Vortag", () => {
+  // Woke up at 07:30 and walked away before the network came back.
+  const state = setIdle(overnight(), true, at("07:40", "2026-09-23"), 300)
+  const r = decide(at("07:45", "2026-09-23"), wednesday, state, eveningConfig)
+  assert.deepEqual(r.actions, [{ type: "overnight-close", lastActivity: null }])
+})
+
+test("nach dem Übernacht-Abschluss gilt heute noch nicht als eingestempelt", () => {
+  let state = applyStamp(overnight(), "overnight-close", { ok: true, running: false }, at("07:31", "2026-09-23")).state
+  state = applyStatus(state, false, at("07:40", "2026-09-23")).state
+  assert.equal(state.stampedToday, false)
+})
+
+test("der Übernacht-Hinweis nennt die letzte Aktivität vom Vortag", () => {
+  assert.deepEqual(notification({ type: "overnight-closed", at: "07:31", lastActivity: "2026-09-22T17:59" }, wednesday, overnight()),
+    { headline: "Schicht vom Vortag beendet",
+      body: "Heute um 07:31 ausgestempelt. Bitte die Endzeit in Calamari auf 17:59 am 22.09. korrigieren (letzte Aktivität).",
+      click: "calamari" })
+})
+
+test("der Korrektur-Hinweis nach dem Auto-Abschluss nennt die letzte Aktivität", () => {
+  let state = markSent(hinted(), "final-warning", at("19:00"))
+  state = setIdle(state, true, at("18:45"), 300)
+  const close = decide(at("19:15"), workday, state, eveningConfig).actions[0]
+  assert.deepEqual(close, { type: "auto-close", lastActivity: "2026-09-22T18:40" })
+  assert.deepEqual(notification({ type: "auto-closed", at: "19:15", lastActivity: close.lastActivity }, workday, state).body,
+    "Um 19:15 ausgestempelt, letzte Aktivität 18:40. Bitte die Endzeit in Calamari darauf korrigieren.")
+})
+
+test("wer beim Auto-Abschluss aktiv ist, bekommt keine letzte Aktivität genannt", () => {
+  const state = markSent(hinted(), "final-warning", at("19:00"))
+  assert.deepEqual(decide(at("19:15"), workday, state, eveningConfig).actions, [{ type: "auto-close", lastActivity: null }])
+})
+
+test("Auto-Abschluss und Übernacht-Abschluss stempeln aus und kündigen ihren Korrektur-Hinweis an", () => {
+  assert.deepEqual(closeFor({ type: "auto-close", lastActivity: "2026-09-22T18:40" }),
+    { stamp: "clock-out", notice: { type: "auto-closed", lastActivity: "2026-09-22T18:40" } })
+  assert.deepEqual(closeFor({ type: "overnight-close", lastActivity: null }),
+    { stamp: "overnight-close", notice: { type: "overnight-closed", lastActivity: null } })
+  assert.equal(closeFor({ type: "stamp-reminder" }), null)
 })

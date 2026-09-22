@@ -1,8 +1,10 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Wayland
 import "js/shiftclock.mjs" as ShiftClock
 import "js/reminders.mjs" as Reminders
+import "js/activity.mjs" as Activity
 
 // Headless singleton for the plugin. Owns the runtime state, the poll timer
 // and the calls to bin/calamari (keepLoaded: code changes here need a shell
@@ -77,20 +79,23 @@ Item {
     // Polls wait for the persisted state, so an answer cannot be undone by
     // loading an older file afterwards.
     function poll() {
-        if (root.stateLoaded && !root.busy)
-            statusProc.running = true
+        if (!root.stateLoaded || root.busy)
+            return
+        var overnight = ShiftClock.needsOvernightCheck(root.shiftState, new Date())
+        statusProc.command = overnight ? [root.helper, "status", "--overnight"] : [root.helper, "status"]
+        statusProc.running = true
     }
 
     // "clock-in", "clock-out", "break-start" or "break-end", always now. A
     // failure is shown, never queued.
-    // autoClose: the auto-close of js/reminders.mjs, which tells the user
-    // to correct the end time afterwards.
-    function stamp(action, autoClose) {
+    // notice: the correction hint ({ type, lastActivity }, see
+    // js/reminders.mjs notification) to send once the clock-out went through.
+    function stamp(action, notice) {
         if (!root.stateLoaded || root.busy)
             return
         root.stampError = ""
         stampProc.action = action
-        stampProc.autoClose = autoClose === true
+        stampProc.notice = notice || null
         stampProc.pollWhenDone = false
         stampProc.command = [root.helper, ShiftClock.helperCommand(action)]
         stampProc.running = true
@@ -118,15 +123,26 @@ Item {
     function runReminders() {
         var actions = root.decision.actions
         for (var i = 0; i < actions.length; i++) {
-            // The clock-out waits for a free helper; recorded once it starts.
-            if (actions[i].type === "auto-close" && root.busy)
+            var close = Reminders.closeFor(actions[i])
+            // A clock-out waits for a free helper; recorded once it starts.
+            if (close && root.busy)
                 continue
             root.setShiftState(Reminders.markSent(root.shiftState, actions[i].type, root.now))
-            if (actions[i].type === "auto-close")
-                root.stamp("clock-out", true)
+            if (close)
+                root.stamp(close.stamp, close.notice)
             else
                 root.notify(actions[i])
         }
+    }
+
+    // The user's activity (js/activity.mjs): a heartbeat each tick, and the
+    // idle monitor with the lock timeout of the shell's idle config.
+    readonly property int lockTimeoutSeconds: root.shell && root.shell.idleConfig && root.shell.idleConfig.lock > 0
+        ? root.shell.idleConfig.lock : 300
+
+    function recordActivity(next) {
+        if (root.stateLoaded && next !== root.shiftState)
+            root.setShiftState(next)
     }
 
     // "+1 h weiterarbeiten" in the panel.
@@ -205,7 +221,7 @@ Item {
         if (root.authState !== "ok")
             root.refreshIdentity()
         root.fetchDayInfo()
-        var result = ShiftClock.applyStatus(root.shiftState, out.running, root.now)
+        var result = ShiftClock.applyStatus(root.shiftState, out.running, root.now, out.overnight === true)
         root.setShiftState(result.state)
         if (result.startTimeQuery) {
             var after = result.startTimeQuery.after
@@ -232,8 +248,8 @@ Item {
             root.errorMessage = ""
         }
         root.setShiftState(result.state)
-        if (out.ok && stampProc.autoClose)
-            root.notify({ type: "auto-closed", at: Qt.formatTime(root.now, "HH:mm") })
+        if (out.ok && stampProc.notice)
+            root.notify(Object.assign({ at: Qt.formatTime(root.now, "HH:mm") }, stampProc.notice))
     }
 
     function setShiftState(next) {
@@ -250,6 +266,8 @@ Item {
             return
         root.stateLoaded = true
         root.shiftState = ShiftClock.restoreState(text)
+        // A saved idle state from before a restart is not today's truth.
+        root.recordActivity(Activity.setIdle(root.shiftState, idleMonitor.isIdle, new Date(), root.lockTimeoutSeconds))
         root.poll()
     }
 
@@ -280,7 +298,7 @@ Item {
     Process {
         id: stampProc
         property string action: ""
-        property bool autoClose: false
+        property var notice: null
         // Ask Calamari for the real status once the helper has exited
         // (poll() waits while it runs).
         property bool pollWhenDone: false
@@ -358,6 +376,13 @@ Item {
         onTriggered: root.poll()
     }
 
+    IdleMonitor {
+        id: idleMonitor
+        timeout: root.lockTimeoutSeconds
+        respectInhibitors: true
+        onIsIdleChanged: root.recordActivity(Activity.setIdle(root.shiftState, isIdle, new Date(), root.lockTimeoutSeconds))
+    }
+
     // The duration ticks locally between two polls, and the reminder logic
     // looks again (its nextCheckAt is never further off than a tick matters).
     // A tick far too late means the machine slept: ask Calamari right away.
@@ -374,6 +399,7 @@ Item {
             }
             root.lastTick = tick
             root.now = new Date()
+            root.recordActivity(Activity.heartbeat(root.shiftState, root.now))
         }
     }
 

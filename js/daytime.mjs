@@ -21,3 +21,12 @@ export function minuteOfDay(d) {
 export function toHhmm(minutes) {
   return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`
 }
+
+// "YYYY-MM-DDTHH:MM", for moments that may lie on another day.
+export function momentOf(d) {
+  return `${ymd(d)}T${toHhmm(minuteOfDay(d))}`
+}
+
+export function fromMoment(moment) {
+  return new Date(`${moment}:00`)
+}

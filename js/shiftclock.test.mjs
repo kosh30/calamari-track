@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { applyStamp, applyStatus, applyStartTime, barView, breakAction, dayOffToday, emptyState, endBreakAsFeierabend, feierabendAction, helperCommand, restoreState, setDayOff, stampAction, stampLabel } from "./shiftclock.mjs"
+import { applyStamp, applyStatus, applyStartTime, barView, breakAction, dayOffToday, emptyState, endBreakAsFeierabend, feierabendAction, helperCommand, needsOvernightCheck, restoreState, setDayOff, stampAction, stampLabel } from "./shiftclock.mjs"
 
 const at = (hhmm, date = "2026-09-22") => new Date(`${date}T${hhmm}:00`)
 
@@ -283,4 +283,22 @@ test("„Feierabend“ bietet das Panel nur während einer Pause an", () => {
   assert.equal(feierabendAction({ kind: "break", text: "0:10" }), "end-break")
   assert.equal(feierabendAction({ kind: "running", text: "1:00" }), null)
   assert.equal(feierabendAction({ kind: "idle", text: "" }), null)
+})
+
+test("lief gestern zuletzt eine Schicht, fragt die erste Abfrage des Tages auch nach dem Vortag", () => {
+  const yesterday = applyStatus(emptyState(), true, at("17:00", "2026-09-21")).state
+  assert.equal(needsOvernightCheck(yesterday, at("07:30")), true)
+  assert.equal(needsOvernightCheck(applyStatus(yesterday, false, at("07:30")).state, at("07:33")), false)
+  const idleYesterday = applyStatus(emptyState(), false, at("17:00", "2026-09-21")).state
+  assert.equal(needsOvernightCheck(idleYesterday, at("07:30")), false)
+})
+
+test("solange die Schicht vom Vortag offen ist, fragt jede Abfrage auch nach dem Vortag", () => {
+  const yesterday = applyStatus(emptyState(), true, at("17:00", "2026-09-21")).state
+  const overnight = applyStatus(yesterday, true, at("07:30"), true).state
+  assert.equal(needsOvernightCheck(overnight, at("07:35")), true)
+  assert.equal(overnight.stampedToday, false)
+  const gone = applyStatus(overnight, false, at("07:36"), false).state
+  assert.equal(gone.overnight, false)
+  assert.equal(needsOvernightCheck(gone, at("07:40")), false)
 })

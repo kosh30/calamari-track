@@ -129,13 +129,22 @@ Mit Calamari spricht das Plugin ausschließlich über den offiziellen MCP-Server
   - Schlägt das Ausstempeln fehl, wird es alle 5 Min wiederholt. Das ist keine Warteschlange, sondern die fällige Aktion, solange die Schicht läuft.
   - Den sanften Hinweis gibt es nur an Tagen mit Kernzeit, letzte Warnung und Auto-Abschluss an jedem Tag.
   - Die Adresse von Calamari im Browser ist firmenspezifisch und steht deshalb nicht im Repo, sondern in der Einstellung `webUrl`. Ist sie leer, hat der Korrektur-Hinweis keine Klick-Aktion.
+- **Letzte Aktivität und Übernacht-Fall:**
+  - Der Zustand kennt `lastSeen` (Heartbeat im 15-s-Takt, minutengenau gespeichert), `idle` und `awaySince`, den Beginn der letzten Abwesenheit. Diese Felder bleiben über den Tageswechsel erhalten.
+  - `awaySince` ist der Beginn des Leerlaufs (Meldung des Idle-Monitors minus Lock-Timeout) oder, bei einer Heartbeat-Lücke über 5 Min ohne Leerlauf, der letzte Heartbeat davor. Der erste Heartbeat nach dem Aufwachen überschreibt es nicht, damit ein Abschluss nach dem Aufwachen die Abwesenheit davor nennt, auch wenn das Netz erst später wieder da ist.
+  - Der Korrektur-Hinweis nach dem Auto-Abschluss nennt die letzte Aktivität nur, wenn der Benutzer gerade im Leerlauf ist. Sonst ist er da, und die Endzeit stimmt.
+  - Stand die Schicht im gespeicherten Zustand eines früheren Tages auf „läuft“, fragt die erste Abfrage des neuen Tages `status --overnight`. Das prüft zusätzlich das Fenster 23:57–23:59 des Vortags, weil ungeprüft ist, ob Calamari eine Schicht über Mitternacht für „heute“ zählt. Läuft sie noch, folgt sofort der Übernacht-Abschluss: `clock-out` ohne Feierabend, damit der neue Tag normal beginnt, und ein Korrektur-Hinweis mit der letzten Aktivität vom Vortag.
+  - Zeigt „heute“ eine laufende Schicht, gilt sie nur als die vom Vortag, wenn sie schon um 00:00 lief. Sonst ist es eine heute begonnene, und die gestrige erreichte nur Mitternacht.
+  - Solange eine Übernacht-Schicht offen ist, fragt jede Abfrage `--overnight`. Die letzte Aktivität im Übernacht-Hinweis wird nur genannt, wenn sie vor heute liegt.
+  - Grenzen: Wer um Mitternacht noch arbeitet, wird bei der ersten Abfrage nach 00:00 ausgestempelt (keine Schicht über Mitternacht). Eine gestern kurz vor Mitternacht beendete Schicht kann einen vergeblichen Übernacht-Abschluss auslösen. Calamari lehnt `clockOut` dann ab, und das Panel zeigt den Fehler.
+  - *Noch zu prüfen bei der Abnahme:* ob `checkTimesheetOverlap` für „heute“ eine Schicht zeigt, die gestern begann.
 - **Pause:**
   - Eine Pause beginnt nur über den Pause-Button im Plugin (`breakSince` im Zustand). Ein Ausstempeln im Web bleibt eine Lücke ohne Pausen-Erinnerung.
   - Einstempeln, auch im Web oder per Handy, beendet die Pause.
   - Die Pausen-Erinnerung gilt an jedem Tag, auch an freien Tagen.
   - Wer aus der Pause direkt in den Feierabend geht, wählt im Panel „Feierabend“. Das stempelt nichts, weil die Schicht schon mit dem Beginn der Pause endete, und der Feierabend gilt ab dem Beginn der Pause.
   - Scheitert „Pause beginnen“ mit einem Fehler, obwohl Calamari ausgestempelt hat (z.B. Timeout), bleibt nur die Lücke. Es gibt dann keine Pausenmarkierung und keine Pausen-Erinnerung.
-  - Eine Pause über Mitternacht geht mit dem Tageswechsel des Zustands verloren (siehe Übernacht-Fall, Ticket 09).
+  - Eine Pause über Mitternacht geht mit dem Tageswechsel des Zustands verloren.
 - **Freier Tag:**
   - Frei machen einen Tag ein ganzer Feiertag, eine ganztägige Abwesenheit der Kategorie `TIMEOFF` (Urlaub, Krankheit) und der Schalter „Heute frei“.
   - Eine Abwesenheit der Kategorie `WORK` (z.B. Dienstreise) und eine stundenweise Abwesenheit lassen den Tag bestehen.

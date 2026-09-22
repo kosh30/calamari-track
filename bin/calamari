@@ -505,7 +505,25 @@ def running_now(client):
 
 
 def status(args):
-    return {"running": with_mcp(running_now)}
+    """With --overnight also asks whether yesterday's shift still runs: it
+    reaches past midnight, and whether Calamari counts it for today is
+    unverified, so the end of yesterday is checked as well. A shift running
+    today only counts as yesterday's if it already ran at 00:00; otherwise
+    it is today's own (yesterday's then merely reached midnight)."""
+    if not args.overnight:
+        return {"running": with_mcp(running_now)}
+
+    def work(client):
+        date, _ = today_and_minute()
+        yesterday = (now().date() - datetime.timedelta(days=1)).isoformat()
+        day_end = 24 * 60 - 1
+        today = running_now(client)
+        reached_midnight = overlaps(client, yesterday, day_end - STATUS_WINDOW, day_end)
+        overnight = reached_midnight and (not today or overlaps(client, date, 0, 1))
+        return today, overnight
+
+    today, overnight = with_mcp(work)
+    return {"running": today or overnight, "overnight": overnight}
 
 
 def clock_in(args):
@@ -621,6 +639,8 @@ def parse_args(argv):
             sub.add_argument("--after", metavar="HH:MM")
         if name == "day-info":
             sub.add_argument("--date", metavar="YYYY-MM-DD")
+        if name == "status":
+            sub.add_argument("--overnight", action="store_true")
     return parser.parse_args(argv)
 
 

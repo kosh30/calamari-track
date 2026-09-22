@@ -9,7 +9,8 @@ provides the import context: `qmllint -I lint *.qml`.
 - `qs/Ui/KeyboardPanel.qml` is a hand-written minimal stub covering only
   the members `Panel.qml` uses.
 - `Quickshell/` holds hand-written minimal stubs for the Quickshell C++ API,
-  taken from ax1g/quickshell-screentime-plugin (MIT). On a machine with
+  taken from ax1g/quickshell-screentime-plugin (MIT); `Quickshell/Wayland/`
+  (`IdleMonitor`) is our own in the same style. On a machine with
   omarchy installed the real Quickshell modules shadow them.
 
 `.qmllint.ini` disables only `MissingProperty` (members of the shell's

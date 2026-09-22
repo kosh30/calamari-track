@@ -11,11 +11,15 @@
 //              that saw no shift and by the own clock-out.
 //   clockedOutAt  HH:MM of the own clock-out that began the Feierabend today
 //   breakSince HH:MM of the own clock-out that began the running Pause
+//   stoppedAt  HH:MM of the last own clock-out of any kind (status lag)
+//   overnight  true while the running shift began on an earlier day
 //   stampedToday  true once a shift of today was seen running
 //   dayOff     true after the panel switch "Heute frei" (today only)
 //   postponedTo  HH:MM the next final warning was moved to by "+1 h"
 //              (js/reminders.mjs postpone)
 //   sent       { reminder type: HH:MM last sent today }, see js/reminders.mjs
+//   lastSeen, idle, awaySince  the user's activity, see js/activity.mjs;
+//              unlike the rest they carry over to the next day
 //
 // Known limit: the start of a follow-up shift is only found if the plugin
 // saw the gap before it (searchAfter). A break the plugin never observed (shell
@@ -28,25 +32,31 @@ import { minuteOfDay, pad, toHhmm, toMinutes, ymd } from "./daytime.mjs"
 const STATUS_WINDOW = 2
 
 export function emptyState() {
-  return { date: "", running: null, startedAt: null, searchAfter: null, clockedOutAt: null, breakSince: null, stampedToday: false, dayOff: false, postponedTo: null, sent: {} }
+  return { date: "", running: null, startedAt: null, searchAfter: null, clockedOutAt: null, breakSince: null, stoppedAt: null, overnight: false, stampedToday: false, dayOff: false, postponedTo: null, sent: {},
+    lastSeen: null, idle: false, awaySince: null }
 }
 
 function forToday(state, now) {
   const today = ymd(now)
   if (state && state.date === today) return Object.assign({}, state)
-  // A new day: yesterday's polls say nothing about today's shift.
-  return Object.assign(emptyState(), { date: today, running: state ? state.running : null })
+  // A new day: yesterday's polls say nothing about today's shift, but
+  // whether one still runs and when the user was last active still hold.
+  const carried = emptyState()
+  for (const key of ["running", "lastSeen", "idle", "awaySince"])
+    if (state && key in state) carried[key] = state[key]
+  return Object.assign(carried, { date: today })
 }
 
-// Applies an answer of `status`. Returns { state, startTimeQuery }, where
-// startTimeQuery is null or { after: "HH:MM" | null }, the --after argument
-// for `start-time` when the start of the running shift is unknown.
-export function applyStatus(state, running, now) {
+// Applies an answer of `status` (overnight: `status --overnight` found
+// yesterday's shift still running). Returns { state, startTimeQuery },
+// where startTimeQuery is null or { after: "HH:MM" | null }, the --after
+// argument for `start-time` when the start of the running shift is unknown.
+export function applyStatus(state, running, now, overnight = false) {
   const next = forToday(state, now)
-  // Right after the own clock-out (Feierabend or Pause) the ended shift
-  // still overlaps the status window; the clock-out is the newer truth.
-  const stoppedAt = next.clockedOutAt || next.breakSince
-  if (running && stoppedAt && minuteOfDay(now) - toMinutes(stoppedAt) <= STATUS_WINDOW)
+  // Right after the own clock-out (Feierabend, Pause, overnight close) the
+  // ended shift still overlaps the status window; the clock-out is the
+  // newer truth.
+  if (running && next.stoppedAt && minuteOfDay(now) - toMinutes(next.stoppedAt) <= STATUS_WINDOW)
     running = false
   // In the minute of the own clock-in the status window, which ends at the
   // full minute, cannot see the new shift yet. (A start found by start-time
@@ -54,6 +64,7 @@ export function applyStatus(state, running, now) {
   if (!running && next.running && next.startedAt && minuteOfDay(now) === toMinutes(next.startedAt))
     running = true
   next.running = running
+  next.overnight = false
   if (!running) {
     next.startedAt = null
     // No shift overlapped the window, so any earlier one ended before it.
@@ -64,9 +75,17 @@ export function applyStatus(state, running, now) {
   // Feierabend or the Pause is over.
   next.clockedOutAt = null
   next.breakSince = null
+  // Yesterday's shift is no stamp of today; it is to be closed at once.
+  if (overnight) return { state: Object.assign(next, { overnight: true }), startTimeQuery: null }
   next.stampedToday = true
   if (next.startedAt) return { state: next, startTimeQuery: null }
   return { state: next, startTimeQuery: { after: next.searchAfter } }
+}
+
+// Whether the next `status` needs --overnight: a shift was running in the
+// state of an earlier day, or yesterday's shift is still open.
+export function needsOvernightCheck(state, now) {
+  return state.running === true && (state.date !== ymd(now) || state.overnight === true)
 }
 
 function laterOf(a, b) {
@@ -103,8 +122,8 @@ function stopShift(state, now) {
   const minute = minuteOfDay(now)
   // The ended shift reaches into the minute of the clock-out.
   return Object.assign(next, {
-    running: false, startedAt: null, clockedOutAt: null, breakSince: null,
-    searchAfter: toHhmm(Math.min(minute + 1, 24 * 60 - 1)),
+    running: false, startedAt: null, clockedOutAt: null, breakSince: null, overnight: false,
+    stoppedAt: toHhmm(minute), searchAfter: toHhmm(Math.min(minute + 1, 24 * 60 - 1)),
   })
 }
 
@@ -165,6 +184,7 @@ function duration(since, now) {
 const STAMP_ACTIONS = {
   "clock-in": "Einstempeln", "clock-out": "Ausstempeln",
   "break-start": "Pause beginnen", "break-end": "Pause beenden",
+  "overnight-close": "Übernacht-Abschluss",
 }
 
 // The panel's button text for a stamp action.
@@ -175,7 +195,8 @@ export function stampLabel(action) {
 // The helper command behind a stamp action: a Pause is a clock-out plus
 // the local mark, its end a clock-in (ADR 0001).
 export function helperCommand(action) {
-  return action === "break-start" ? "clock-out" : action === "break-end" ? "clock-in" : action
+  if (action === "break-start" || action === "overnight-close") return "clock-out"
+  return action === "break-end" ? "clock-in" : action
 }
 const STAMP_CAUSES = {
   NETWORK: "Calamari nicht erreichbar",
@@ -219,7 +240,9 @@ export function applyStamp(state, action, out, now) {
     return { state, error: stampErrorText(action, code, message), pollNow: code !== "RATE_LIMITED" }
   }
   if (helperCommand(action) === "clock-out") {
-    const next = action === "break-start" ? applyBreakStart(state, now) : applyClockOut(state, now)
+    // The overnight close ends yesterday's shift; today has no Feierabend yet.
+    const next = action === "break-start" ? applyBreakStart(state, now)
+      : action === "overnight-close" ? stopShift(state, now) : applyClockOut(state, now)
     return { state: next, error: "", pollNow: false }
   }
   if (out.running) return { state: applyClockIn(state, now), error: "", pollNow: false }

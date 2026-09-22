@@ -187,6 +187,46 @@ class CalamariCliTest(unittest.TestCase):
 
         self.assertEqual((code, out), (0, {"ok": True, "running": True}))
 
+    def test_status_overnight_sees_a_shift_still_running_from_yesterday(self):
+        # Whether Calamari counts such a shift for today is unverified, so
+        # the helper also looks at the end of yesterday.
+        self.login()
+        self.fake.now = "2026-09-23T07:30:00"
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+
+        code, out = self.run_helper("status", "--overnight")
+
+        self.assertEqual((code, out), (0, {"ok": True, "running": True, "overnight": True}))
+
+    def test_status_overnight_without_a_shift_from_yesterday(self):
+        self.login()
+        self.fake.now = "2026-09-23T07:30:00"
+        self.fake.shifts = [("2026-09-22", "09:40:30", "18:00:00"), ("2026-09-23", "07:00:10", None)]
+
+        code, out = self.run_helper("status", "--overnight")
+
+        self.assertEqual((code, out), (0, {"ok": True, "running": True, "overnight": False}))
+
+    def test_status_overnight_does_not_take_todays_own_shift_for_yesterdays(self):
+        # Yesterday's shift reached 23:59 (closed later in the web), today a
+        # new one runs since 07:00: that one must not be closed.
+        self.login()
+        self.fake.now = "2026-09-23T07:30:00"
+        self.fake.shifts = [("2026-09-22", "09:40:30", None), ("2026-09-23", "07:00:10", None)]
+
+        code, out = self.run_helper("status", "--overnight")
+
+        self.assertEqual((code, out), (0, {"ok": True, "running": True, "overnight": False}))
+
+    def test_status_overnight_when_calamari_counts_the_shift_for_today_too(self):
+        self.login()
+        self.fake.now = "2026-09-23T07:30:00"
+        self.fake.shifts = [("2026-09-22", "09:40:30", None), ("2026-09-23", "00:00:00", None)]
+
+        code, out = self.run_helper("status", "--overnight")
+
+        self.assertEqual((code, out), (0, {"ok": True, "running": True, "overnight": True}))
+
     def test_start_time_finds_the_start_minute_of_the_running_shift(self):
         self.login()
         self.fake.shifts = [("2026-09-22", "09:40:30", None)]

@@ -6,9 +6,16 @@
 
 **Status:** ready-for-agent
 
-- [ ] Letzte Aktivität und Heartbeat werden im lokalen Zustand gespeichert
-- [ ] Eine Heartbeat-Lücke über 5 Min wird als Suspend erkannt, die letzte Aktivität ist der Heartbeat davor
-- [ ] Der Korrektur-Hinweis nennt die letzte Aktivität
-- [ ] Tests für `decide`: Übernacht-Fall (`overnight-close`), danach normaler neuer Tag mit Stempel-Erinnerung ab Beginn der Kernzeit
+- [x] Letzte Aktivität und Heartbeat werden im lokalen Zustand gespeichert
+- [x] Eine Heartbeat-Lücke über 5 Min wird als Suspend erkannt, die letzte Aktivität ist der Heartbeat davor
+- [x] Der Korrektur-Hinweis nennt die letzte Aktivität
+- [x] Tests für `decide`: Übernacht-Fall (`overnight-close`), danach normaler neuer Tag mit Stempel-Erinnerung ab Beginn der Kernzeit
 - [ ] Das Verhalten des Overlap-Checks über Mitternacht ist geprüft und in der Spec bzw. im ADR dokumentiert
 - [ ] Szenario „Deckel zu mit laufender Schicht, am nächsten Morgen auf“ manuell abgenommen
+
+## Comments
+
+**2026-09-22 (Agent):** Umgesetzt. Die Regeln stehen in spec.md unter „Letzte Aktivität und Übernacht-Fall“.
+- `js/activity.mjs` enthält `heartbeat`, `setIdle` und `lastActivity`. Der Zustand kennt `lastSeen`, `idle` und `awaySince`, die den Tageswechsel überstehen. Der Service zählt den Heartbeat im 15-s-Takt und nutzt den `IdleMonitor` mit `shell.idleConfig.lock`.
+- `status --overnight` prüft zusätzlich 23:57–23:59 des Vortags. Eine heute laufende Schicht gilt nur dann als die vom Vortag, wenn sie schon um 00:00 lief. Der Übernacht-Abschluss (`overnight-close`) stempelt aus, ohne Feierabend, und schickt den Korrektur-Hinweis mit der letzten Aktivität vom Vortag.
+- Noch offen: Ob Calamari eine Schicht über Mitternacht für „heute“ zählt, zeigt erst die Abnahme über Nacht. Beide Fälle sind abgedeckt.

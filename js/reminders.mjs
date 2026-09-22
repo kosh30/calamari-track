@@ -11,8 +11,9 @@
 // decide() is idempotent: what was sent is recorded with markSent() in
 // state.sent, so the same moment never yields the same reminder twice.
 
+import { lastActivity } from "./activity.mjs"
 import { coreTime } from "./daycalendar.mjs"
-import { minuteOfDay, toHhmm, toMinutes, ymd } from "./daytime.mjs"
+import { fromMoment, minuteOfDay, pad, toHhmm, toMinutes, ymd } from "./daytime.mjs"
 
 // A failed auto-close is tried again after this many minutes.
 const AUTO_CLOSE_RETRY = 5
@@ -58,6 +59,7 @@ export function decide(now, day, state, settings) {
   // A state of another date (right after midnight, before the first poll
   // of the new day) or an unknown status must not remind.
   if (state.failed || state.date !== ymd(now)) return quiet()
+  if (state.running && state.overnight) return decideOvernight(now, state)
   if (state.breakSince && !state.running) return decideBreak(now, state, config)
   if (state.running) return decideShift(now, day, state, config)
   return decideStamp(now, day, state, config)
@@ -120,7 +122,18 @@ function decideEvening(now, state, config) {
   if (minute < closeMinute)
     return Object.assign(r, { nextCheckAt: r.autoCloseAt, canExtend: closeMinute < limit })
   // Due until the shift is gone; a failed clock-out is retried now and then.
-  return Object.assign(repeating(now, state, "auto-close", AUTO_CLOSE_RETRY, closeMinute, null), { autoCloseAt: r.autoCloseAt })
+  // Someone idle at the auto-close gets told when they were last active.
+  const close = { type: "auto-close", lastActivity: state.idle ? lastActivity(state) : null }
+  return Object.assign(repeating(now, state, close, AUTO_CLOSE_RETRY, closeMinute, null), { autoCloseAt: r.autoCloseAt })
+}
+
+// A shift still running from an earlier day is closed at once (retried
+// like the auto-close), reporting the last activity for the correction.
+function decideOvernight(now, state) {
+  // Only an absence that began before today tells when yesterday ended.
+  const away = lastActivity(state)
+  const before = away && away < `${ymd(now)}T00:00` ? away : null
+  return repeating(now, state, { type: "overnight-close", lastActivity: before }, AUTO_CLOSE_RETRY, 0, null)
 }
 
 // "+1 h weiterarbeiten": the next final warning comes extendMinutes from
@@ -139,20 +152,20 @@ function decideBreak(now, state, config) {
   const limit = since + config.breakLimitMinutes
   if (minute < limit) return Object.assign(quiet(), { nextCheckAt: atMinute(now, limit) })
   // A reminder sent before this Pause began belongs to an earlier one.
-  return repeating(now, state, "break-reminder", config.breakReminderMinutes, since, null)
+  return repeating(now, state, { type: "break-reminder" }, config.breakReminderMinutes, since, null)
 }
 
-// A reminder of this type is due unless one went out within the last
+// The action is due unless one of its type went out within the last
 // interval minutes (ignoring those sent before `since`); next look at the
 // following one, or at `until` if that is earlier.
-function repeating(now, state, type, interval, since, until) {
+function repeating(now, state, action, interval, since, until) {
   const minute = minuteOfDay(now)
-  const sent = state.sent && state.sent[type]
+  const sent = state.sent && state.sent[action.type]
   const last = sent && toMinutes(sent) >= since ? toMinutes(sent) : null
   const due = last === null || minute - last >= interval
   const next = (due ? minute : last) + interval
   return Object.assign(quiet(), {
-    actions: due ? [{ type }] : [],
+    actions: due ? [action] : [],
     nextCheckAt: atMinute(now, until === null ? next : Math.min(next, until)),
   })
 }
@@ -170,7 +183,7 @@ function decideStamp(now, day, state, config) {
   // Only "noch gar nicht eingestempelt" earns a reminder; a Feierabend or a
   // Pause implies a shift today.
   if (minute >= coreEnd || state.running !== false || state.stampedToday || state.clockedOutAt) return quiet()
-  const r = repeating(now, state, "stamp-reminder", config.stampReminderMinutes, 0, coreEnd)
+  const r = repeating(now, state, { type: "stamp-reminder" }, config.stampReminderMinutes, 0, coreEnd)
   return Object.assign(r, { barState: "reminder" })
 }
 
@@ -181,8 +194,9 @@ export function markSent(state, type, now) {
 }
 
 // Headline, body and click target ("panel" or "calamari", the web app) of
-// the notification for an action of decide(), or for { type:
-// "auto-closed", at: "HH:MM" } after the auto-close stamped out.
+// the notification for an action of decide(), or for the correction hints
+// { type: "auto-closed" | "overnight-closed", at: "HH:MM", lastActivity }
+// once the close stamped out.
 export function notification(action, day, state, settings) {
   const panel = (headline, body) => ({ headline, body, click: "panel" })
   if (action.type === "soft-hint")
@@ -190,12 +204,30 @@ export function notification(action, day, state, settings) {
   if (action.type === "final-warning")
     return panel("Letzte Warnung",
       `Auto-Abschluss um ${action.autoCloseAt}. Im Panel: ${extendLabel(settings)} oder jetzt ausstempeln.`)
-  if (action.type === "auto-closed")
-    return { headline: "Schicht automatisch beendet",
-      body: `Um ${action.at} ausgestempelt. Bitte die Endzeit in Calamari korrigieren.`, click: "calamari" }
+  if (action.type === "auto-closed") {
+    const body = action.lastActivity
+      ? `Um ${action.at} ausgestempelt, letzte Aktivität ${clockOf(action.lastActivity)}. Bitte die Endzeit in Calamari darauf korrigieren.`
+      : `Um ${action.at} ausgestempelt. Bitte die Endzeit in Calamari korrigieren.`
+    return { headline: "Schicht automatisch beendet", body, click: "calamari" }
+  }
+  if (action.type === "overnight-closed") {
+    const body = action.lastActivity
+      ? `Heute um ${action.at} ausgestempelt. Bitte die Endzeit in Calamari auf ${clockOf(action.lastActivity)} am ${dayOf(action.lastActivity)} korrigieren (letzte Aktivität).`
+      : `Heute um ${action.at} ausgestempelt. Bitte die Endzeit in Calamari korrigieren.`
+    return { headline: "Schicht vom Vortag beendet", body, click: "calamari" }
+  }
   if (action.type === "break-reminder")
     return panel("Pause läuft noch", `Die Pause läuft seit ${state.breakSince}.`)
   return panel("Noch nicht eingestempelt", `Die Kernzeit läuft seit ${day.coreStart}.`)
+}
+
+function clockOf(stamp) {
+  return toHhmm(minuteOfDay(fromMoment(stamp)))
+}
+
+function dayOf(stamp) {
+  const d = fromMoment(stamp)
+  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.`
 }
 
 // The panel's countdown line for a decision with a pending auto-close.
@@ -209,4 +241,14 @@ export function countdownText(decision, now) {
 export function extendLabel(settings) {
   const minutes = withDefaults(settings).extendMinutes
   return minutes === 60 ? "+1 h weiterarbeiten" : `+${minutes} Min weiterarbeiten`
+}
+
+// For the closing actions of decide(): the stamp action to run and the
+// correction hint to send once it went through; null for plain reminders.
+export function closeFor(action) {
+  if (action.type === "auto-close")
+    return { stamp: "clock-out", notice: { type: "auto-closed", lastActivity: action.lastActivity } }
+  if (action.type === "overnight-close")
+    return { stamp: "overnight-close", notice: { type: "overnight-closed", lastActivity: action.lastActivity } }
+  return null
 }
