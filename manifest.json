@@ -17,6 +17,28 @@
     "description": "Schichtstatus und Stempeln für Calamari",
     "category": "Productivity",
     "allowMultiple": false,
-    "defaultSection": "right"
+    "defaultSection": "right",
+    "defaults": {
+      "pollIntervalMinutes": 3,
+      "stampReminderMinutes": 5
+    },
+    "schema": [
+      {
+        "key": "pollIntervalMinutes",
+        "type": "integer",
+        "label": "Abfrage-Intervall (Minuten)",
+        "min": 1,
+        "max": 60,
+        "defaultValue": 3
+      },
+      {
+        "key": "stampReminderMinutes",
+        "type": "integer",
+        "label": "Stempel-Erinnerung wiederholen alle (Minuten)",
+        "min": 1,
+        "max": 60,
+        "defaultValue": 5
+      }
+    ]
   }
 }

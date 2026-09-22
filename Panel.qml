@@ -85,6 +85,7 @@ Panel {
                     readonly property var view: root.view
                     text: !view || view.kind === "unknown" ? "Schichtstatus wird abgefragt …"
                         : view.kind === "error" ? "Schichtstatus unbekannt"
+                        : view.kind === "reminder" ? "Noch nicht eingestempelt, die Kernzeit läuft"
                         : view.kind === "idle" ? (shift.clockedOutAt ? "Feierabend seit " + shift.clockedOutAt : "Keine laufende Schicht")
                         : shift.startedAt ? "Schicht läuft seit " + shift.startedAt + " (" + view.text + ")"
                         : "Schicht läuft"

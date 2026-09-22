@@ -559,6 +559,28 @@ def start_time(args):
     return {"startedAt": with_mcp(search)}
 
 
+WEEKDAYS = ("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY")
+
+
+def day_info(args):
+    """Working day and core time of one date from the weekly work plan.
+    Holidays and absences are not part of it yet."""
+    try:
+        date = datetime.date.fromisoformat(args.date) if args.date else now().date()
+    except ValueError:
+        raise HelperError("USAGE", "expected YYYY-MM-DD, got %r" % args.date)
+    plan = with_mcp(lambda c: c.call_tool("getWorkPlan", {}))
+    weekday = WEEKDAYS[date.weekday()]
+    day = next((d for d in plan.get("days", []) if d.get("dayOfWeek") == weekday), None) \
+        if isinstance(plan, dict) else None
+    if day is None:
+        raise HelperError("MCP_ERROR", "getWorkPlan: no entry for %s in %r" % (weekday, plan))
+    working = day.get("workingDay") is True
+    return {"date": date.isoformat(), "workingDay": working,
+            "coreStart": day.get("startTime") if working else None,
+            "coreEnd": day.get("finishTime") if working else None}
+
+
 class _Parser(argparse.ArgumentParser):
     def error(self, message):
         raise HelperError("USAGE", message)
@@ -572,11 +594,13 @@ def parse_args(argv):
         sub.set_defaults(run=run)
         if name == "start-time":
             sub.add_argument("--after", metavar="HH:MM")
+        if name == "day-info":
+            sub.add_argument("--date", metavar="YYYY-MM-DD")
     return parser.parse_args(argv)
 
 
 COMMANDS = {"login": login, "whoami": whoami, "status": status, "start-time": start_time,
-            "clock-in": clock_in, "clock-out": clock_out}
+            "clock-in": clock_in, "clock-out": clock_out, "day-info": day_info}
 
 
 def main(argv):

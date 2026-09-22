@@ -10,38 +10,21 @@
 //              the --after of the next start-time search. Set by a poll
 //              that saw no shift and by the own clock-out.
 //   clockedOutAt  HH:MM of the own clock-out that began the Feierabend today
+//   stampedToday  true once a shift of today was seen running
+//   sent       { reminder type: HH:MM last sent today }, see js/reminders.mjs
 //
 // Known limit: the start of a follow-up shift is only found if the plugin
 // saw the gap before it (searchAfter). A break the plugin never observed (shell
 // off, suspend) leaves the cached start of the earlier shift.
+
+import { minuteOfDay, pad, toHhmm, toMinutes, ymd } from "./daytime.mjs"
 
 // `status` looks back this many minutes, so a shift that just ended can
 // still look running for that long.
 const STATUS_WINDOW = 2
 
 export function emptyState() {
-  return { date: "", running: null, startedAt: null, searchAfter: null, clockedOutAt: null }
-}
-
-function ymd(d) {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
-function pad(n) {
-  return String(n).padStart(2, "0")
-}
-
-function toMinutes(hhmm) {
-  const [h, m] = hhmm.split(":").map(Number)
-  return h * 60 + m
-}
-
-function minuteOfDay(d) {
-  return d.getHours() * 60 + d.getMinutes()
-}
-
-function toHhmm(minutes) {
-  return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`
+  return { date: "", running: null, startedAt: null, searchAfter: null, clockedOutAt: null, stampedToday: false, sent: {} }
 }
 
 function forToday(state, now) {
@@ -75,6 +58,7 @@ export function applyStatus(state, running, now) {
   // A shift runs again (stamped in the web or on the phone): the
   // Feierabend is over.
   next.clockedOutAt = null
+  next.stampedToday = true
   if (next.startedAt) return { state: next, startTimeQuery: null }
   return { state: next, startTimeQuery: { after: next.searchAfter } }
 }
@@ -104,7 +88,7 @@ export function restoreState(text) {
 function applyClockIn(state, now) {
   const next = forToday(state, now)
   const minute = toHhmm(minuteOfDay(now))
-  return Object.assign(next, { running: true, startedAt: minute, clockedOutAt: null })
+  return Object.assign(next, { running: true, startedAt: minute, clockedOutAt: null, stampedToday: true })
 }
 
 // The own clock-out succeeded: no shift runs, and it is Feierabend.
@@ -122,13 +106,14 @@ export function applyStartTime(state, startedAt) {
   return Object.assign({}, state, { startedAt })
 }
 
-// kind: "auth" (login needed), "error", "unknown", "running" or "idle";
-// text: the shift duration H:MM while running and its start is known.
-export function barView({ state, now, authState, failed }) {
+// kind: "auth" (login needed), "error", "unknown", "running", "reminder"
+// (a stamp reminder is due, see js/reminders.mjs) or "idle"; text: the
+// shift duration H:MM while running and its start is known.
+export function barView({ state, now, authState, failed, reminding }) {
   if (authState === "required") return { kind: "auth", text: "" }
   if (failed) return { kind: "error", text: "" }
   if (!state || state.running === null) return { kind: "unknown", text: "" }
-  if (!state.running) return { kind: "idle", text: "" }
+  if (!state.running) return { kind: reminding ? "reminder" : "idle", text: "" }
   if (!state.startedAt) return { kind: "running", text: "" }
   const minutes = Math.max(minuteOfDay(now) - toMinutes(state.startedAt), 0)
   return { kind: "running", text: `${Math.floor(minutes / 60)}:${pad(minutes % 60)}` }
@@ -147,10 +132,11 @@ function stampErrorText(action, code, message) {
 }
 
 // The stamp action the panel offers for a bar view: "clock-out" while a
-// shift runs, "clock-in" without one, null while the status is not known.
+// shift runs, "clock-in" without one (reminded or not), null while the
+// status is not known.
 export function stampAction(view) {
   if (view.kind === "running") return "clock-out"
-  if (view.kind === "idle") return "clock-in"
+  if (view.kind === "idle" || view.kind === "reminder") return "clock-in"
   return null
 }
 

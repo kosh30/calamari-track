@@ -12,7 +12,7 @@ BarWidget {
 
     property var panelItem: null
     readonly property var service: bar && bar.shell ? bar.shell.serviceFor(moduleName) : null
-    // kind: auth | error | unknown | running | idle (js/shiftclock.mjs barView)
+    // kind: auth | error | unknown | running | reminder | idle (js/shiftclock.mjs barView)
     readonly property var view: service && service.barView ? service.barView : ({ kind: "unknown", text: "" })
     readonly property bool alerting: view.kind === "auth" || view.kind === "error"
     readonly property color barForeground: bar ? bar.barForeground : Color.foreground
@@ -65,9 +65,21 @@ BarWidget {
     implicitWidth: button.implicitWidth
     implicitHeight: button.implicitHeight
 
+    // The service owns the timers and reminders; it reads this widget's settings.
+    function injectSettings() {
+        if (root.service)
+            root.service.settings = root.settings
+    }
+
     onBarChanged: injectPanel()
-    onSettingsChanged: injectPanel()
-    onServiceChanged: injectPanel()
+    onSettingsChanged: {
+        injectPanel()
+        injectSettings()
+    }
+    onServiceChanged: {
+        injectPanel()
+        injectSettings()
+    }
 
     Loader {
         id: panelLoader
@@ -87,11 +99,13 @@ BarWidget {
         text: root.alerting ? "󰀦" : (root.view.text ? "󰔟 " + root.view.text : "󰔟")
         active: root.alerting
         foreground: root.view.kind === "running" ? root.themeGreen
+            : root.view.kind === "reminder" ? Color.urgent
             : root.view.kind === "idle" ? Color.muted : root.barForeground
         dimmed: root.view.kind === "unknown"
         tooltipText: root.opened ? "" : root.view.kind === "auth" ? "Calamari: Anmeldung nötig"
             : root.view.kind === "error" ? "Calamari: Fehler"
             : root.view.kind === "running" ? "Calamari: Schicht läuft"
+            : root.view.kind === "reminder" ? "Calamari: noch nicht eingestempelt"
             : root.view.kind === "idle" ? "Calamari: keine laufende Schicht" : "Calamari Tracker"
 
         onPressed: function (b) {

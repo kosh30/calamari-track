@@ -175,6 +175,7 @@ test("nach einem Fehlschlag wird der echte Status abgefragt, außer Calamari dro
 test("das Panel bietet Ausstempeln bei laufender Schicht und sonst Einstempeln an", () => {
   assert.equal(stampAction({ kind: "running", text: "1:00" }), "clock-out")
   assert.equal(stampAction({ kind: "idle", text: "" }), "clock-in")
+  assert.equal(stampAction({ kind: "reminder", text: "" }), "clock-in")
 })
 
 test("ohne bekannten Status bietet das Panel kein Stempeln an", () => {
@@ -188,4 +189,10 @@ test("in der Minute des Einstempelns gilt die eben begonnene Schicht weiter als 
   const r = applyStatus(state, false, at("11:21"))
   assert.deepEqual(view(r.state, "11:21"), { kind: "running", text: "0:00" })
   assert.equal(view(applyStatus(r.state, false, at("11:24")).state, "11:24").kind, "idle")
+})
+
+test("solange eine Stempel-Erinnerung fällig ist, zeigt die Bar sie an", () => {
+  const state = applyStatus(emptyState(), false, at("09:10")).state
+  assert.equal(barView({ state, now: at("09:10"), authState: "ok", failed: false, reminding: true }).kind, "reminder")
+  assert.equal(barView({ state, now: at("09:10"), authState: "ok", failed: true, reminding: true }).kind, "error")
 })

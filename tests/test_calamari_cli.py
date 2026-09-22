@@ -287,6 +287,34 @@ class CalamariCliTest(unittest.TestCase):
             with self.subTest(command):
                 self.assert_error(self.run_helper(command), "AUTH_REQUIRED")
 
+    # Tagesinformation
+
+    def test_day_info_takes_working_day_and_core_time_from_the_work_plan(self):
+        self.login()
+
+        code, out = self.run_helper("day-info", "--date", "2026-09-25")  # a Friday
+
+        self.assertEqual((code, out), (0, {"ok": True, "date": "2026-09-25", "workingDay": True,
+                                           "coreStart": "09:00", "coreEnd": "16:30"}))
+
+    def test_day_info_knows_the_weekend_is_no_working_day(self):
+        self.login()
+
+        code, out = self.run_helper("day-info", "--date", "2026-09-26")  # a Saturday
+
+        self.assertEqual((code, out), (0, {"ok": True, "date": "2026-09-26", "workingDay": False,
+                                           "coreStart": None, "coreEnd": None}))
+
+    def test_day_info_defaults_to_today(self):
+        self.login()
+
+        code, out = self.run_helper("day-info")
+
+        self.assertEqual((code, out["date"], out["coreEnd"]), (0, "2026-09-22", "16:45"))
+
+    def test_day_info_rejects_a_malformed_date(self):
+        self.assert_error(self.run_helper("day-info", "--date", "22.09.2026"), "USAGE")
+
     # Other failures
 
     def test_rate_limit_is_reported(self):

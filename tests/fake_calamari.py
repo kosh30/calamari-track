@@ -39,6 +39,12 @@ class FakeCalamari:
         # also hand to the helper (CALAMARI_NOW).
         self.now = "2026-09-22T14:00:00"
         self.shifts = []
+        # Shape of the real getWorkPlan answer.
+        week = [(d, "09:00", "16:45") for d in ("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY")]
+        week += [("FRIDAY", "09:00", "16:30"), ("SATURDAY", None, None), ("SUNDAY", None, None)]
+        self.work_plan = {"id": 3, "name": "Vollzeit", "days": [
+            {"dayOfWeek": d, "workingDay": start is not None, "startTime": start, "finishTime": end,
+             "durationSeconds": None if start is None else 27900} for d, start, end in week]}
         # Shape of the real getMyProfile answer (trimmed).
         self.profile = {"personUuid": "00000000-0000-4000-8000-000000000001", "legacyId": 1,
                         "name": "Erika Mustermann", "email": "erika@example.com",
@@ -221,6 +227,8 @@ class _Handler(BaseHTTPRequestHandler):
                 return self._overlap(msg["id"], msg["params"]["arguments"])
             if name in ("clockIn", "clockOut"):
                 return self._clock(msg["id"], name)
+            if name == "getWorkPlan":
+                return self._reply(msg["id"], {"content": [{"type": "text", "text": json.dumps(self.fake.work_plan)}]})
             if name == "getMyProfile":
                 return self._reply(msg["id"], {"content": [{"type": "text", "text": json.dumps(self.fake.profile)}]})
             return self._reply(msg["id"], error={"code": -32602, "message": "Unknown tool " + name})
