@@ -7,11 +7,11 @@
 **Status:** ready-for-agent
 
 - [x] Tests für `decide`: sanfter Hinweis genau einmal, letzte Warnung zur konfigurierten Uhrzeit, Auto-Abschluss nach der Wartezeit, „+1 h“ verschiebt beides, Obergrenze gewinnt, Wochenende mit laufender Schicht, kein Hinweis nach dem Feierabend
-- [ ] Das Panel zeigt nach der letzten Warnung einen Countdown und beide Buttons
+- [x] Das Panel zeigt nach der letzten Warnung einen Countdown und beide Buttons
 - [x] „+1 h“ wird im lokalen Zustand gespeichert und übersteht einen Neustart
-- [ ] Der Auto-Abschluss stempelt aus und verschickt den Korrektur-Hinweis, ein Klick öffnet Calamari
+- [x] Der Auto-Abschluss stempelt aus und verschickt den Korrektur-Hinweis, ein Klick öffnet Calamari
 - [x] Uhrzeit der letzten Warnung, Versatz des sanften Hinweises, Wartezeit, Dauer von „+1 h“ und Obergrenze sind konfigurierbar
-- [ ] Der ganze Ablauf ist mit verkürzten Zeiten einmal manuell mit dem Benutzer gegen echtes Calamari abgenommen
+- [x] Der ganze Ablauf ist mit verkürzten Zeiten einmal manuell mit dem Benutzer gegen echtes Calamari abgenommen
 
 ## Comments
 
@@ -20,3 +20,9 @@
 - „+1 h“ speichert `postponedTo`, das übersteht einen Neustart.
 - Der Auto-Abschluss stempelt über `clock-out` aus. Danach kommt der Korrektur-Hinweis, ein Klick öffnet `webUrl` (Einstellung, firmenspezifisch, nicht im Repo).
 - Notifications laufen der Reihe nach über eine kleine Warteschlange, damit zwei gleichzeitig fällige nicht verloren gehen.
+
+**2026-09-22 (Agent):** Mit dem Benutzer gegen echtes Calamari abgenommen. Verkürzte Werte per `omarchy bar set`: Kernzeit Dienstag bis 13:50, sanfter Hinweis nach 1 Min, letzte Warnung 13:53, Wartezeit 2 Min, „+1 h“ = 3 Min, Obergrenze 14:10.
+- 13:51 sanfter Hinweis, 13:53 letzte Warnung. Ein Klick öffnete das Panel mit Countdown, „+3 Min“ geklickt (`postponedTo` 13:56).
+- 13:56 neue letzte Warnung, keine Reaktion. 13:58 Auto-Abschluss: `clock-out` in Calamari, danach meldete `status` ab 14:01 keine Schicht mehr.
+- Der Korrektur-Hinweis kam, ein Klick öffnete `webUrl` im Browser.
+- Anschließend alle Werte auf die Standardwerte zurückgesetzt, `webUrl` bleibt in der lokalen `shell.json`.
