@@ -9,7 +9,7 @@
 - [x] `status` liefert `{"ok": true, "running": bool}`
 - [x] `start-time` liefert die Startzeit der laufenden Schicht auf die Minute genau, `--after HH:MM` sucht erst ab dieser Zeit
 - [x] Die Bar ist grau ohne Schicht und grün mit tickender Dauer bei laufender Schicht
-- [ ] Eine im Web begonnene Schicht erscheint spätestens nach einem Abfrage-Intervall
+- [x] Eine im Web begonnene Schicht erscheint spätestens nach einem Abfrage-Intervall
 - [x] Beim Öffnen des Panels wird sofort abgefragt
 - [x] Netz- oder Anmeldefehler zeigen einen Fehlerzustand in der Bar
 - [x] Tests gegen den Fake: Status ja/nein und Intervallhalbierung findet die im Fake hinterlegte Startzeit
@@ -28,3 +28,8 @@
 - Der graue Zustand ohne Schicht ist per Test abgedeckt, in der Shell aber erst mit Ticket 04 zu sehen (Ausstempeln).
 
 **2026-09-22 (Agent):** Fehlerzustand abgenommen: Ohne Netz zeigt die Bar das rote 󰀦. Den Anmeldefehler hat Ticket 02 schon gezeigt. Offen bleibt nur noch „eine Web-Schicht erscheint nach spätestens einem Intervall“. Das wird zusammen mit Ticket 04 geprüft, weil es echte Stempelungen braucht.
+
+**2026-09-22 (Agent):** Web-Schicht abgenommen: Im Web um 11:25 ausgestempelt und um 11:29 eingestempelt, das Panel blieb dabei zu.
+- Die Abfrage um 11:29:42 sah noch keine Schicht, weil eine in der laufenden Minute begonnene Schicht im Status-Fenster fehlt. Sie merkte sich `searchAfter` 11:27.
+- Die Abfrage um 11:32:42 fand die Schicht, `start-time --after 11:27` lieferte 11:29.
+- Im schlechtesten Fall dauert die Erkennung also ein Intervall plus bis zu einer Minute.

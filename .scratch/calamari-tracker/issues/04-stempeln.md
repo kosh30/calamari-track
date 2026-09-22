@@ -12,7 +12,7 @@
 - [x] Einstempeln nach dem Feierabend hebt den Feierabend auf
 - [x] Fehler werden im Panel angezeigt, keine Offline-Warteschlange
 - [x] Tests gegen den Fake für `clock-in`/`clock-out` und die Fehlercodes `NETWORK`, `RATE_LIMITED`, `MCP_ERROR`
-- [ ] Einmal manuell mit dem Benutzer gegen echtes Calamari abgenommen (erzeugt echte Stempelungen)
+- [x] Einmal manuell mit dem Benutzer gegen echtes Calamari abgenommen (erzeugt echte Stempelungen)
 
 ## Comments
 
@@ -28,3 +28,5 @@
 - Wieder eingestempelt um 11:21: Die Bar ist grün und zeigt `0:00`, der Feierabend ist aufgehoben.
 - `clockOut` ohne laufende Schicht wird mit `isError: true` abgelehnt. Der Text ist nur allgemein („Error has occurred. We are working to solve it.“, doppelt) und lässt sich nicht von einer Serverstörung unterscheiden. Der Helfer meldet `MCP_ERROR`.
 - Gefunden und behoben: `status` meldete um 11:21:45 „läuft nicht“, erst ab 11:22:00 „läuft“. Eine Abfrage in der Minute des Einstempelns (z.B. beim Öffnen des Panels) hätte die Bar bis zur nächsten Abfrage grau gemacht. Der Service ignoriert das jetzt in dieser Minute.
+
+**2026-09-22 (Agent):** Abnahme abgeschlossen. Außerdem die Web-Schicht aus Ticket 03 geprüft, siehe dort.
