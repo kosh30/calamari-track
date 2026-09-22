@@ -94,6 +94,7 @@ class CalamariCliTest(unittest.TestCase):
         self.assertEqual(out["ok"], True)
         self.assertEqual(out["name"], "Erika Mustermann")
         self.assertEqual(out["email"], "erika@example.com")
+        self.assertEqual(out["personUuid"], "00000000-0000-4000-8000-000000000001")
         self.assertEqual(self.fake.tool_calls, [("getMyProfile", {})])
 
     def test_whoami_understands_sse_responses(self):

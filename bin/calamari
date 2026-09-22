@@ -450,11 +450,9 @@ def call_tool(name, arguments=None):
 
 def whoami():
     profile = call_tool("getMyProfile")
-    if not isinstance(profile, dict):
-        return {"name": str(profile), "email": None, "profile": profile}
-    name = (profile.get("name") or profile.get("fullName")
-            or " ".join(p for p in (profile.get("firstName"), profile.get("lastName")) if p))
-    return {"name": name, "email": profile.get("email"), "profile": profile}
+    if not isinstance(profile, dict) or not profile.get("name"):
+        raise HelperError("MCP_ERROR", "getMyProfile: unexpected answer %r" % (profile,))
+    return {"name": profile["name"], "email": profile.get("email"), "personUuid": profile.get("personUuid")}
 
 
 COMMANDS = {"login": login, "whoami": whoami}

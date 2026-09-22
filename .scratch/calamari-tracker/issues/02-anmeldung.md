@@ -8,9 +8,9 @@
 
 **Risiko:** Die Registrierung mit einem eigenen Client ist noch nicht erprobt. Scheitert sie, wird das Ticket gestoppt und mit dem Benutzer neu entschieden.
 
-- [ ] `login` führt den kompletten Browser-Login durch (manuell mit dem Benutzer abgenommen)
-- [ ] `whoami` liefert den Namen des Benutzers als JSON (`{"ok": true, ...}`)
-- [ ] Tokens und Client-Daten liegen im Keyring, nicht auf der Platte
+- [x] `login` führt den kompletten Browser-Login durch (manuell mit dem Benutzer abgenommen)
+- [x] `whoami` liefert den Namen des Benutzers als JSON (`{"ok": true, ...}`)
+- [x] Tokens und Client-Daten liegen im Keyring, nicht auf der Platte
 - [x] Automatischer Refresh bei abgelaufenem Token bzw. 401. Scheitert der Refresh, gibt es `{"ok": false, "error": {"code": "AUTH_REQUIRED"}}` mit Exit-Code ≠ 0
 - [ ] Das Panel zeigt den Anmeldestatus, „Neu anmelden“ startet den Login
 - [ ] Die Bar zeigt ein Warnsymbol, solange eine Anmeldung nötig ist
@@ -24,3 +24,11 @@
 - Zusätzlich zu Keyring und Basis-URL gibt es `$BROWSER` als dritte Naht. Das ist die übliche Konvention, und der Test-Browser folgt damit dem Redirect.
 - Ein Refresh läuft unter einer Dateisperre, weil Calamari Refresh-Tokens rotiert und parallele Läufe sich sonst gegenseitig abmelden.
 - Noch offen ist die manuelle Abnahme. Der erste echte Login lief nach 300 s ohne Browser-Rückmeldung ab. Ungeprüft sind außerdem das Feldformat von `getMyProfile` (`whoami` gibt dafür `profile` roh mit aus) sowie Panel und Bar in der laufenden Shell (`omarchy-restart-shell` für `Service.qml`).
+
+**2026-09-22 (Agent):** Die manuelle Abnahme mit dem Benutzer ist erfolgt:
+- `login` läuft per Microsoft-SSO durch, und `whoami` liefert den Namen.
+- Die Einträge `client` und `tokens` liegen im Keyring (`secret-tool`).
+- Ein erzwungener Refresh gegen Calamari hat funktioniert.
+- Access-Tokens laufen nur ca. 300 s, und das Refresh-Token rotiert bei jedem Refresh. Die Sperre ist also nötig.
+- `getMyProfile` liefert direkt `name`, `email` und `personUuid`. `whoami` gibt genau diese drei Felder aus, `personUuid` braucht später `day-info`.
+- Offen ist nur noch die Prüfung von Panel und Bar in der laufenden Shell.

@@ -33,8 +33,12 @@ class FakeCalamari:
         self.protocol_version = None  # answer initialize with this version instead of echoing
         self.tool_error = False
         self.mcp_status = None  # force an HTTP status on MCP calls, e.g. 429
-        self.profile = {"firstName": "Erika", "lastName": "Mustermann",
-                        "email": "erika@example.com"}
+        # Shape of the real getMyProfile answer (trimmed).
+        self.profile = {"personUuid": "00000000-0000-4000-8000-000000000001", "legacyId": 1,
+                        "name": "Erika Mustermann", "email": "erika@example.com",
+                        "directManager": {"personUuid": "00000000-0000-4000-8000-000000000002",
+                                          "name": "Max Mustermann", "email": "max@example.com"},
+                        "teams": [{"id": 1, "name": "IT-Team"}], "roles": []}
 
         # Observable state.
         self.clients = {}
