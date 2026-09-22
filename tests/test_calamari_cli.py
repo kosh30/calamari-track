@@ -295,7 +295,8 @@ class CalamariCliTest(unittest.TestCase):
         code, out = self.run_helper("day-info", "--date", "2026-09-25")  # a Friday
 
         self.assertEqual((code, out), (0, {"ok": True, "date": "2026-09-25", "workingDay": True,
-                                           "coreStart": "09:00", "coreEnd": "16:30"}))
+                                           "coreStart": "09:00", "coreEnd": "16:30",
+                                           "holiday": None, "absence": None}))
 
     def test_day_info_knows_the_weekend_is_no_working_day(self):
         self.login()
@@ -303,7 +304,70 @@ class CalamariCliTest(unittest.TestCase):
         code, out = self.run_helper("day-info", "--date", "2026-09-26")  # a Saturday
 
         self.assertEqual((code, out), (0, {"ok": True, "date": "2026-09-26", "workingDay": False,
-                                           "coreStart": None, "coreEnd": None}))
+                                           "coreStart": None, "coreEnd": None,
+                                           "holiday": None, "absence": None}))
+
+    def test_day_info_names_a_public_holiday(self):
+        self.login()
+
+        code, out = self.run_helper("day-info", "--date", "2026-10-03")
+
+        self.assertEqual((code, out["holiday"]), (0, {"name": "Tag der Deutschen Einheit",
+                                                      "halfDay": False, "halfdayPeriod": None}))
+
+    def test_day_info_names_a_half_holiday_with_its_period(self):
+        self.login()
+
+        code, out = self.run_helper("day-info", "--date", "2026-12-24")
+
+        self.assertEqual((code, out["holiday"]), (0, {"name": "Heiligabend (PM)",
+                                                      "halfDay": True, "halfdayPeriod": "PM"}))
+        self.assertEqual(out["coreEnd"], "16:45")  # shortening the core time is decide's job
+
+    def test_day_info_names_the_own_absence_on_its_last_day(self):
+        self.login()
+
+        code, out = self.run_helper("day-info", "--date", "2026-10-16")
+
+        self.assertEqual((code, out["absence"]), (0, {"category": "TIMEOFF", "fullDay": True}))
+
+    def test_day_info_ignores_absences_of_colleagues(self):
+        self.login()
+
+        code, out = self.run_helper("day-info", "--date", "2026-10-19")
+
+        self.assertEqual((code, out["absence"]), (0, None))
+
+    def test_day_info_prefers_time_off_over_a_working_absence(self):
+        self.login()
+        self.fake.absences.append((self.fake.profile["personUuid"], {
+            "userId": 1, "name": "Erika Mustermann", "category": "TIMEOFF", "fullDayRequest": True,
+            "start": "2026-11-02T00:00", "end": "2026-11-02T00:00"}))
+
+        code, out = self.run_helper("day-info", "--date", "2026-11-02")
+
+        self.assertEqual((code, out["absence"]), (0, {"category": "TIMEOFF", "fullDay": True}))
+
+    def test_day_info_prefers_time_off_for_the_whole_day_over_hourly_time_off(self):
+        self.login()
+        me = self.fake.profile["personUuid"]
+        self.fake.absences[:0] = [(me, {"userId": 1, "name": "Erika Mustermann", "category": "TIMEOFF",
+                                        "fullDayRequest": False, "start": "2026-11-02T08:00", "end": "2026-11-02T10:00"})]
+        self.fake.absences.append((me, {"userId": 1, "name": "Erika Mustermann", "category": "TIMEOFF",
+                                        "fullDayRequest": True, "start": "2026-11-02T00:00", "end": "2026-11-02T00:00"}))
+
+        code, out = self.run_helper("day-info", "--date", "2026-11-02")
+
+        self.assertEqual((code, out["absence"]), (0, {"category": "TIMEOFF", "fullDay": True}))
+
+    def test_day_info_prefers_a_whole_holiday_over_a_half_one(self):
+        self.login()
+        self.fake.holidays.insert(0, {"name": "Halber Tag", "start": "2026-10-03", "end": "2026-10-03",
+                                      "halfDay": True, "halfdayPeriod": "PM"})
+
+        code, out = self.run_helper("day-info", "--date", "2026-10-03")
+
+        self.assertEqual((code, out["holiday"]["name"], out["holiday"]["halfDay"]), (0, "Tag der Deutschen Einheit", False))
 
     def test_day_info_defaults_to_today(self):
         self.login()

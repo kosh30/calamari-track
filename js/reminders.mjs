@@ -2,14 +2,16 @@
 // (js/shiftclock.mjs) and the config it decides which reminders are due and
 // what the bar shows. No Qt; tested with `node --test js/`.
 //
-//   day     { date, workingDay, coreStart, coreEnd } from `day-info`, or
-//           null while unknown
+//   day     { date, workingDay, coreStart, coreEnd, holiday, absence }
+//           from `day-info`, or null while unknown
 //   state   the shift state, plus failed: true while the status is unknown
-//   config  { stampReminderMinutes }
+//   config  { stampReminderMinutes, coreMonday .. coreSunday }; the
+//           calendar rules are in js/daycalendar.mjs
 //
 // decide() is idempotent: what was sent is recorded with markSent() in
 // state.sent, so the same moment never yields the same reminder twice.
 
+import { coreTime } from "./daycalendar.mjs"
 import { minuteOfDay, toHhmm, toMinutes, ymd } from "./daytime.mjs"
 
 function atMinute(now, minute) {
@@ -23,11 +25,11 @@ export function decide(now, day, state, config) {
   // A day info or state of another date (right after midnight, before the
   // first poll of the new day) or an unknown status must not remind.
   const today = ymd(now)
-  if (!day || day.date !== today || !day.workingDay || !day.coreStart || !day.coreEnd) return quiet
-  if (state.failed || state.date !== today) return quiet
+  if (!day || day.date !== today || state.failed || state.date !== today) return quiet
+  const core = coreTime(day, state, config)
+  if (!core) return quiet
   const minute = minuteOfDay(now)
-  const coreStart = toMinutes(day.coreStart)
-  const coreEnd = toMinutes(day.coreEnd)
+  const { start: coreStart, end: coreEnd } = core
   if (minute < coreStart) return Object.assign(quiet, { nextCheckAt: atMinute(now, coreStart) })
   // Only "noch gar nicht eingestempelt" earns a reminder; a Feierabend
   // implies a shift today.

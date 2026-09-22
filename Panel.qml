@@ -101,6 +101,16 @@ Panel {
                     onClicked: root.service.stamp(root.stampAction)
                 }
 
+                Button {
+                    visible: root.service !== null && root.authState === "ok"
+                    readonly property bool dayOff: root.service !== null && root.service.dayOff
+                    text: dayOff ? "Heute frei (zurücknehmen)" : "Heute frei"
+                    tooltipText: "Keine Stempel-Erinnerungen bis morgen"
+                    selected: dayOff
+                    bordered: true
+                    onClicked: root.service.setDayOff(!dayOff)
+                }
+
                 Text {
                     width: parent.width
                     visible: root.service !== null && root.service.stampError !== ""

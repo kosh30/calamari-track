@@ -563,22 +563,47 @@ WEEKDAYS = ("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", 
 
 
 def day_info(args):
-    """Working day and core time of one date from the weekly work plan.
-    Holidays and absences are not part of it yet."""
+    """Working day and core time of one date from the weekly work plan, plus
+    the public holiday and the own absence on it. Of several it keeps the one
+    that frees the most (whole before half holiday; whole-day time off before
+    hourly time off before working absences); what that means for reminders
+    (free day, shortened core time) is left to the plugin."""
     try:
         date = datetime.date.fromisoformat(args.date) if args.date else now().date()
     except ValueError:
         raise HelperError("USAGE", "expected YYYY-MM-DD, got %r" % args.date)
-    plan = with_mcp(lambda c: c.call_tool("getWorkPlan", {}))
+    day = date.isoformat()
+
+    def fetch_day(client):
+        plan = client.call_tool("getWorkPlan", {})
+        holidays = client.call_tool("getPublicHolidays", {"from": day, "to": day})
+        me = client.call_tool("getMyProfile", {})
+        # Without peopleUuids search returns the absences of the whole company.
+        absences = client.call_tool("search", {"from": day, "to": day, "peopleUuids": [me["personUuid"]]})
+        return plan, holidays, absences
+
+    plan, holidays, absences = with_mcp(fetch_day)
     weekday = WEEKDAYS[date.weekday()]
-    day = next((d for d in plan.get("days", []) if d.get("dayOfWeek") == weekday), None) \
+    entry = next((d for d in plan.get("days", []) if d.get("dayOfWeek") == weekday), None) \
         if isinstance(plan, dict) else None
-    if day is None:
+    if entry is None:
         raise HelperError("MCP_ERROR", "getWorkPlan: no entry for %s in %r" % (weekday, plan))
-    working = day.get("workingDay") is True
-    return {"date": date.isoformat(), "workingDay": working,
-            "coreStart": day.get("startTime") if working else None,
-            "coreEnd": day.get("finishTime") if working else None}
+    working = entry.get("workingDay") is True
+
+    on_day = [h for h in holidays.get("holidays", []) if h.get("start", "") <= day <= h.get("end", "")]
+    on_day.sort(key=lambda h: h.get("halfDay") is True)
+    holiday = on_day[0] if on_day else None
+    # end is the last day of the absence (verified against real ones).
+    own = [a for a in absences.get("absences", []) if a.get("start", "")[:10] <= day <= a.get("end", "")[:10]]
+    own.sort(key=lambda a: (a.get("category") != "TIMEOFF", a.get("fullDayRequest") is not True))
+    absence = own[0] if own else None
+    return {"date": day, "workingDay": working,
+            "coreStart": entry.get("startTime") if working else None,
+            "coreEnd": entry.get("finishTime") if working else None,
+            "holiday": holiday and {"name": (holiday.get("name") or "").strip(), "halfDay": holiday.get("halfDay") is True,
+                                    "halfdayPeriod": holiday.get("halfdayPeriod")},
+            "absence": absence and {"category": absence.get("category"),
+                                    "fullDay": absence.get("fullDayRequest") is True}}
 
 
 class _Parser(argparse.ArgumentParser):

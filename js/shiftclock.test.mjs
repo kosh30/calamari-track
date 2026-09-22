@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { applyStamp, applyStatus, applyStartTime, barView, emptyState, restoreState, stampAction } from "./shiftclock.mjs"
+import { applyStamp, applyStatus, applyStartTime, barView, dayOffToday, emptyState, restoreState, setDayOff, stampAction } from "./shiftclock.mjs"
 
 const at = (hhmm, date = "2026-09-22") => new Date(`${date}T${hhmm}:00`)
 
@@ -195,4 +195,11 @@ test("solange eine Stempel-Erinnerung fällig ist, zeigt die Bar sie an", () => 
   const state = applyStatus(emptyState(), false, at("09:10")).state
   assert.equal(barView({ state, now: at("09:10"), authState: "ok", failed: false, reminding: true }).kind, "reminder")
   assert.equal(barView({ state, now: at("09:10"), authState: "ok", failed: true, reminding: true }).kind, "error")
+})
+
+test("„Heute frei“ gilt nur für den Tag, an dem es gesetzt wurde", () => {
+  const state = setDayOff(applyStatus(emptyState(), false, at("08:00")).state, true, at("08:00"))
+  assert.equal(dayOffToday(state, at("23:59")), true)
+  // after midnight, even before the first poll of the new day
+  assert.equal(dayOffToday(state, at("00:01", "2026-09-23")), false)
 })

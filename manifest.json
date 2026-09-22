@@ -20,7 +20,14 @@
     "defaultSection": "right",
     "defaults": {
       "pollIntervalMinutes": 3,
-      "stampReminderMinutes": 5
+      "stampReminderMinutes": 5,
+      "coreMonday": "",
+      "coreTuesday": "",
+      "coreWednesday": "",
+      "coreThursday": "",
+      "coreFriday": "",
+      "coreSaturday": "",
+      "coreSunday": ""
     },
     "schema": [
       {
@@ -38,6 +45,48 @@
         "min": 1,
         "max": 60,
         "defaultValue": 5
+      },
+      {
+        "key": "coreMonday",
+        "type": "string",
+        "label": "Kernzeit Montag (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "defaultValue": ""
+      },
+      {
+        "key": "coreTuesday",
+        "type": "string",
+        "label": "Kernzeit Dienstag (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "defaultValue": ""
+      },
+      {
+        "key": "coreWednesday",
+        "type": "string",
+        "label": "Kernzeit Mittwoch (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "defaultValue": ""
+      },
+      {
+        "key": "coreThursday",
+        "type": "string",
+        "label": "Kernzeit Donnerstag (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "defaultValue": ""
+      },
+      {
+        "key": "coreFriday",
+        "type": "string",
+        "label": "Kernzeit Freitag (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "defaultValue": ""
+      },
+      {
+        "key": "coreSaturday",
+        "type": "string",
+        "label": "Kernzeit Samstag (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "defaultValue": ""
+      },
+      {
+        "key": "coreSunday",
+        "type": "string",
+        "label": "Kernzeit Sonntag (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "defaultValue": ""
       }
     ]
   }

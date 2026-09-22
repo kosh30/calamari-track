@@ -1,13 +1,14 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
 import { decide, markSent, notification } from "./reminders.mjs"
-import { applyStamp, applyStatus, emptyState, restoreState } from "./shiftclock.mjs"
+import { applyStamp, applyStatus, emptyState, restoreState, setDayOff } from "./shiftclock.mjs"
 
 const at = (hhmm, date = "2026-09-22") => new Date(`${date}T${hhmm}:00`)
 const workday = { date: "2026-09-22", workingDay: true, coreStart: "09:00", coreEnd: "16:45" }
 const config = { stampReminderMinutes: 5 }
 const noShift = now => applyStatus(emptyState(), false, at(now)).state
 const types = r => r.actions.map(a => a.type)
+const quietDay = { barState: null, actions: [], nextCheckAt: null }
 
 test("in der Kernzeit ohne Schicht kommt sofort eine Stempel-Erinnerung", () => {
   const r = decide(at("09:00"), workday, noShift("09:00"), config)
@@ -77,7 +78,7 @@ test("wer mitten in der Kernzeit startet, wird sofort erinnert", () => {
 test("am Wochenende gibt es keine Stempel-Erinnerung", () => {
   const saturday = { date: "2026-09-26", workingDay: false, coreStart: null, coreEnd: null }
   const r = decide(at("10:00", "2026-09-26"), saturday, applyStatus(emptyState(), false, at("10:00", "2026-09-26")).state, config)
-  assert.deepEqual(r, { barState: null, actions: [], nextCheckAt: null })
+  assert.deepEqual(r, quietDay)
 })
 
 test("ohne bekannten Arbeitsplan oder Status wird nicht erinnert", () => {
@@ -105,5 +106,99 @@ test("ein Zustand von gestern löst heute keine Stempel-Erinnerung aus", () => {
 
 test("ein Arbeitstag ohne Kernzeit im Arbeitsplan löst keine Erinnerung aus", () => {
   const vague = Object.assign({}, workday, { coreStart: null, coreEnd: null })
-  assert.deepEqual(decide(at("10:00"), vague, noShift("10:00"), config), { barState: null, actions: [], nextCheckAt: null })
+  assert.deepEqual(decide(at("10:00"), vague, noShift("10:00"), config), quietDay)
+})
+
+// Freie Tage
+
+const withDay = extra => Object.assign({}, workday, { holiday: null, absence: null }, extra)
+
+test("an einem Feiertag gibt es keine Stempel-Erinnerung", () => {
+  const day = withDay({ holiday: { name: "Tag der Deutschen Einheit", halfDay: false, halfdayPeriod: null } })
+  assert.deepEqual(decide(at("10:00"), day, noShift("10:00"), config), quietDay)
+})
+
+test("ein halber Feiertag am Nachmittag lässt die Kernzeit um 12:00 enden", () => {
+  const eve = withDay({ date: "2026-12-24", holiday: { name: "Heiligabend (PM)", halfDay: true, halfdayPeriod: "PM" } })
+  const state = applyStatus(emptyState(), false, at("11:50", "2026-12-24")).state
+  assert.deepEqual(types(decide(at("11:50", "2026-12-24"), eve, state, config)), ["stamp-reminder"])
+  assert.deepEqual(decide(at("12:00", "2026-12-24"), eve, state, config), quietDay)
+})
+
+test("ein halber Feiertag am Vormittag lässt die Kernzeit erst um 12:00 beginnen", () => {
+  const morningOff = withDay({ holiday: { name: "Halber Tag (AM)", halfDay: true, halfdayPeriod: "AM" } })
+  const r = decide(at("10:00"), morningOff, noShift("10:00"), config)
+  assert.deepEqual(types(r), [])
+  assert.deepEqual(r.nextCheckAt, at("12:00"))
+})
+
+test("an einem Urlaubs- oder Krankheitstag gibt es keine Stempel-Erinnerung", () => {
+  const day = withDay({ absence: { category: "TIMEOFF", fullDay: true } })
+  assert.deepEqual(decide(at("10:00"), day, noShift("10:00"), config), quietDay)
+})
+
+test("eine Abwesenheit, bei der gearbeitet wird, ist kein freier Tag", () => {
+  // e.g. a business trip: category WORK
+  const day = withDay({ absence: { category: "WORK", fullDay: true } })
+  assert.deepEqual(types(decide(at("10:00"), day, noShift("10:00"), config)), ["stamp-reminder"])
+})
+
+test("eine stundenweise Abwesenheit ist kein freier Tag", () => {
+  const day = withDay({ absence: { category: "TIMEOFF", fullDay: false } })
+  assert.deepEqual(types(decide(at("10:00"), day, noShift("10:00"), config)), ["stamp-reminder"])
+})
+
+test("mit „Heute frei“ gibt es heute keine Stempel-Erinnerung, auch nach einem Neustart", () => {
+  const state = restoreState(JSON.stringify(setDayOff(noShift("08:00"), true, at("08:00"))))
+  assert.deepEqual(decide(at("10:00"), withDay({}), state, config), quietDay)
+})
+
+test("„Heute frei“ lässt sich zurücknehmen", () => {
+  const state = setDayOff(setDayOff(noShift("08:00"), true, at("08:00")), false, at("10:00"))
+  assert.deepEqual(types(decide(at("10:00"), withDay({}), state, config)), ["stamp-reminder"])
+})
+
+test("„Heute frei“ gilt am nächsten Tag nicht mehr", () => {
+  const monday = setDayOff(applyStatus(emptyState(), false, at("08:00", "2026-09-21")).state, true, at("08:00", "2026-09-21"))
+  const tuesday = applyStatus(monday, false, at("10:00")).state
+  assert.deepEqual(types(decide(at("10:00"), withDay({}), tuesday, config)), ["stamp-reminder"])
+})
+
+test("eine Arbeitsplan-Überschreibung gilt für ihren Wochentag", () => {
+  // 2026-09-22 is a Tuesday
+  const own = Object.assign({}, config, { coreTuesday: "08:00-13:00" })
+  assert.deepEqual(types(decide(at("08:00"), withDay({}), noShift("08:00"), own)), ["stamp-reminder"])
+  assert.deepEqual(decide(at("13:00"), withDay({}), noShift("13:00"), own), quietDay)
+  const otherDay = Object.assign({}, config, { coreMonday: "08:00-13:00" })
+  assert.deepEqual(types(decide(at("08:00"), withDay({}), noShift("08:00"), otherDay)), [])
+})
+
+test("eine Arbeitsplan-Überschreibung macht einen arbeitsfreien Wochentag zum Arbeitstag", () => {
+  const saturday = { date: "2026-09-26", workingDay: false, coreStart: null, coreEnd: null, holiday: null, absence: null }
+  const state = applyStatus(emptyState(), false, at("10:00", "2026-09-26")).state
+  const own = Object.assign({}, config, { coreSaturday: "09:00-12:00" })
+  assert.deepEqual(types(decide(at("10:00", "2026-09-26"), saturday, state, own)), ["stamp-reminder"])
+})
+
+test("„frei“ als Arbeitsplan-Überschreibung macht den Wochentag arbeitsfrei", () => {
+  const own = Object.assign({}, config, { coreTuesday: "frei" })
+  assert.deepEqual(decide(at("10:00"), withDay({}), noShift("10:00"), own), quietDay)
+})
+
+test("eine unlesbare Arbeitsplan-Überschreibung lässt den Arbeitsplan gelten", () => {
+  for (const text of ["", "8-13 Uhr", "13:00-08:00", "09:00-99:99", "25:00-26:00"]) {
+    const own = Object.assign({}, config, { coreTuesday: text })
+    assert.deepEqual(types(decide(at("10:00"), withDay({}), noShift("10:00"), own)), ["stamp-reminder"], text)
+  }
+})
+
+test("ein Feiertag gilt auch an einem überschriebenen Wochentag", () => {
+  const day = withDay({ holiday: { name: "Tag der Deutschen Einheit", halfDay: false, halfdayPeriod: null } })
+  const own = Object.assign({}, config, { coreTuesday: "08:00-13:00" })
+  assert.deepEqual(decide(at("10:00"), day, noShift("10:00"), own), quietDay)
+})
+
+test("eine Arbeitsplan-Überschreibung darf die Stunde einstellig schreiben", () => {
+  const own = Object.assign({}, config, { coreTuesday: "8:00-13:00" })
+  assert.deepEqual(types(decide(at("08:00"), withDay({}), noShift("08:00"), own)), ["stamp-reminder"])
 })

@@ -11,6 +11,7 @@
 //              that saw no shift and by the own clock-out.
 //   clockedOutAt  HH:MM of the own clock-out that began the Feierabend today
 //   stampedToday  true once a shift of today was seen running
+//   dayOff     true after the panel switch "Heute frei" (today only)
 //   sent       { reminder type: HH:MM last sent today }, see js/reminders.mjs
 //
 // Known limit: the start of a follow-up shift is only found if the plugin
@@ -24,7 +25,7 @@ import { minuteOfDay, pad, toHhmm, toMinutes, ymd } from "./daytime.mjs"
 const STATUS_WINDOW = 2
 
 export function emptyState() {
-  return { date: "", running: null, startedAt: null, searchAfter: null, clockedOutAt: null, stampedToday: false, sent: {} }
+  return { date: "", running: null, startedAt: null, searchAfter: null, clockedOutAt: null, stampedToday: false, dayOff: false, sent: {} }
 }
 
 function forToday(state, now) {
@@ -100,6 +101,18 @@ function applyClockOut(state, now) {
     running: false, startedAt: null, clockedOutAt: toHhmm(minute),
     searchAfter: toHhmm(Math.min(minute + 1, 24 * 60 - 1)),
   })
+}
+
+// The panel switch "Heute frei". Like everything in the state it belongs
+// to today and is gone tomorrow.
+export function setDayOff(state, on, now) {
+  return Object.assign(forToday(state, now), { dayOff: on })
+}
+
+// Whether "Heute frei" is on for the day of now; a switch from yesterday
+// no longer counts, even before the first poll of the new day.
+export function dayOffToday(state, now) {
+  return state.dayOff === true && state.date === ymd(now)
 }
 
 export function applyStartTime(state, startedAt) {

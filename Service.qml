@@ -37,7 +37,11 @@ Item {
         var value = root.settings ? root.settings[name] : undefined
         return value === undefined || value === null ? fallback : value
     }
-    readonly property var config: ({ stampReminderMinutes: root.setting("stampReminderMinutes", 5) })
+    // The settings as js/reminders.mjs reads them (coreMonday .. coreSunday
+    // pass through as they are).
+    readonly property var config: Object.assign({}, root.settings, {
+        stampReminderMinutes: root.setting("stampReminderMinutes", 5)
+    })
 
     // Today's `day-info`, fetched once per date; null until then.
     property var dayInfo: null
@@ -88,6 +92,13 @@ Item {
         stampProc.pollWhenDone = false
         stampProc.command = [root.helper, action]
         stampProc.running = true
+    }
+
+    // The panel switch "Heute frei".
+    readonly property bool dayOff: ShiftClock.dayOffToday(root.shiftState, root.now)
+    function setDayOff(on) {
+        if (root.stateLoaded)
+            root.setShiftState(ShiftClock.setDayOff(root.shiftState, on, new Date()))
     }
 
     function fetchDayInfo() {

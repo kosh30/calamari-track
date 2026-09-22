@@ -45,6 +45,20 @@ class FakeCalamari:
         self.work_plan = {"id": 3, "name": "Vollzeit", "days": [
             {"dayOfWeek": d, "workingDay": start is not None, "startTime": start, "finishTime": end,
              "durationSeconds": None if start is None else 27900} for d, start, end in week]}
+        # Shapes of the real getPublicHolidays / search answers.
+        self.holidays = [
+            {"name": "Tag der Deutschen Einheit", "start": "2026-10-03", "end": "2026-10-03", "halfDay": False, "halfdayPeriod": None},
+            {"name": "Heiligabend (PM)", "start": "2026-12-24", "end": "2026-12-24", "halfDay": True, "halfdayPeriod": "PM"},
+        ]
+        me, other = "00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000003"
+        self.absences = [
+            (me, {"userId": 1, "name": "Erika Mustermann", "category": "TIMEOFF", "fullDayRequest": True,
+                  "start": "2026-10-12T00:00", "end": "2026-10-16T00:00"}),
+            (me, {"userId": 1, "name": "Erika Mustermann", "category": "WORK", "fullDayRequest": True,
+                  "start": "2026-11-02T00:00", "end": "2026-11-02T00:00"}),
+            (other, {"userId": 3, "name": "Max Mustermann", "category": "TIMEOFF", "fullDayRequest": True,
+                     "start": "2026-10-19T00:00", "end": "2026-10-19T00:00"}),
+        ]
         # Shape of the real getMyProfile answer (trimmed).
         self.profile = {"personUuid": "00000000-0000-4000-8000-000000000001", "legacyId": 1,
                         "name": "Erika Mustermann", "email": "erika@example.com",
@@ -227,6 +241,20 @@ class _Handler(BaseHTTPRequestHandler):
                 return self._overlap(msg["id"], msg["params"]["arguments"])
             if name in ("clockIn", "clockOut"):
                 return self._clock(msg["id"], name)
+            if name == "getPublicHolidays":
+                args = msg["params"]["arguments"]
+                found = [h for h in self.fake.holidays if h["start"] <= args["to"] and h["end"] >= args["from"]]
+                return self._reply(msg["id"], {"content": [{"type": "text", "text": json.dumps(
+                    {"from": args["from"], "to": args["to"], "holidays": found})}]})
+            if name == "search":
+                # Without peopleUuids the real tool returns the whole company.
+                args = msg["params"]["arguments"]
+                people = args.get("peopleUuids")
+                found = [a for uuid, a in self.fake.absences
+                         if (people is None or uuid in people)
+                         and a["start"][:10] <= args["to"] and a["end"][:10] >= args["from"]]
+                return self._reply(msg["id"], {"content": [{"type": "text", "text": json.dumps(
+                    {"returned": len(found), "nextCursor": None, "absences": found})}]})
             if name == "getWorkPlan":
                 return self._reply(msg["id"], {"content": [{"type": "text", "text": json.dumps(self.fake.work_plan)}]})
             if name == "getMyProfile":
