@@ -4,7 +4,7 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 **Risiko:** Die Registrierung mit einem eigenen Client ist noch nicht erprobt. Scheitert sie, wird das Ticket gestoppt und mit dem Benutzer neu entschieden.
 
@@ -12,8 +12,8 @@
 - [x] `whoami` liefert den Namen des Benutzers als JSON (`{"ok": true, ...}`)
 - [x] Tokens und Client-Daten liegen im Keyring, nicht auf der Platte
 - [x] Automatischer Refresh bei abgelaufenem Token bzw. 401. Scheitert der Refresh, gibt es `{"ok": false, "error": {"code": "AUTH_REQUIRED"}}` mit Exit-Code ≠ 0
-- [ ] Das Panel zeigt den Anmeldestatus, „Neu anmelden“ startet den Login
-- [ ] Die Bar zeigt ein Warnsymbol, solange eine Anmeldung nötig ist
+- [x] Das Panel zeigt den Anmeldestatus, „Neu anmelden“ startet den Login
+- [x] Die Bar zeigt ein Warnsymbol, solange eine Anmeldung nötig ist
 - [x] Tests gegen einen Fake-OAuth/MCP-Server (JSON- und SSE-Antworten): Login inkl. PKCE-Prüfung, Refresh, `AUTH_REQUIRED`. Keyring und Basis-URL per Umgebungsvariable ersetzbar
 
 ## Comments
@@ -32,3 +32,8 @@
 - Access-Tokens laufen nur ca. 300 s, und das Refresh-Token rotiert bei jedem Refresh. Die Sperre ist also nötig.
 - `getMyProfile` liefert direkt `name`, `email` und `personUuid`. `whoami` gibt genau diese drei Felder aus, `personUuid` braucht später `day-info`.
 - Offen ist nur noch die Prüfung von Panel und Bar in der laufenden Shell.
+
+**2026-09-22 (Agent):** Mit dem Benutzer in der laufenden Shell abgenommen:
+- Das Panel zeigt „Angemeldet als …“.
+- Nach dem Löschen der Tokens erscheinen das Warnsymbol in der Bar und „Neu anmelden“ im Panel.
+- „Neu anmelden“ führt den Browser-Login durch und stellt den Status wieder her.
