@@ -4,7 +4,7 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] `status` liefert `{"ok": true, "running": bool}`
 - [x] `start-time` liefert die Startzeit der laufenden Schicht auf die Minute genau, `--after HH:MM` sucht erst ab dieser Zeit

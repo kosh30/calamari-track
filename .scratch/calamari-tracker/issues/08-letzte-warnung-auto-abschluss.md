@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Tests für `decide`: sanfter Hinweis genau einmal, letzte Warnung zur konfigurierten Uhrzeit, Auto-Abschluss nach der Wartezeit, „+1 h“ verschiebt beides, Obergrenze gewinnt, Wochenende mit laufender Schicht, kein Hinweis nach dem Feierabend
 - [x] Das Panel zeigt nach der letzten Warnung einen Countdown und beide Buttons

@@ -4,7 +4,7 @@
 
 **Blocked by:** 03
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] `clock-in` / `clock-out` im Helfer, danach Status-Abfrage, JSON-Ausgabe
 - [x] Der Button im Panel wechselt passend zwischen „Einstempeln“ und „Ausstempeln“

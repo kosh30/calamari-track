@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Der Pause-Button ist nur bei laufender Schicht sichtbar
 - [x] Pause beginnen = Ausstempeln + Markierung, Pause beenden = Einstempeln + Markierung entfernen

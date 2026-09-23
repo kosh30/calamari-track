@@ -4,7 +4,7 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] `day-info --date` liefert `workingDay`, `coreStart`, `coreEnd` aus dem Arbeitsplan
 - [x] `decide` ist ein reines JS-Modul ohne Qt-Abhängigkeit

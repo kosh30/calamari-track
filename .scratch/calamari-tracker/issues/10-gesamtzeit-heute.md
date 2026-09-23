@@ -4,11 +4,11 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Anzahl der nötigen MCP-Aufrufe für einen typischen Tag (1–3 Schichten) gemessen und dokumentiert
-- [x] Entweder: `worked-today` liefert die Summe in Minuten, das Panel zeigt sie, gecacht und nur bei Statuswechsel neu berechnet
-- [ ] Oder: Entscheidung gegen die Funktion mit Begründung in der Spec
+- [ ] Entweder: `worked-today` liefert die Summe in Minuten, das Panel zeigt sie, gecacht und nur bei Statuswechsel neu berechnet
+- [x] Oder: Entscheidung gegen die Funktion mit Begründung in der Spec
 - [x] Test gegen den Fake mit mehreren Schichten und Lücken (falls umgesetzt)
 
 ## Comments

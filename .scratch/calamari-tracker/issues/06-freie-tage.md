@@ -4,7 +4,7 @@
 
 **Blocked by:** 05
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] `day-info` liefert zusätzlich `holiday` (inkl. `halfDay`/`halfdayPeriod`) und `absence`
 - [x] Tests für `decide`: Feiertag, Abwesenheit, „Heute frei“, halber Feiertag (verkürzte Kernzeit), Arbeitsplan-Überschreibung
