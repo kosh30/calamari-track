@@ -305,10 +305,8 @@ class CalamariCliTest(unittest.TestCase):
         self.assertIn(("2026-09-22", "14:00:30", None), self.fake.shifts)
         (req,) = self.clock_ins()
         self.assertEqual((req["person"], req["projectId"]), ("erika@example.com", 7))
-        # Now, in UTC with Z.
-        self.assertRegex(req["time"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
-        stamped = datetime.datetime.fromisoformat(req["time"]).astimezone().replace(tzinfo=None)
-        self.assertEqual(stamped, datetime.datetime(2026, 9, 22, 14, 0, 30))
+        # Now, as local time without zone.
+        self.assertEqual(req["time"], "2026-09-22T14:00:30")
         # Neither MCP clockIn nor a check afterwards: shiftStatus is the answer.
         self.assertEqual([n for n, _ in self.fake.tool_calls if n != "getMyProfile"], [])
 

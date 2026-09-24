@@ -184,12 +184,13 @@ class _Handler(BaseHTTPRequestHandler):
         self._send(404, {"message": "Not found", "code": "INVALID_METHOD_URL", "field": None})
 
     def _clock_in(self, req):
-        """Like Calamari: time is UTC with Z (it answered "Incorrect value"
-        to local time with +02:00, 2026-09-24), a known projectId is
-        optional, and a clock-in during a running shift is ignored."""
+        """Like Calamari: time is local, without zone or fraction (it answered
+        "Incorrect value" to Z, +02:00, +0200 and .000, 2026-09-24), a known
+        projectId is optional, and a clock-in during a running shift is
+        ignored."""
         time = req.get("time")
         try:
-            valid = isinstance(time, str) and time.endswith("Z") and bool(datetime.datetime.fromisoformat(time))
+            valid = isinstance(time, str) and bool(datetime.datetime.strptime(time, "%Y-%m-%dT%H:%M:%S"))
         except ValueError:
             valid = False
         if not valid:

@@ -777,8 +777,9 @@ def clock_in(args):
         raise HelperError("PROJECT_UNKNOWN", "Calamari has no project %r for %s" % (name, client.person),
                           project=name)
     body = {
-        # UTC with Z: Calamari answers "Incorrect value" to +02:00 (2026-09-24).
-        "time": now().astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        # Local time without zone: Calamari answers "Incorrect value" to Z,
+        # +02:00, +0200 and milliseconds (tried 2026-09-24).
+        "time": now().strftime("%Y-%m-%dT%H:%M:%S"),
         "projectId": project["id"],
     }
     answer = client.call("/clockin/terminal/v1/clock-in", body)
