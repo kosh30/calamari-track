@@ -36,8 +36,11 @@ class FakeCalamari:
         self.rest_failure = None
         # Force the shiftStatus of the clock-in answer, e.g. "FINISHED".
         self.clock_in_status = None
-        # The running shift is in a break (get-current says BREAK).
-        self.on_break = False
+        # Breaks inside the shifts, like shifts: (date, "HH:MM:SS" start,
+        # end or None while running). An open one makes get-current say BREAK.
+        self.breaks = []
+        # Force an answer on timesheetentries/find only: (HTTP status, error code).
+        self.find_failure = None
         # Force the status of the get-current answer, e.g. "PAUSED".
         self.shift_status = None
 
@@ -185,13 +188,44 @@ class _Handler(BaseHTTPRequestHandler):
             return self._send(200, self.fake.break_types)
         if path == "/clockin/terminal/v1/clock-in":
             return self._clock_in(req)
+        if path == "/clockin/timesheetentries/v1/find":
+            return self._find(req)
         if path == "/clockin/shift/status/v1/get-current":
             running = any(end is None for _, _, end in self.fake.shifts)
-            status = "BREAK" if running and self.fake.on_break else "STARTED" if running else "STOPPED"
+            on_break = any(end is None for _, _, end in self.fake.breaks)
+            status = "BREAK" if running and on_break else "STARTED" if running else "STOPPED"
             return self._send(200, {"person": {"firstName": "Erika", "lastName": "Mustermann",
                                                "email": req.get("person")},
                                     "status": self.fake.shift_status or status})
         self._send(404, {"message": "Not found", "code": "INVALID_METHOD_URL", "field": None})
+
+    def _find(self, req):
+        """The own timesheet entries of the dates, with their breaks; times
+        are UTC with +0000, as the real answer has them."""
+        if self.fake.find_failure:
+            status, code = self.fake.find_failure
+            return self._send(status, {"message": "forced failure", "code": code, "field": None})
+        if req.get("employees") != [req.get("person")]:
+            # Without the filter the real API answers for the whole company.
+            return self._send(400, {"message": "fake: employees must be the own person", "code": "TEST", "field": None})
+
+        def utc(date, hms):
+            if hms is None:
+                return None
+            local = datetime.datetime.fromisoformat("%sT%s" % (date, hms)).astimezone()
+            return local.astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+0000")
+
+        entries = []
+        for date, start, end in self.fake.shifts:
+            if not req["from"] <= date <= req["to"]:
+                continue
+            breaks = [{"from": utc(d, s), "to": utc(d, e), "duration": None, "breakType": {"id": 1, "name": "Break"}}
+                      for d, s, e in self.fake.breaks if d == date and s >= start and (end is None or s < end)]
+            entries.append({"id": len(entries) + 1, "started": utc(date, start), "finished": utc(date, end),
+                            "startedTimeZone": "Europe/Vienna", "duration": 0, "breaks": breaks, "projects": [],
+                            "closed": end is not None, "description": ""})
+        # Newest first, like the real answer.
+        return self._send(200, list(reversed(entries)))
 
     def _clock_in(self, req):
         """Like Calamari: time is local, without zone or fraction (it answered

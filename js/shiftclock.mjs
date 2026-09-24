@@ -34,9 +34,10 @@
 //              js/activity.mjs; unlike the rest they carry over to the
 //              next day
 //
-// Known limit: the start of a follow-up shift is only found if the plugin
-// saw the gap before it (searchAfter). A break the plugin never observed (shell
-// off, suspend) leaves the cached start of the earlier shift.
+// Known limit: when `status` cannot read the running shift's start from
+// Calamari, the start of a follow-up shift is only found if the plugin saw
+// the gap before it (searchAfter); a gap it never observed (shell off,
+// suspend) leaves the cached start of the earlier shift.
 
 import { awayCovers, lastActivity } from "./activity.mjs"
 import { minuteOfDay, pad, toHhmm, toMinutes, ymd } from "./daytime.mjs"
@@ -63,12 +64,14 @@ function forToday(state, now) {
 
 // Applies an answer of `status`: shift is "running", "break" (a Pause
 // inside the running shift) or "stopped". Calamari's answer is exact, so
-// it counts as it is. Returns { state, startTimeQuery, endTimeQuery }:
+// it counts as it is. known holds what `status` read from the running
+// shift's timesheet entry: { startedAt, breakSince }, HH:MM or null when
+// unknown. Returns { state, startTimeQuery, endTimeQuery }:
 // startTimeQuery is null or { after: "HH:MM" | null }, the --after argument
 // for `start-time` when the start of the running shift is unknown;
 // endTimeQuery is null or { after: "HH:MM" }, for `end-time` when a shift
 // of known start ended outside the plugin (web, phone).
-export function applyStatus(state, shift, now) {
+export function applyStatus(state, shift, now, known = {}) {
   const next = forToday(state, now)
   const before = { running: next.running, startedAt: next.startedAt, breakSince: next.breakSince }
   const minute = minuteOfDay(now)
@@ -93,9 +96,11 @@ export function applyStatus(state, shift, now) {
   }
   // A shift runs (maybe stamped in the web or on the phone): the
   // Feierabend is over, and so is the own Pause. A Pause Calamari reports
-  // counts from its first sight; its real start is unknown.
+  // counts from its start if Calamari told it, else from its first sight.
   next.clockedOutAt = null
+  if (known.startedAt) next.startedAt = known.startedAt
   if (!next.onBreak) Object.assign(next, { breakSince: null, breakStartUnknown: false })
+  else if (known.breakSince) Object.assign(next, { breakSince: known.breakSince, breakStartUnknown: false })
   else if (!pauseInShift) Object.assign(next, { breakSince: toHhmm(minute), breakStartUnknown: true })
   next.stampedToday = true
   if (next.startedAt) return { state: next, startTimeQuery: null, endTimeQuery: null }

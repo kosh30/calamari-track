@@ -543,3 +543,32 @@ test("Pause beenden aus einer fremden Pause behält die Startzeit der Schicht", 
   assert.equal(r.state.onBreak, false)
   assert.equal(view(r.state, "12:31").kind, "running")
 })
+
+// Beginn von Schicht und Pause aus Calamaris Zeiteintrag
+
+test("kennt Calamari den Beginn der Pause, zählt sie ab dort und nicht ab dem ersten Sehen", () => {
+  const r = applyStatus(running("09:00", "12:00"), "break", at("12:10"), { startedAt: "09:00", breakSince: "11:46" })
+  assert.equal(r.state.breakSince, "11:46")
+  assert.equal(r.state.breakStartUnknown, false)
+  assert.deepEqual(view(r.state, "12:10"), { kind: "break", text: "0:24" })
+  assert.equal(breakSinceText(r.state), "11:46")
+})
+
+test("kennt Calamari den Beginn der Schicht, braucht es keine Startzeit-Suche", () => {
+  const r = applyStatus(emptyState(), "running", at("12:10"), { startedAt: "11:24", breakSince: null })
+  assert.equal(r.startTimeQuery, null)
+  assert.equal(r.state.startedAt, "11:24")
+})
+
+test("Calamaris Beginn der Schicht ersetzt einen veralteten gecachten", () => {
+  // A break the plugin never observed (shell off) left the earlier shift's start.
+  const r = applyStatus(running("08:00", "10:00"), "running", at("12:10"), { startedAt: "11:24", breakSince: null })
+  assert.equal(r.state.startedAt, "11:24")
+})
+
+test("ohne bekannte Zeiten bleibt es beim ersten Sehen und bei der Startzeit-Suche", () => {
+  const r = applyStatus(emptyState(), "break", at("12:10"), { startedAt: null, breakSince: null })
+  assert.equal(r.state.breakSince, "12:10")
+  assert.equal(r.state.breakStartUnknown, true)
+  assert.deepEqual(r.startTimeQuery, { after: null })
+})

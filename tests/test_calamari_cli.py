@@ -175,9 +175,8 @@ class CalamariCliTest(unittest.TestCase):
 
         code, out = self.run_helper("status")
 
-        self.assertEqual((code, out), (0, {"ok": True, "shift": "running"}))
-        self.assertEqual(self.fake.rest_calls[-1],
-                         ("/clockin/shift/status/v1/get-current", {"person": "erika@example.com"}))
+        self.assertEqual((code, out), (0, {"ok": True, "shift": "running", "startedAt": "09:40", "breakSince": None}))
+        self.assertIn(("/clockin/shift/status/v1/get-current", {"person": "erika@example.com"}), self.fake.rest_calls)
 
     def test_status_without_shift_is_stopped(self):
         self.login()
@@ -186,17 +185,35 @@ class CalamariCliTest(unittest.TestCase):
 
         code, out = self.run_helper("status")
 
-        self.assertEqual((code, out), (0, {"ok": True, "shift": "stopped"}))
+        self.assertEqual((code, out), (0, {"ok": True, "shift": "stopped", "startedAt": None, "breakSince": None}))
+        # Nothing runs, so there is no entry to read.
+        self.assertNotIn("/clockin/timesheetentries/v1/find", [p for p, _ in self.fake.rest_calls])
 
     def test_status_sees_a_break(self):
         self.login()
         self.store_api_key()
-        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
-        self.fake.on_break = True
+        self.fake.shifts = [("2026-09-22", "08:00:00", "09:30:00"), ("2026-09-22", "09:40:30", None)]
+        self.fake.breaks = [("2026-09-22", "11:00:00", "11:10:00"), ("2026-09-22", "12:05:40", None)]
 
         code, out = self.run_helper("status")
 
-        self.assertEqual((code, out), (0, {"ok": True, "shift": "break"}))
+        # The start of the running shift and of its open break, local time.
+        self.assertEqual((code, out), (0, {"ok": True, "shift": "break", "startedAt": "09:40", "breakSince": "12:05"}))
+        (req,) = [r for p, r in self.fake.rest_calls if p == "/clockin/timesheetentries/v1/find"]
+        self.assertEqual(req["employees"], ["erika@example.com"])
+        self.assertEqual((req["from"], req["to"]), ("2026-09-22", "2026-09-22"))
+
+    def test_status_without_the_times_still_tells_the_status(self):
+        self.login()
+        self.store_api_key()
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+        self.fake.breaks = [("2026-09-22", "12:05:40", None)]
+        self.fake.find_failure = (403, None)
+
+        code, out = self.run_helper("status")
+
+        self.assertEqual((code, out), (0, {"ok": True, "shift": "break", "startedAt": None, "breakSince": None}))
+        self.assertIn("API_SCOPE_MISSING", self.log_text())
 
     def test_status_no_longer_sees_a_shift_ended_a_minute_ago(self):
         # REST knows the status; the lag of the overlap trick is gone.
@@ -206,7 +223,7 @@ class CalamariCliTest(unittest.TestCase):
 
         code, out = self.run_helper("status")
 
-        self.assertEqual((code, out), (0, {"ok": True, "shift": "stopped"}))
+        self.assertEqual((code, out), (0, {"ok": True, "shift": "stopped", "startedAt": None, "breakSince": None}))
         self.assertEqual(self.fake.overlap_calls, 0)
 
     def test_status_with_an_unexpected_answer_is_an_api_error(self):

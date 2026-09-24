@@ -23,3 +23,9 @@
 - In einer fremden Pause gibt es wie in der eigenen nur die Pausen-Erinnerung: keine Stempel-Erinnerung, kein sanfter Hinweis, und bis Ticket 05 auch keine letzte Warnung und keinen Auto-Abschluss. „Feierabend“ ohne Stempeln wird dort nicht angeboten (Ticket 05).
 - Offen bis Ticket 04: „Pause beenden“ ist noch ein REST-Einstempeln. Ob Calamari damit eine Pause beendet, ist nicht geprüft. Meldet die nächste Abfrage weiter BREAK, zählt die Pause ab ihrem ersten Sehen weiter.
 - Abnahme: `omarchy-restart-shell`, Pause im Web beginnen, Panel öffnen (fragt sofort ab): Bar zeigt Pause; im Web beenden, Panel öffnen: laufende Schicht mit der alten Startzeit.
+
+**2026-09-24 (Agent):** Bei der Abnahme zeigte die Bar eine Pause, die seit 4 Minuten lief, mit 0:00 (gezählt ab dem ersten Sehen). Der API-Key darf aber auch `timesheetentries/v1/find` lesen, und der offene Eintrag nennt den Beginn der Schicht und seiner offenen Pause (UTC, `+0000`). Mit dem Benutzer vereinbart, das schon hier zu nutzen:
+- `status` liefert bei laufender Schicht zusätzlich `startedAt` und `breakSince` (HH:MM lokal) aus dem heutigen Eintrag. Kann er nicht gelesen werden, bleiben beide `null` und der Fehler steht im Journal. Der Status selbst gilt trotzdem.
+- Bekannte Zeiten ersetzen im Plugin das erste Sehen und die Startzeit-Suche, auch eine veraltete gecachte Startzeit. „seit spätestens“ erscheint nur noch ohne diese Zeiten.
+- Die Startzeit-/Endzeit-Suche und der Tagesende-Check per MCP bleiben, sie ließen sich mit denselben Einträgen ersetzen (Phase 2).
+- Gegen das echte Calamari: `{"shift": "break", "startedAt": "11:24", "breakSince": "11:46"}`.

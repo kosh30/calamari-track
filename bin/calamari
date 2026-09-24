@@ -784,12 +784,47 @@ SHIFT_STATUS = {"STARTED": "running", "BREAK": "break", "STOPPED": "stopped"}
 
 def status(args):
     """The shift status over REST (docs/adr/0003): "running", "break" (a
-    Pause inside the running shift) or "stopped"."""
-    answer = RestClient().call("/clockin/shift/status/v1/get-current")
+    Pause inside the running shift) or "stopped". While a shift runs, also
+    startedAt and breakSince (HH:MM local, the open break's start) from
+    today's timesheet entry; null if that cannot be read, which costs only
+    the times, not the status."""
+    client = RestClient()
+    answer = client.call("/clockin/shift/status/v1/get-current")
     shift = SHIFT_STATUS.get(answer.get("status")) if isinstance(answer, dict) else None
     if shift is None:
         raise HelperError("API_ERROR", "get-current: unexpected answer %r" % (answer,))
-    return {"shift": shift}
+    times = {"startedAt": None, "breakSince": None}
+    if shift != "stopped":
+        try:
+            times = open_entry_times(client)
+        except HelperError as e:
+            log("err", "status: no times of the running shift: %s %s" % (e.code, e.message))
+    return dict(times, shift=shift)
+
+
+def open_entry_times(client):
+    """Start of today's open timesheet entry and of its open break."""
+    today = now().date().isoformat()
+    # Without employees the answer holds the whole company.
+    entries = client.call("/clockin/timesheetentries/v1/find",
+                          {"from": today, "to": today, "employees": [client.person]})
+    if not isinstance(entries, list):
+        raise HelperError("API_ERROR", "timesheetentries/find: unexpected answer %r" % (entries,))
+    entry = next((e for e in entries if isinstance(e, dict) and e.get("started") and not e.get("finished")), None)
+    if entry is None:
+        return {"startedAt": None, "breakSince": None}
+    open_break = next((b for b in entry.get("breaks") or [] if b.get("from") and not b.get("to")), None)
+    return {"startedAt": local_hhmm(entry["started"]),
+            "breakSince": local_hhmm(open_break["from"]) if open_break else None}
+
+
+def local_hhmm(stamp):
+    """HH:MM local of a REST timestamp like 2026-09-24T09:24:53+0000."""
+    try:
+        moment = datetime.datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S%z")
+    except (TypeError, ValueError):
+        raise HelperError("API_ERROR", "unexpected timestamp %r" % (stamp,))
+    return moment.astimezone().strftime("%H:%M")
 
 
 def lookup(args):

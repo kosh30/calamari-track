@@ -10,4 +10,5 @@ Seit 2026-09-24 haben wir einen API-Key für `https://cti.calamari.io/api`. Ab j
 - Schlägt REST fehl, stempelt das Plugin nicht per MCP ohne Projekt nach. Es zeigt den Fehler wie jede fehlgeschlagene Stempelung.
 - Die REST-Stempelungen nehmen eine Uhrzeit. In Phase 1 nutzt das nur das Ausstempeln aus einer Pause (Feierabend statt Pause, Auto-Abschluss während einer Pause): Die Schicht endet beim Pausenbeginn. Die übrigen Umwege aus ADR 0001 (Startzeit- und Endzeit-Suche, `day-end`, Auto-Abschluss nur „jetzt“) ersetzen wir erst in Phase 2.
 - Die Terminal-Endpunkte nehmen die Uhrzeit nur als lokale Zeit ohne Zeitzone und ohne Millisekunden (`2026-09-24T11:24:53`); mit `Z` oder Offset antworten sie „Incorrect value“ (ausprobiert 2026-09-24).
+- Der Key darf auch `timesheetentries/v1/find` lesen. `status` holt daraus den Beginn der laufenden Schicht und ihrer offenen Pause; mehr nutzt das Plugin davon in Phase 1 nicht.
 - Das Rate-Limit liegt bei 720 Anfragen pro Stunde und 2880 pro Tag (Stand 2026-09-24).
