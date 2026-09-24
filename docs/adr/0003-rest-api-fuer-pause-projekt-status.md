@@ -9,4 +9,5 @@ Seit 2026-09-24 haben wir einen API-Key für `https://cti.calamari.io/api`. Ab j
 - In Clockin muss ein „API Terminal“ eingerichtet sein, auf das der Benutzer Zugriff hat, sonst antworten Stempeln und Pausen mit `API_TERMINAL_NOT_AVAILABLE`.
 - Schlägt REST fehl, stempelt das Plugin nicht per MCP ohne Projekt nach. Es zeigt den Fehler wie jede fehlgeschlagene Stempelung.
 - Die REST-Stempelungen nehmen eine Uhrzeit. In Phase 1 nutzt das nur das Ausstempeln aus einer Pause (Feierabend statt Pause, Auto-Abschluss während einer Pause): Die Schicht endet beim Pausenbeginn. Die übrigen Umwege aus ADR 0001 (Startzeit- und Endzeit-Suche, `day-end`, Auto-Abschluss nur „jetzt“) ersetzen wir erst in Phase 2.
+- Die Terminal-Endpunkte nehmen die Uhrzeit nur als lokale Zeit ohne Zeitzone und ohne Millisekunden (`2026-09-24T11:24:53`); mit `Z` oder Offset antworten sie „Incorrect value“ (ausprobiert 2026-09-24).
 - Das Rate-Limit liegt bei 720 Anfragen pro Stunde und 2880 pro Tag (Stand 2026-09-24).
