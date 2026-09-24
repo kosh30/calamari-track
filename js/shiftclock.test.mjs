@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { applyDayEnd, applyStamp, breakSinceText, applyStatus, applyStartTime, barView, breakAction, dayOffToday, emptyState, helperCommand, pendingDayEnd, applyEndTime, restoreState, setDayOff, stampAction, stampLabel, workedMinutes, workedText } from "./shiftclock.mjs"
+import { applyDayEnd, applyStamp, breakSinceText, applyStatus, applyStartTime, barView, breakAction, dayOffToday, emptyState, feierabendAction, helperCommand, pendingDayEnd, applyEndTime, restoreState, setDayOff, stampAction, stampLabel, workedMinutes, workedText } from "./shiftclock.mjs"
 import { setIdle } from "./activity.mjs"
 
 const at = (hhmm, date = "2026-09-22") => new Date(`${date}T${hhmm}:00`)
@@ -569,4 +569,50 @@ test("ohne bekannte Zeiten bleibt es beim ersten Sehen und bei der Startzeit-Suc
   assert.equal(r.state.breakSince, "12:10")
   assert.equal(r.state.breakStartUnknown, true)
   assert.deepEqual(r.startTimeQuery, { after: null })
+})
+
+// Feierabend aus der Pause (Ticket 05)
+
+const pausedAt = (since, begun = "09:00") => breakStart(clockIn(emptyState(), begun), since)
+
+test("in einer Pause bietet das Panel den Feierabend an, sonst nicht", () => {
+  assert.equal(feierabendAction({ kind: "break", text: "0:10" }), "break-clock-out")
+  assert.equal(feierabendAction({ kind: "running", text: "1:00" }), null)
+  assert.equal(feierabendAction({ kind: "idle", text: "" }), null)
+  assert.equal(stampLabel("break-clock-out"), "Feierabend")
+  assert.deepEqual(helperCommand("break-clock-out", { defaultProject: "X", breakType: "Y" }), ["clock-out-break"])
+})
+
+test("Feierabend aus der Pause endet die Schicht beim Pausenbeginn, die Endzeit stimmt schon", () => {
+  const r = applyStamp(pausedAt("17:32"), "break-clock-out",
+    { ok: true, running: false, stamped: true, endedAt: "17:32", atBreakStart: true }, at("17:35"))
+  assert.equal(r.error, "")
+  assert.equal(r.endTimeKnown, true)
+  assert.equal(r.state.clockedOutAt, "17:32")
+  assert.equal(r.state.running, false)
+  assert.equal(r.state.onBreak, false)
+  assert.deepEqual(view(r.state, "17:40"), { kind: "idle", text: "" })
+  assert.equal(workedMinutes(r.state, at("18:00")), 8 * 60 + 32)
+})
+
+test("ohne bekannten Pausenbeginn endet die Schicht jetzt, und die Endzeit will korrigiert werden", () => {
+  const r = applyStamp(pausedAt("17:32"), "break-clock-out",
+    { ok: true, running: false, stamped: true, endedAt: "17:35", atBreakStart: false }, at("17:35"))
+  assert.equal(r.endTimeKnown, false)
+  assert.equal(r.state.clockedOutAt, "17:35")
+  // The Pause is no work, whatever end Calamari has.
+  assert.equal(workedMinutes(r.state, at("18:00")), 8 * 60 + 32)
+})
+
+test("lief beim Feierabend aus der Pause keine Schicht mehr, sagt das Panel es", () => {
+  const r = applyStamp(pausedAt("17:32"), "break-clock-out",
+    { ok: true, running: false, stamped: false, endedAt: null, atBreakStart: false }, at("17:35"))
+  assert.equal(r.state.clockedOutAt, null)
+  assert.equal(r.error, "Feierabend: Calamari meldet keine laufende Schicht.")
+  assert.equal(r.pollNow, true)
+})
+
+test("das normale Ausstempeln kennt seine Endzeit nicht vorab", () => {
+  const r = applyStamp(clockIn(emptyState(), "09:00"), "clock-out", { ok: true, running: false, stamped: true }, at("17:00"))
+  assert.equal(r.endTimeKnown, false)
 })

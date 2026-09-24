@@ -513,3 +513,49 @@ test("nach einer fremden Pause läuft die Schicht mit ihren Erinnerungen weiter"
   const state = applyStatus(seenBreak("12:10"), "running", at("12:40")).state
   assert.deepEqual(types(decide(at("17:15"), workday, state, eveningConfig)), ["soft-hint"])
 })
+
+// Pause am Abend (Ticket 05)
+
+const pausedAt = (since, begun = "09:00") => stamp(working(begun), "break-start", since)
+
+test("in einer Pause am Abend kommen letzte Warnung und Auto-Abschluss wie in der Schicht", () => {
+  let state = markSent(pausedAt("18:30"), "break-reminder", at("19:00"))
+  const warning = decide(at("19:00"), workday, state, eveningConfig)
+  assert.deepEqual(types(warning), ["final-warning"])
+  assert.deepEqual(warning.autoCloseAt, at("19:15"))
+  state = markSent(state, "final-warning", at("19:00"))
+  state = markSent(state, "break-reminder", at("19:15"))
+  assert.deepEqual(decide(at("19:15"), workday, state, eveningConfig).actions,
+    [{ type: "auto-close", lastActivity: null, inPause: true }])
+})
+
+test("die Pausen-Erinnerung läuft am Abend neben der letzten Warnung weiter", () => {
+  const r = decide(at("19:00"), workday, pausedAt("18:30"), eveningConfig)
+  assert.deepEqual(types(r).sort(), ["break-reminder", "final-warning"])
+})
+
+test("„+1 h“ verschiebt auch in einer Pause letzte Warnung und Auto-Abschluss", () => {
+  let state = markSent(markSent(pausedAt("18:30"), "final-warning", at("19:00")), "break-reminder", at("19:15"))
+  state = postpone(state, eveningConfig, at("19:05"))
+  const r = decide(at("19:15"), workday, state, eveningConfig)
+  assert.deepEqual(types(r), [])
+  assert.equal(r.canExtend, false)
+  assert.deepEqual(types(decide(at("20:05"), workday, markSent(state, "break-reminder", at("20:05")), eveningConfig)),
+    ["final-warning"])
+})
+
+test("in einer Pause kommt weiterhin kein sanfter Hinweis", () => {
+  assert.deepEqual(types(decide(at("17:20"), workday, pausedAt("17:10"), eveningConfig)), [])
+})
+
+test("der Auto-Abschluss aus einer Pause stempelt auf den Pausenbeginn aus", () => {
+  assert.deepEqual(closeFor({ type: "auto-close", lastActivity: null, inPause: true }),
+    { stamp: "break-clock-out", notice: { type: "auto-closed", lastActivity: null } })
+})
+
+test("die letzte Warnung in einer Pause bietet den Feierabend an", () => {
+  const state = pausedAt("18:30")
+  const warning = decide(at("19:00"), workday, state, eveningConfig).actions.find(a => a.type === "final-warning")
+  assert.deepEqual(notification(warning, workday, state),
+    { headline: "Letzte Warnung", body: "Auto-Abschluss um 19:15. Im Panel: +1 h weiterarbeiten oder Feierabend.", click: "panel" })
+})

@@ -485,6 +485,64 @@ class CalamariCliTest(unittest.TestCase):
         self.assert_error((code, out), "API_ERROR")
         self.assertIn("NO_STARTED_SHIFT", out["error"]["message"])
 
+    # Feierabend aus der Pause (ticket 05)
+
+    def clock_outs(self):
+        return [req for path, req in self.fake.rest_calls if path == "/clockin/terminal/v1/clock-out"]
+
+    def test_clock_out_break_ends_the_shift_at_the_exact_start_of_its_break(self):
+        self.login()
+        self.store_api_key()
+        self.fake.now = "2026-09-22T17:35:35"
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+        self.fake.breaks = [("2026-09-22", "12:00:00", "12:30:00"), ("2026-09-22", "17:32:17", None)]
+
+        code, out = self.run_helper("clock-out-break")
+
+        self.assertEqual((code, out), (0, {"ok": True, "running": False, "stamped": True, "endedAt": "17:32",
+                                           "atBreakStart": True}))
+        (req,) = self.clock_outs()
+        self.assertEqual(req, {"person": "erika@example.com", "time": "2026-09-22T17:32:17"})
+        self.assertEqual(self.fake.shifts, [("2026-09-22", "09:40:30", "17:32:17")])
+        self.assertNotIn("clockOut", [n for n, _ in self.fake.tool_calls])
+
+    def test_clock_out_break_without_a_known_break_start_ends_now(self):
+        self.login()
+        self.store_api_key()
+        self.fake.now = "2026-09-22T17:35:35"
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+        self.fake.breaks = [("2026-09-22", "17:32:17", None)]
+        self.fake.find_failure = (403, None)
+
+        code, out = self.run_helper("clock-out-break")
+
+        self.assertEqual((code, out), (0, {"ok": True, "running": False, "stamped": True, "endedAt": "17:35",
+                                           "atBreakStart": False}))
+        self.assertEqual(self.clock_outs()[0]["time"], "2026-09-22T17:35:35")
+        self.assertIn("API_SCOPE_MISSING", self.log_text())
+
+    def test_clock_out_break_without_running_shift_stamps_nothing(self):
+        self.login()
+        self.store_api_key()
+        self.fake.shifts = [("2026-09-22", "08:00:00", "12:00:00")]
+
+        code, out = self.run_helper("clock-out-break")
+
+        self.assertEqual((code, out), (0, {"ok": True, "running": False, "stamped": False, "endedAt": None,
+                                           "atBreakStart": False}))
+        self.assertEqual(self.clock_outs(), [])
+
+    def test_failed_clock_out_break_is_not_retried_another_way(self):
+        self.login()
+        self.store_api_key()
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+        self.fake.breaks = [("2026-09-22", "17:32:17", None)]
+        self.fake.rest_failure = (400, "API_TERMINAL_NOT_AVAILABLE")
+
+        self.assert_error(self.run_helper("clock-out-break"), "API_TERMINAL_MISSING")
+        self.assertEqual(self.fake.shifts, [("2026-09-22", "09:40:30", None)])
+        self.assertNotIn("clockOut", [n for n, _ in self.fake.tool_calls])
+
     def test_clock_out_ends_the_running_shift(self):
         self.login()
         self.fake.now = "2026-09-22T17:30:30"

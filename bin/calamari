@@ -833,21 +833,35 @@ def status(args):
     today's timesheet entry; null if that cannot be read, which costs only
     the times, not the status."""
     client = RestClient()
+    shift = current_shift(client)
+    started = break_from = None
+    if shift != "stopped":
+        started, break_from = open_entry_or_none(client, "status")
+    return {"shift": shift, "startedAt": hhmm_of(started), "breakSince": hhmm_of(break_from)}
+
+
+def current_shift(client):
+    """The own shift status: "running", "break" or "stopped"."""
     answer = client.call("/clockin/shift/status/v1/get-current")
     shift = SHIFT_STATUS.get(answer.get("status")) if isinstance(answer, dict) else None
     if shift is None:
         raise HelperError("API_ERROR", "get-current: unexpected answer %r" % (answer,))
-    times = {"startedAt": None, "breakSince": None}
-    if shift != "stopped":
-        try:
-            times = open_entry_times(client)
-        except HelperError as e:
-            log("err", "status: no times of the running shift: %s %s" % (e.code, e.message))
-    return dict(times, shift=shift)
+    return shift
 
 
-def open_entry_times(client):
-    """Start of today's open timesheet entry and of its open break."""
+def open_entry_or_none(client, command):
+    """open_entry(), or (None, None) with the failure in the journal: the
+    times are a bonus to what the command does anyway."""
+    try:
+        return open_entry(client)
+    except HelperError as e:
+        log("err", "%s: no times of the running shift: %s %s" % (command, e.code, e.message))
+        return None, None
+
+
+def open_entry(client):
+    """Local start of today's open timesheet entry and of its open break
+    (datetimes, or None)."""
     today = now().date().isoformat()
     # Without employees the answer holds the whole company.
     entries = client.call("/clockin/timesheetentries/v1/find",
@@ -856,19 +870,42 @@ def open_entry_times(client):
         raise HelperError("API_ERROR", "timesheetentries/find: unexpected answer %r" % (entries,))
     entry = next((e for e in entries if isinstance(e, dict) and e.get("started") and not e.get("finished")), None)
     if entry is None:
-        return {"startedAt": None, "breakSince": None}
+        return None, None
     open_break = next((b for b in entry.get("breaks") or [] if b.get("from") and not b.get("to")), None)
-    return {"startedAt": local_hhmm(entry["started"]),
-            "breakSince": local_hhmm(open_break["from"]) if open_break else None}
+    return local_moment(entry["started"]), local_moment(open_break["from"]) if open_break else None
 
 
-def local_hhmm(stamp):
-    """HH:MM local of a REST timestamp like 2026-09-24T09:24:53+0000."""
+def local_moment(stamp):
+    """Local naive datetime of a REST timestamp like 2026-09-24T09:24:53+0000."""
     try:
         moment = datetime.datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S%z")
     except (TypeError, ValueError):
         raise HelperError("API_ERROR", "unexpected timestamp %r" % (stamp,))
-    return moment.astimezone().strftime("%H:%M")
+    return moment.astimezone().replace(tzinfo=None)
+
+
+def hhmm_of(moment):
+    return moment.strftime("%H:%M") if moment else None
+
+
+def clock_out_break(args):
+    """Feierabend from a Pause over REST: ends the shift at the exact start
+    of its open break, so the end time needs no correction. Calamari takes
+    a time in the past and closes the break there (leaving it 0 s long,
+    tried 2026-09-24). Without a known break start it ends the shift now
+    (atBreakStart false: the end time wants correcting). Nothing is sent
+    without a running shift; stamped tells whether clock-out was sent."""
+    client = RestClient()
+    if current_shift(client) == "stopped":
+        return {"running": False, "stamped": False, "endedAt": None, "atBreakStart": False}
+    _, break_from = open_entry_or_none(client, "clock-out-break")
+    end = break_from or now()
+    body = {"time": end.strftime("%Y-%m-%dT%H:%M:%S")}
+    answer = client.call("/clockin/terminal/v1/clock-out", body)
+    log("info", "clock-out-break: sent %s, got %s" % (json.dumps(body), json.dumps(answer)))
+    if not isinstance(answer, dict) or answer.get("shiftStatus") != "FINISHED":
+        raise HelperError("API_ERROR", "clock-out: Calamari did not end the shift: %r" % (answer,))
+    return {"running": False, "stamped": True, "endedAt": hhmm_of(end), "atBreakStart": break_from is not None}
 
 
 def lookup(args):
@@ -911,7 +948,7 @@ def parse_args(argv):
 COMMANDS = {"login": login, "whoami": whoami, "tools": tools, "status": status, "start-time": start_time,
             "end-time": end_time, "clock-in": clock_in, "clock-out": clock_out, "day-info": day_info,
             "day-end": day_end, "api-key": api_key, "lookup": lookup,
-            "break-start": break_start, "break-stop": break_stop}
+            "break-start": break_start, "break-stop": break_stop, "clock-out-break": clock_out_break}
 
 
 def main(argv):

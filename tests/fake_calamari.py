@@ -188,6 +188,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self._send(200, self.fake.break_types)
         if path == "/clockin/terminal/v1/clock-in":
             return self._clock_in(req)
+        if path == "/clockin/terminal/v1/clock-out":
+            return self._clock_out(req)
         if path in ("/clockin/terminal/v1/break-start", "/clockin/terminal/v1/break-stop"):
             return self._break(path.endswith("start"), req)
         if path == "/clockin/timesheetentries/v1/find":
@@ -228,6 +230,19 @@ class _Handler(BaseHTTPRequestHandler):
                             "closed": end is not None, "description": ""})
         # Newest first, like the real answer.
         return self._send(200, list(reversed(entries)))
+
+    def _clock_out(self, req):
+        """Like Calamari (tried 2026-09-24): ends the running shift at time,
+        also one in the past, and closes an open break there too; without a
+        running shift the request is ignored."""
+        try:
+            at = datetime.datetime.strptime(req.get("time") or "", "%Y-%m-%dT%H:%M:%S")
+        except ValueError:
+            return self._send(400, {"message": "Incorrect value", "code": None, "field": "time"})
+        hms = at.strftime("%H:%M:%S")
+        self.fake.shifts = [(d, s, e if e is not None else hms) for d, s, e in self.fake.shifts]
+        self.fake.breaks = [(d, s, e if e is not None else hms) for d, s, e in self.fake.breaks]
+        return self._send(200, {"person": {"firstName": "Erika", "lastName": "Mustermann"}, "shiftStatus": "FINISHED"})
 
     def _break(self, start, req):
         """Like Calamari's terminal: time and a known breakType are required,

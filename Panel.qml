@@ -21,6 +21,7 @@ Panel {
     readonly property var view: service ? service.barView : null
     readonly property var stampAction: authState === "ok" && view !== null ? ShiftClock.stampAction(view) : null
     readonly property var breakAction: authState === "ok" && view !== null ? ShiftClock.breakAction(view) : null
+    readonly property var feierabendAction: authState === "ok" && view !== null ? ShiftClock.feierabendAction(view) : null
     // After the final warning: the countdown to the auto-close.
     readonly property string countdown: service ? Reminders.countdownText(service.decision, service.now) : ""
 
@@ -179,6 +180,15 @@ Panel {
                         text: root.actionText(root.breakAction)
                         bordered: true
                         onClicked: root.service.stamp(root.breakAction)
+                    }
+
+                    Button {
+                        visible: root.feierabendAction !== null
+                        enabled: root.service !== null && !root.service.busy
+                        text: root.actionText(root.feierabendAction)
+                        tooltipText: "Die Schicht endet beim Beginn der Pause (ist er Calamari nicht bekannt: jetzt)"
+                        bordered: true
+                        onClicked: root.service.stamp(root.feierabendAction)
                     }
 
                     Button {

@@ -294,8 +294,9 @@ Item {
             root.errorMessage = ""
         }
         root.setShiftState(result.state)
-        // A close that found no shift stamped nothing, so there is nothing to correct.
-        if (out.ok && out.stamped !== false && stampProc.notice)
+        // A close that found no shift stamped nothing, and one at the start
+        // of the Pause ended right: either way there is nothing to correct.
+        if (out.ok && out.stamped !== false && !result.endTimeKnown && stampProc.notice)
             root.notify(Object.assign({ at: Qt.formatTime(root.now, "HH:mm") }, stampProc.notice))
     }
 

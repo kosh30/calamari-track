@@ -60,7 +60,7 @@ export function decide(now, day, state, settings) {
   // A state of another date (right after midnight, before the first poll
   // of the new day) or an unknown status must not remind.
   if (state.failed || state.running === null || state.date !== ymd(now)) return quiet()
-  if (inPause(state)) return decideBreak(now, state, config)
+  if (inPause(state)) return decidePause(now, state, config)
   if (state.running) return decideShift(now, day, state, config)
   return decideStamp(now, day, state, config)
 }
@@ -140,6 +140,18 @@ export function postpone(state, settings, now) {
   return Object.assign({}, state, { postponedTo: toHhmm(minute) })
 }
 
+// A Pause: its reminder and, as in the shift, the final warning and the
+// auto-close (a Pause still open in the evening is a forgotten Feierabend).
+// No soft hint. The auto-close ends the shift at the Pause's start.
+function decidePause(now, state, config) {
+  const pause = decideBreak(now, state, config)
+  const r = decideEvening(now, state, config)
+  const evening = r.actions.map(a => (a.type === "auto-close" ? Object.assign({}, a, { inPause: true }) : a))
+  r.actions = pause.actions.concat(evening)
+  r.nextCheckAt = earlier(r.nextCheckAt, pause.nextCheckAt)
+  return r
+}
+
 // The Pause reminder: from breakLimitMinutes into the Pause on, every
 // breakReminderMinutes. Any day, working or not.
 function decideBreak(now, state, config) {
@@ -200,7 +212,7 @@ export function notification(action, day, state, settings) {
     return panel("Schicht läuft noch", `Die Kernzeit endete um ${action.coreEnd}.`)
   if (action.type === "final-warning")
     return panel("Letzte Warnung",
-      `Auto-Abschluss um ${action.autoCloseAt}. Im Panel: ${extendLabel(settings)} oder jetzt ausstempeln.`)
+      `Auto-Abschluss um ${action.autoCloseAt}. Im Panel: ${extendLabel(settings)} oder ${inPause(state) ? "Feierabend" : "jetzt ausstempeln"}.`)
   if (action.type === "auto-closed") {
     const body = action.lastActivity
       ? `Um ${action.at} ausgestempelt, letzte Aktivität ${clockOf(action.lastActivity)}. Bitte die Endzeit in Calamari darauf korrigieren.`
@@ -246,6 +258,7 @@ export function extendLabel(settings) {
 // correction hint to send once it went through; null for plain reminders.
 export function closeFor(action) {
   if (action.type === "auto-close")
-    return { stamp: "clock-out", notice: { type: "auto-closed", lastActivity: action.lastActivity } }
+    return { stamp: action.inPause ? "break-clock-out" : "clock-out",
+      notice: { type: "auto-closed", lastActivity: action.lastActivity } }
   return null
 }

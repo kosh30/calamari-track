@@ -197,10 +197,9 @@ function applyClockIn(state, now) {
     breakSince: null, breakStartUnknown: false, stampedToday: true })
 }
 
-// The own clock-out succeeded: no shift runs.
-function stopShift(state, now) {
+// The own clock-out succeeded: no shift runs since minute (default now).
+function stopShift(state, now, minute = minuteOfDay(now)) {
   const next = forToday(state, now)
-  const minute = minuteOfDay(now)
   // The own clock-out knows the end of today's shift right away.
   if (next.running && next.startedAt) addShift(next, next.startedAt, toHhmm(minute))
   endPause(next, minute)
@@ -210,9 +209,9 @@ function stopShift(state, now) {
   })
 }
 
-// Ausstempeln: it is Feierabend.
-function applyClockOut(state, now) {
-  return Object.assign(stopShift(state, now), { clockedOutAt: toHhmm(minuteOfDay(now)) })
+// Ausstempeln: it is Feierabend since minute (default now).
+function applyClockOut(state, now, minute = minuteOfDay(now)) {
+  return Object.assign(stopShift(state, now, minute), { clockedOutAt: toHhmm(minute) })
 }
 
 // Pause beginnen: the shift goes on, in a Pause from now.
@@ -269,6 +268,7 @@ function duration(since, now) {
 const STAMP_ACTIONS = {
   "clock-in": "Einstempeln", "clock-out": "Ausstempeln",
   "break-start": "Pause beginnen", "break-end": "Pause beenden",
+  "break-clock-out": "Feierabend",
 }
 
 // The panel's button text for a stamp action.
@@ -288,6 +288,7 @@ export function helperCommand(action, settings) {
   if (action === "clock-in") return named("clock-in", "--project", s.defaultProject)
   if (action === "break-start") return named("break-start", "--break-type", s.breakType)
   if (action === "break-end") return named("break-stop", "--break-type", s.breakType)
+  if (action === "break-clock-out") return ["clock-out-break"]
   return [action]
 }
 const STAMP_CAUSES = {
@@ -323,13 +324,24 @@ export function breakAction(view) {
   return view.kind === "running" ? "break-start" : null
 }
 
-// Applies an answer of `clock-in`, `clock-out`, `break-start` or
-// `break-stop` for a stamp action.
-// Returns { state, error, pollNow }: error is the panel's line ("" when
-// all is well). A failure keeps the state, so the user can retry; nothing
-// is queued. Its outcome is unknown (a timeout may have stamped anyway),
-// so pollNow asks Calamari right away, unless it is throttling us.
+// Feierabend instead of the Pause's end: only in a Pause.
+export function feierabendAction(view) {
+  return view.kind === "break" ? "break-clock-out" : null
+}
+
+// Applies an answer of `clock-in`, `clock-out`, `break-start`,
+// `break-stop` or `clock-out-break` for a stamp action.
+// Returns { state, error, pollNow, endTimeKnown }: error is the panel's
+// line ("" when all is well). A failure keeps the state, so the user can
+// retry; nothing is queued. Its outcome is unknown (a timeout may have
+// stamped anyway), so pollNow asks Calamari right away, unless it is
+// throttling us. endTimeKnown: the clock-out ended the shift at its
+// Pause's start, so the end time needs no correction.
 export function applyStamp(state, action, out, now) {
+  return Object.assign({ endTimeKnown: false }, stampResult(state, action, out, now))
+}
+
+function stampResult(state, action, out, now) {
   if (!out.ok) {
     return { state, error: stampErrorText(action, out.error), pollNow: out.error.code !== "RATE_LIMITED" }
   }
@@ -344,7 +356,7 @@ export function applyStamp(state, action, out, now) {
     const says = begin ? "keine Pause" : "weiter eine Pause"
     return { state, error: `${STAMP_ACTIONS[action]}: Calamari meldet ${says}. Bitte im Web prüfen.`, pollNow: true }
   }
-  if (action === "clock-out" && out.stamped === false) {
+  if ((action === "clock-out" || action === "break-clock-out") && out.stamped === false) {
     // No shift ran, so nothing was stamped: no Feierabend, and nothing to
     // correct; look again.
     return {
@@ -354,6 +366,10 @@ export function applyStamp(state, action, out, now) {
     }
   }
   if (action === "clock-out") return { state: applyClockOut(state, now), error: "", pollNow: false }
+  if (action === "break-clock-out") {
+    const end = out.endedAt ? toMinutes(out.endedAt) : minuteOfDay(now)
+    return { state: applyClockOut(state, now, end), error: "", pollNow: false, endTimeKnown: out.atBreakStart === true }
+  }
   if (out.running) return { state: applyClockIn(state, now), error: "", pollNow: false }
   // Calamari took the clock-in but shows no shift: say so, and look again.
   return {
