@@ -7,6 +7,7 @@ of the helper against it means the helper spoke the protocol correctly.
 """
 
 import base64
+import datetime
 import hashlib
 import json
 import secrets
@@ -33,6 +34,8 @@ class FakeCalamari:
         self.break_types = [{"id": 1, "name": "Mittagspause"}, {"id": 2, "name": "Kurze Pause"}]
         # Force an answer on REST calls: (HTTP status, error code), e.g. (403, None).
         self.rest_failure = None
+        # Force the shiftStatus of the clock-in answer, e.g. "FINISHED".
+        self.clock_in_status = None
 
         # Knobs for the tests.
         self.response_mode = "json"  # or "sse"
@@ -176,7 +179,26 @@ class _Handler(BaseHTTPRequestHandler):
             return self._send(200, self.fake.projects)
         if path == "/clockin/terminal/v1/get-break-types-for-person":
             return self._send(200, self.fake.break_types)
+        if path == "/clockin/terminal/v1/clock-in":
+            return self._clock_in(req)
         self._send(404, {"message": "Not found", "code": "INVALID_METHOD_URL", "field": None})
+
+    def _clock_in(self, req):
+        """Like Calamari: time is ISO with offset, a known projectId is
+        optional, and a clock-in during a running shift is ignored."""
+        try:
+            stamped = datetime.datetime.fromisoformat(req["time"])
+        except (KeyError, TypeError, ValueError):
+            stamped = None
+        if stamped is None or stamped.tzinfo is None:
+            return self._send(400, {"message": "Invalid time", "code": "INVALID_TIME", "field": "time"})
+        if "projectId" in req and req["projectId"] not in [p["id"] for p in self.fake.projects]:
+            return self._send(400, {"message": "Invalid project", "code": "INVALID_PROJECT", "field": "projectId"})
+        today, now = self.fake.now.split("T")
+        if not any(end is None for _, _, end in self.fake.shifts):
+            self.fake.shifts.append((today, now, None))
+        return self._send(200, {"person": {"firstName": "Erika", "lastName": "Mustermann"},
+                                "shiftStatus": self.fake.clock_in_status or "STARTED"})
 
     def _register(self, req):
         if not req.get("redirect_uris"):

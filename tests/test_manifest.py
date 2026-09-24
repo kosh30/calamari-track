@@ -26,6 +26,11 @@ class ManifestTest(unittest.TestCase):
         self.assertEqual(field["defaultValue"], "https://cti.calamari.io/api")
         self.assertEqual(field["format"], "url")
 
+    def test_the_default_project_is_check_in_by_name(self):
+        widget = json.loads((ROOT / "manifest.json").read_text())["barWidget"]
+        (field,) = [f for f in widget["schema"] if f["key"] == "defaultProject"]
+        self.assertEqual((field["type"], field["defaultValue"]), ("string", "Check-in"))
+
 
 if __name__ == "__main__":
     unittest.main()

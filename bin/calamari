@@ -39,6 +39,8 @@ from urllib.parse import parse_qs, quote, urlencode, urlsplit, urlunsplit
 
 DEFAULT_BASE_URL = "https://gateway.eu-west-1.calamari.io"
 DEFAULT_API_URL = "https://cti.calamari.io/api"
+# The project of the own clock-ins, as web and phone set it (widget setting defaultProject).
+DEFAULT_PROJECT = "Check-in"
 MCP_PATH = "/mcp-server/mcp"
 SCOPE = "mcp"
 KEYRING_SERVICE = "kosh.calamari-tracker"
@@ -52,10 +54,12 @@ EXPIRY_MARGIN = 60
 
 
 class HelperError(Exception):
-    def __init__(self, code, message):
+    def __init__(self, code, message, **details):
         super().__init__(message)
         self.code = code
         self.message = message
+        # Extra fields of the error object, for the plugin's own wording.
+        self.details = details
 
 
 class Unauthorized(Exception):
@@ -545,25 +549,6 @@ def day_end(args):
     return {"ranToMidnight": with_mcp(lambda c: overlaps(c, date, last - 1, last))}
 
 
-def clock_in(args):
-    """Stamps now, then asks Calamari whether the shift really runs. The new
-    shift starts inside the current minute, after the end of the `status`
-    window, so this check looks at the current minute instead. Once clockIn
-    was accepted a failing check is no failure: the stamp happened, and like
-    clock-out it counts. (Unauthorized is swallowed too, or with_mcp would
-    stamp a second time.)"""
-    def work(client):
-        client.call_tool("clockIn", {})
-        date, minute = today_and_minute()
-        start = min(minute, 24 * 60 - 2)
-        try:
-            return overlaps(client, date, start, start + 1)
-        except (HelperError, Unauthorized):
-            return True
-
-    return {"running": with_mcp(work)}
-
-
 def clock_out(args):
     """Stamps now, but only while a shift runs: a clockOut without one still
     leaves a seconds-long entry in Calamari (seen 2026-09-22). "Runs" means
@@ -744,21 +729,48 @@ def own_person(store):
     return person
 
 
+def projects(client):
+    return id_names(client, "/clockin/projects/v1/get-projects-for-person")
+
+
+def id_names(client, path):
+    """A REST list of the own person, reduced to [{id, name}]."""
+    items = client.call(path)
+    if not isinstance(items, list):
+        raise HelperError("API_ERROR", "%s: unexpected answer %r" % (path, items))
+    return [{"id": i.get("id"), "name": i.get("name")} for i in items if isinstance(i, dict)]
+
+
+def clock_in(args):
+    """Stamps now over REST with the project named by --project, so the
+    shift is not "Ohne Projekt" (docs/adr/0003). An unknown name stamps
+    nothing, and a REST failure never falls back to MCP clockIn. Calamari
+    ignores a clock-in during a running shift; its shiftStatus tells how
+    things stand afterwards either way."""
+    client = RestClient()
+    name = args.project.strip()
+    project = next((p for p in projects(client) if p["name"] == name), None)
+    if project is None:
+        raise HelperError("PROJECT_UNKNOWN", "Calamari has no project %r for %s" % (name, client.person),
+                          project=name)
+    answer = client.call("/clockin/terminal/v1/clock-in", {
+        "time": now().astimezone().isoformat(timespec="seconds"),
+        "projectId": project["id"],
+    })
+    shift = answer.get("shiftStatus") if isinstance(answer, dict) else None
+    if shift not in ("STARTED", "FINISHED"):
+        raise HelperError("API_ERROR", "clock-in: unexpected answer %r" % (answer,))
+    return {"running": shift == "STARTED"}
+
+
 def lookup(args):
     """The projects and break types Calamari offers the user, the names
     the default project and break type settings can pick from."""
     client = RestClient()
-
-    def named(path):
-        items = client.call(path)
-        if not isinstance(items, list):
-            raise HelperError("API_ERROR", "%s: unexpected answer %r" % (path, items))
-        return [{"id": i.get("id"), "name": i.get("name")} for i in items if isinstance(i, dict)]
-
     return {
         "person": client.person,
-        "projects": named("/clockin/projects/v1/get-projects-for-person"),
-        "breakTypes": named("/clockin/terminal/v1/get-break-types-for-person"),
+        "projects": projects(client),
+        "breakTypes": id_names(client, "/clockin/terminal/v1/get-break-types-for-person"),
     }
 
 
@@ -781,6 +793,8 @@ def parse_args(argv):
             sub.add_argument("--date", metavar="YYYY-MM-DD")
         if name == "day-end":
             sub.add_argument("--date", metavar="YYYY-MM-DD", required=True)
+        if name == "clock-in":
+            sub.add_argument("--project", metavar="NAME", default=DEFAULT_PROJECT)
     return parser.parse_args(argv)
 
 
@@ -795,7 +809,7 @@ def main(argv):
         out = dict(ok=True, **args.run(args))
         code = 0
     except HelperError as e:
-        out, code = {"ok": False, "error": {"code": e.code, "message": e.message}}, 1
+        out, code = {"ok": False, "error": dict(e.details, code=e.code, message=e.message)}, 1
     except Exception as e:  # never break the one-JSON-object contract
         out, code = {"ok": False, "error": {"code": "INTERNAL", "message": "%s: %s" % (type(e).__name__, e)}}, 1
     print(json.dumps(out, ensure_ascii=False))

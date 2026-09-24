@@ -110,7 +110,8 @@ Item {
     }
 
     // "clock-in", "clock-out", "break-start" or "break-end", always now. A
-    // failure is shown, never queued.
+    // clock-in goes over REST with the default project (docs/adr/0003). A
+    // failure is shown, never queued, and never retried another way.
     // notice: the correction hint ({ type, lastActivity }, see
     // js/reminders.mjs notification) to send once the clock-out went through.
     function stamp(action, notice) {
@@ -120,7 +121,7 @@ Item {
         stampProc.action = action
         stampProc.notice = notice || null
         stampProc.pollWhenDone = false
-        stampProc.command = [root.helper].concat(ShiftClock.helperCommand(action))
+        stampProc.command = [root.helper].concat(ShiftClock.helperCommand(action, root.setting("defaultProject", "")))
         stampProc.running = true
     }
 

@@ -167,6 +167,20 @@ test("ein fehlgeschlagenes Stempeln nennt Aktion und Ursache und dass nichts nac
     "Ausstempeln fehlgeschlagen: clockOut: no started shift. Es wird nichts nachgereicht.")
 })
 
+test("scheitert das Einstempeln über REST, nennt das Panel die Ursache verständlich", () => {
+  const fail = (code, extra) => applyStamp(emptyState(), "clock-in", { ok: false, error: Object.assign({ code, message: "raw" }, extra) }, at("08:00")).error
+  assert.equal(fail("API_TERMINAL_MISSING"),
+    "Einstempeln fehlgeschlagen: API Terminal fehlt in Calamari Clockin. Es wird nichts nachgereicht.")
+  assert.equal(fail("API_SCOPE_MISSING"),
+    "Einstempeln fehlgeschlagen: keine Berechtigung für den API-Key. Es wird nichts nachgereicht.")
+  assert.equal(fail("API_KEY_REQUIRED"),
+    "Einstempeln fehlgeschlagen: kein API-Key, bitte bin/calamari api-key ausführen. Es wird nichts nachgereicht.")
+  assert.equal(fail("API_KEY_REJECTED"),
+    "Einstempeln fehlgeschlagen: Calamari lehnt den API-Key ab. Es wird nichts nachgereicht.")
+  assert.equal(fail("PROJECT_UNKNOWN", { project: "Kunde B" }),
+    "Einstempeln fehlgeschlagen: Projekt „Kunde B“ gibt es in Calamari nicht. Es wird nichts nachgereicht.")
+})
+
 test("nach einem Fehlschlag wird der echte Status abgefragt, außer Calamari drosselt", () => {
   const fail = code => applyStamp(emptyState(), "clock-in", { ok: false, error: { code, message: "" } }, at("08:00")).pollNow
   assert.equal(fail("NETWORK"), true)
@@ -267,6 +281,16 @@ test("Pausen-Aktionen stempeln bei Calamari aus bzw. ein", () => {
   assert.deepEqual(helperCommand("break-start"), ["clock-out"])
   assert.deepEqual(helperCommand("break-end"), ["clock-in"])
   assert.deepEqual(helperCommand("clock-in"), ["clock-in"])
+})
+
+test("Einstempeln nennt dem Helper das Standard-Projekt, leer heißt seine Vorgabe", () => {
+  assert.deepEqual(helperCommand("clock-in", "Kunde A"), ["clock-in", "--project", "Kunde A"])
+  assert.deepEqual(helperCommand("break-end", "Check-in"), ["clock-in", "--project", "Check-in"])
+  assert.deepEqual(helperCommand("clock-in", ""), ["clock-in"])
+  assert.deepEqual(helperCommand("clock-in", "  "), ["clock-in"])
+  assert.deepEqual(helperCommand("clock-in", " Kunde A "), ["clock-in", "--project", "Kunde A"])
+  assert.deepEqual(helperCommand("clock-out", "Kunde A"), ["clock-out"])
+  assert.deepEqual(helperCommand("break-start", "Kunde A"), ["clock-out"])
 })
 
 test("lief beim Ausstempeln gar keine Schicht, ist es kein Feierabend und das Panel sagt es", () => {

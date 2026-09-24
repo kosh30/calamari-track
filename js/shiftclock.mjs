@@ -257,19 +257,28 @@ export function stampLabel(action) {
 }
 
 // The helper command behind a stamp action: a Pause is a clock-out plus
-// the local mark, its end a clock-in (ADR 0001).
-export function helperCommand(action) {
+// the local mark, its end a clock-in (ADR 0001). A clock-in names the
+// default project (the setting defaultProject); empty leaves the helper's.
+export function helperCommand(action, project) {
   if (action === "break-start") return ["clock-out"]
-  return [action === "break-end" ? "clock-in" : action]
+  if (action !== "clock-in" && action !== "break-end") return [action]
+  const name = (project || "").trim()
+  return name ? ["clock-in", "--project", name] : ["clock-in"]
 }
 const STAMP_CAUSES = {
   NETWORK: "Calamari nicht erreichbar",
   RATE_LIMITED: "zu viele Anfragen, bitte gleich erneut versuchen",
   AUTH_REQUIRED: "Anmeldung nötig",
+  // The REST API of the clock-in (ADR 0003).
+  API_TERMINAL_MISSING: "API Terminal fehlt in Calamari Clockin",
+  API_SCOPE_MISSING: "keine Berechtigung für den API-Key",
+  API_KEY_REQUIRED: "kein API-Key, bitte bin/calamari api-key ausführen",
+  API_KEY_REJECTED: "Calamari lehnt den API-Key ab",
 }
 
-function stampErrorText(action, code, message) {
-  const cause = STAMP_CAUSES[code] || message || code
+function stampErrorText(action, error) {
+  const cause = error.code === "PROJECT_UNKNOWN" ? `Projekt „${error.project}“ gibt es in Calamari nicht`
+    : STAMP_CAUSES[error.code] || error.message || error.code
   return `${STAMP_ACTIONS[action]} fehlgeschlagen: ${cause}. Es wird nichts nachgereicht.`
 }
 
@@ -300,8 +309,7 @@ export function feierabendAction(view) {
 // so pollNow asks Calamari right away, unless it is throttling us.
 export function applyStamp(state, action, out, now) {
   if (!out.ok) {
-    const { code, message } = out.error
-    return { state, error: stampErrorText(action, code, message), pollNow: code !== "RATE_LIMITED" }
+    return { state, error: stampErrorText(action, out.error), pollNow: out.error.code !== "RATE_LIMITED" }
   }
   if (helperCommand(action)[0] === "clock-out" && out.stamped === false) {
     // No shift ran, so nothing was stamped: no Feierabend, no Pause, and

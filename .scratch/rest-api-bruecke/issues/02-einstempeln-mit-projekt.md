@@ -6,10 +6,19 @@
 
 **Status:** ready-for-agent
 
-- [ ] Einstempeln geht über REST `clock-in` mit dem aufgelösten Standard-Projekt
-- [ ] Die Einstellung „Standard-Projekt“ (Vorgabe „Check-in“) ist im Einstellungsformular änderbar
-- [ ] Ein unbekannter Projektname ist ein eigener Fehler mit dem Namen im Text, kein Einstempeln ohne Projekt
-- [ ] Kein Rückfall auf MCP `clockIn`
-- [ ] Die Antwort `shiftStatus` ersetzt die bisherige Nachprüfung nach dem Einstempeln
-- [ ] Tests für die Auflösung des Projekts und die Fehlertexte
+- [x] Einstempeln geht über REST `clock-in` mit dem aufgelösten Standard-Projekt
+- [x] Die Einstellung „Standard-Projekt“ (Vorgabe „Check-in“) ist im Einstellungsformular änderbar
+- [x] Ein unbekannter Projektname ist ein eigener Fehler mit dem Namen im Text, kein Einstempeln ohne Projekt
+- [x] Kein Rückfall auf MCP `clockIn`
+- [x] Die Antwort `shiftStatus` ersetzt die bisherige Nachprüfung nach dem Einstempeln
+- [x] Tests für die Auflösung des Projekts und die Fehlertexte
 - [ ] Mit dem Benutzer abgenommen: Die neue Schicht steht in Calamari mit Projekt „Check-in“
+
+## Comments
+
+**2026-09-24 (Agent):** Umgesetzt, die Abnahme mit dem Benutzer steht noch aus.
+- `bin/calamari clock-in [--project NAME]` (Vorgabe „Check-in“): löst den Namen über `get-projects-for-person` auf (exakt, Groß-/Kleinschreibung zählt) und stempelt per REST `clock-in` mit `time` = jetzt (lokal, mit Offset) und `projectId`. `shiftStatus` `STARTED` → `running: true`, `FINISHED` → `running: false`; keine Nachprüfung per MCP mehr. Läuft schon eine Schicht, ignoriert Calamari das Einstempeln und meldet `STARTED`.
+- Unbekannter Name: Fehler `PROJECT_UNKNOWN`, das Fehlerobjekt trägt zusätzlich `project`. Nichts wird gestempelt, kein Rückfall auf MCP `clockIn`, auch nicht bei fehlendem Key oder REST-Fehlern.
+- Neue Einstellung `defaultProject` (Vorgabe „Check-in“). Der Service gibt sie als `--project` mit; leer heißt Vorgabe des Helpers. Braucht `omarchy-restart-shell`.
+- Panel-Texte: „API Terminal fehlt in Calamari Clockin“, „keine Berechtigung für den API-Key“, „kein API-Key, bitte bin/calamari api-key ausführen“, „Calamari lehnt den API-Key ab“, „Projekt „X“ gibt es in Calamari nicht“, „zu viele Anfragen …“.
+- Abnahme: `omarchy-restart-shell`, im Panel einstempeln, in Calamari prüfen, dass die neue Schicht das Projekt „Check-in“ hat. Dabei sieht man auch, ob der Key die Gruppe Terminal hat und ob das API Terminal eingerichtet ist.

@@ -30,6 +30,7 @@
       "hardLimitTime": "23:00",
       "webUrl": "",
       "apiUrl": "https://cti.calamari.io/api",
+      "defaultProject": "Check-in",
       "coreMonday": "",
       "coreTuesday": "",
       "coreWednesday": "",
@@ -122,6 +123,12 @@
         "label": "Calamari-REST-API (Key per bin/calamari api-key)",
         "format": "url",
         "defaultValue": "https://cti.calamari.io/api"
+      },
+      {
+        "key": "defaultProject",
+        "type": "string",
+        "label": "Standard-Projekt beim Einstempeln (Name in Calamari, leer = Check-in)",
+        "defaultValue": "Check-in"
       },
       {
         "key": "coreMonday",

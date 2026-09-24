@@ -1,5 +1,6 @@
 """Seam B: the command-line interface of bin/calamari against a fake gateway."""
 
+import datetime
 import json
 import os
 import subprocess
@@ -284,9 +285,12 @@ class CalamariCliTest(unittest.TestCase):
 
     # Stempeln
 
-    def test_clock_in_starts_a_shift_and_reports_it_running(self):
+    def clock_ins(self):
+        return [req for path, req in self.fake.rest_calls if path == "/clockin/terminal/v1/clock-in"]
+
+    def test_clock_in_stamps_over_rest_with_the_default_project(self):
         self.login()
-        # Stamped mid-minute: the new shift lies after the last full minute.
+        self.store_api_key()
         self.fake.now = "2026-09-22T14:00:30"
         self.fake.shifts = [("2026-09-22", "08:00:00", "12:00:00")]
 
@@ -294,18 +298,67 @@ class CalamariCliTest(unittest.TestCase):
 
         self.assertEqual((code, out), (0, {"ok": True, "running": True}))
         self.assertIn(("2026-09-22", "14:00:30", None), self.fake.shifts)
-        # The status came from Calamari, not from the helper's hope.
-        self.assertIn("checkTimesheetOverlap", [n for n, _ in self.fake.tool_calls])
+        (req,) = self.clock_ins()
+        self.assertEqual((req["person"], req["projectId"]), ("erika@example.com", 7))
+        # Now, as local time with its offset.
+        stamped = datetime.datetime.fromisoformat(req["time"])
+        self.assertIsNotNone(stamped.tzinfo)
+        self.assertEqual(stamped.replace(tzinfo=None), datetime.datetime(2026, 9, 22, 14, 0, 30))
+        # Neither MCP clockIn nor a check afterwards: shiftStatus is the answer.
+        self.assertEqual([n for n, _ in self.fake.tool_calls if n != "getMyProfile"], [])
 
-    def test_clock_in_that_calamari_accepted_counts_even_if_the_check_fails(self):
+    def test_clock_in_resolves_the_named_project(self):
         self.login()
-        self.fake.now = "2026-09-22T14:00:30"
-        self.fake.overlap_error = True
+        self.store_api_key()
+
+        code, out = self.run_helper("clock-in", "--project", "Kunde A")
+
+        self.assertEqual((code, out["running"]), (0, True), out)
+        self.assertEqual([req["projectId"] for req in self.clock_ins()], [9])
+
+    def test_clock_in_with_an_unknown_project_stamps_nothing(self):
+        self.login()
+        self.store_api_key()
+
+        code, out = self.run_helper("clock-in", "--project", "Kunde B")
+
+        self.assert_error((code, out), "PROJECT_UNKNOWN")
+        self.assertIn("Kunde B", out["error"]["message"])
+        self.assertEqual(out["error"]["project"], "Kunde B")
+        self.assertEqual((self.clock_ins(), self.fake.shifts), ([], []))
+        self.assertNotIn("clockIn", [n for n, _ in self.fake.tool_calls])
+
+    def test_clock_in_reports_the_shift_status_calamari_answers(self):
+        # Calamari ignores a clock-in during a running shift and says STARTED.
+        self.login()
+        self.store_api_key()
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
 
         code, out = self.run_helper("clock-in")
 
         self.assertEqual((code, out), (0, {"ok": True, "running": True}))
-        self.assertEqual(self.fake.shifts, [("2026-09-22", "14:00:30", None)])
+        self.assertEqual(len(self.fake.shifts), 1)
+
+        self.fake.clock_in_status = "FINISHED"
+        self.assertEqual(self.run_helper("clock-in"), (0, {"ok": True, "running": False}))
+
+    def test_clock_in_without_api_key_does_not_fall_back_to_mcp(self):
+        self.login()
+
+        self.assert_error(self.run_helper("clock-in"), "API_KEY_REQUIRED")
+        self.assertNotIn("clockIn", [n for n, _ in self.fake.tool_calls])
+        self.assertEqual(self.fake.shifts, [])
+
+    def test_failed_rest_clock_in_does_not_fall_back_to_mcp(self):
+        self.login()
+        self.store_api_key()
+        for status, error, expected in ((400, "API_TERMINAL_NOT_AVAILABLE", "API_TERMINAL_MISSING"),
+                                        (403, None, "API_SCOPE_MISSING"), (429, "QUOTA_EXCEEDED", "RATE_LIMITED")):
+            with self.subTest(expected):
+                self.fake.rest_failure = (status, error)
+                self.assert_error(self.run_helper("clock-in"), expected)
+        self.assertNotIn("clockIn", [n for n, _ in self.fake.tool_calls])
+        self.assertEqual(self.fake.shifts, [])
 
     def test_clock_out_ends_the_running_shift(self):
         self.login()
@@ -339,30 +392,22 @@ class CalamariCliTest(unittest.TestCase):
         self.assertEqual((code, out["stamped"]), (0, False))
         self.assertNotIn("clockOut", [n for n, _ in self.fake.tool_calls])
 
-    def test_clock_in_while_a_shift_runs_is_an_mcp_error(self):
-        self.login()
-        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
-
-        self.assert_error(self.run_helper("clock-in"), "MCP_ERROR")
-        self.assertEqual(len(self.fake.shifts), 1)
-
     def test_stamping_when_rate_limited_is_reported_and_nothing_is_stamped(self):
         self.login()
         self.fake.mcp_status = 429
 
-        for command in ("clock-in", "clock-out"):
-            with self.subTest(command):
-                self.assert_error(self.run_helper(command), "RATE_LIMITED")
+        # REST clock-in: test_failed_rest_clock_in_does_not_fall_back_to_mcp.
+        self.assert_error(self.run_helper("clock-out"), "RATE_LIMITED")
         self.assertEqual(self.fake.shifts, [])
 
     def test_stamping_without_network_is_a_network_error(self):
         self.login()
-
-        for command in ("clock-in", "clock-out"):
-            with self.subTest(command):
-                self.assert_error(self.run_helper(command, base_url="http://127.0.0.1:9"), "NETWORK")
+        self.store_api_key()
+        self.assert_error(self.run_helper("clock-out", base_url="http://127.0.0.1:9"), "NETWORK")
+        self.assert_error(self.run_helper("clock-in", api_url="http://127.0.0.1:9/api"), "NETWORK")
 
     def test_stamping_without_login_needs_auth(self):
+        self.store_api_key()
         for command in ("clock-in", "clock-out"):
             with self.subTest(command):
                 self.assert_error(self.run_helper(command), "AUTH_REQUIRED")
