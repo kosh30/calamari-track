@@ -184,14 +184,16 @@ class _Handler(BaseHTTPRequestHandler):
         self._send(404, {"message": "Not found", "code": "INVALID_METHOD_URL", "field": None})
 
     def _clock_in(self, req):
-        """Like Calamari: time is ISO with offset, a known projectId is
+        """Like Calamari: time is UTC with Z (it answered "Incorrect value"
+        to local time with +02:00, 2026-09-24), a known projectId is
         optional, and a clock-in during a running shift is ignored."""
+        time = req.get("time")
         try:
-            stamped = datetime.datetime.fromisoformat(req["time"])
-        except (KeyError, TypeError, ValueError):
-            stamped = None
-        if stamped is None or stamped.tzinfo is None:
-            return self._send(400, {"message": "Invalid time", "code": "INVALID_TIME", "field": "time"})
+            valid = isinstance(time, str) and time.endswith("Z") and bool(datetime.datetime.fromisoformat(time))
+        except ValueError:
+            valid = False
+        if not valid:
+            return self._send(400, {"message": "Incorrect value", "code": None, "field": "time"})
         if "projectId" in req and req["projectId"] not in [p["id"] for p in self.fake.projects]:
             return self._send(400, {"message": "Invalid project", "code": "INVALID_PROJECT", "field": "projectId"})
         today, now = self.fake.now.split("T")
