@@ -14,6 +14,8 @@ Der MCP-Server bietet (Stand 2026-09-22) weniger als die REST-API. Daraus folgen
 
 Sobald der MCP-Server Status-, Pausen- oder Zeitparameter nachliefert, sollten diese Umwege ersetzt werden.
 
+**Teilweise überholt durch [ADR 0003](0003-rest-api-fuer-pause-projekt-status.md):** Pausen, Projekt und Status laufen seit 2026-09-24 über die REST-API mit Firmen-Key.
+
 Der Stand der Tools vom 2026-09-22 liegt in `docs/mcp-tools.json`: 17 Tools, keins davon kennt Pausen, `clockIn` und `clockOut` nehmen keine Argumente, und kein Tool liest Timesheet-Einträge. Ob Calamari etwas geändert hat, zeigt:
 
 ```

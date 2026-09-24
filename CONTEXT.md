@@ -19,8 +19,15 @@ Beginn bzw. Ende einer Schicht.
 _Avoid_: Start/Stop, Clock-in/Clock-out (im Deutschen)
 
 **Pause**:
-Eine vom Benutzer als Pause markierte Lücke zwischen zwei Schichten desselben Tages. Beginnt nur aus einer laufenden Schicht heraus und ist kein Feierabend. Calamari selbst sieht nur die Lücke.
-_Avoid_: Break (im Deutschen), Calamari-Pause
+Eine Unterbrechung innerhalb einer laufenden Schicht, die Calamari als Pause speichert (mit Pausentyp). Beginnt nur aus einer laufenden Schicht heraus und ist kein Feierabend; die Schicht läuft während der Pause weiter.
+_Avoid_: Break (im Deutschen), Lücke zwischen zwei Schichten
+
+**Projekt**:
+Das Calamari-Projekt, dem eine Schicht zugeordnet ist. Web und Handy setzen „Check-in“; das Plugin setzt beim Einstempeln das Standard-Projekt.
+_Avoid_: Ohne Projekt (so heißt in Calamari das Fehlen eines Projekts)
+
+**Standard-Projekt**:
+Das Projekt, das das Plugin jeder eigenen Einstempelung gibt. Einstellbar, Vorgabe „Check-in“.
 
 **Feierabend**:
 Der Zustand nach dem Ausstempeln an einem Arbeitstag. Ab dann gibt es an diesem Tag keine Stempel-Erinnerungen mehr. Erneutes Einstempeln bleibt möglich.
