@@ -4,14 +4,14 @@
 
 **Blocked by:** 01, 03
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] Pause beginnen = `break-start`, Pause beenden = `break-stop`; kein Aus- oder Einstempeln mehr
 - [x] Die Einstellung „Pausentyp“ ist im Einstellungsformular änderbar; ein unbekannter Name ist ein eigener Fehler
 - [x] Die Pause übersteht einen Neustart der Shell (der Status aus Ticket 03 bestätigt sie)
 - [x] Pausen-Grenze und Wiederholung der Pausen-Erinnerung gelten weiter
 - [x] Tests für `applyStamp` mit den neuen Pausenaktionen
-- [ ] Mit dem Benutzer abgenommen: In Calamari steht eine Schicht mit Projekt „Check-in“ und einer Pause darin
+- [x] Mit dem Benutzer abgenommen: In Calamari steht eine Schicht mit Projekt „Check-in“ und einer Pause darin
 
 ## Comments
 
@@ -22,3 +22,5 @@
 - Bestätigt Calamari die Pause nicht (`breakStatus` passt nicht), bleibt der Zustand und das Panel sagt „Calamari meldet keine Pause / weiter eine Pause“.
 - Bekannte Ungenauigkeit: Endet die Schicht im Web während einer Pause, zählt die Pause bis zur nächsten Abfrage; die Gesamtzeit heute ist dann um bis zu ein Abfrage-Intervall zu niedrig.
 - Abnahme: `omarchy-restart-shell`, im Panel „Pause beginnen“, in Calamari prüfen, dass die Schicht weiterläuft und eine Pause hat; „Pause beenden“; in Calamari eine Schicht mit Projekt „Check-in“ und einer Pause darin. Nebenbei zeigt sich, ob `break-stop` wirklich den Pausentyp braucht.
+
+**2026-09-24 (Agent):** Mit dem Benutzer gegen das echte Calamari abgenommen. Im Panel Pause begonnen und beendet; das Journal zeigt `break-start` 12:26:24 → `STARTED` und `break-stop` 12:26:41 → `FINISHED`, beide mit `breakType` 1. In Calamari steht die Schicht seit 11:24 mit Projekt „Check-in“ und der Pause darin; die Schicht lief durch. Das lokale Zeitformat ohne Zone gilt auch für die Pausen-Endpunkte.
