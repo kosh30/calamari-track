@@ -80,6 +80,9 @@ Item {
 
     readonly property int pollInterval: root.setting("pollIntervalMinutes", 3) * 60 * 1000
     readonly property string helper: Qt.resolvedUrl("bin/calamari").toString().replace(/^file:\/\//, "")
+    // Added to the shell's environment for every helper call: the REST API
+    // of the setting apiUrl (docs/adr/0003); empty leaves the helper's default.
+    readonly property var helperEnv: ({ CALAMARI_API_URL: root.setting("apiUrl", "") || null })
     readonly property string stateDir: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/calamari-tracker"
 
     function refreshIdentity() {
@@ -320,6 +323,7 @@ Item {
 
     Process {
         id: whoamiProc
+        environment: root.helperEnv
         command: [root.helper, "whoami"]
         stdout: StdioCollector {
             onStreamFinished: root.applyIdentity(root.parse(text))
@@ -328,6 +332,7 @@ Item {
 
     Process {
         id: statusProc
+        environment: root.helperEnv
         command: [root.helper, "status"]
         stdout: StdioCollector {
             onStreamFinished: root.applyStatus(root.parse(text))
@@ -336,6 +341,7 @@ Item {
 
     Process {
         id: endTimeProc
+        environment: root.helperEnv
         property string after: ""
         stdout: StdioCollector {
             onStreamFinished: root.applyEndTime(endTimeProc.after, root.parse(text))
@@ -344,6 +350,7 @@ Item {
 
     Process {
         id: dayEndProc
+        environment: root.helperEnv
         property string date: ""
         // Set by a failed question, cleared by the next tick of the timer.
         property bool blocked: false
@@ -357,6 +364,7 @@ Item {
 
     Process {
         id: startTimeProc
+        environment: root.helperEnv
         command: [root.helper, "start-time"]
         stdout: StdioCollector {
             onStreamFinished: root.applyStartTime(root.parse(text))
@@ -365,6 +373,7 @@ Item {
 
     Process {
         id: stampProc
+        environment: root.helperEnv
         property string action: ""
         property var notice: null
         // Ask Calamari for the real status once the helper has exited
@@ -378,6 +387,7 @@ Item {
 
     Process {
         id: dayProc
+        environment: root.helperEnv
         command: [root.helper, "day-info"]
         stdout: StdioCollector {
             onStreamFinished: {
@@ -407,6 +417,7 @@ Item {
 
     Process {
         id: loginProc
+        environment: root.helperEnv
         command: [root.helper, "login"]
         stdout: StdioCollector {
             onStreamFinished: {

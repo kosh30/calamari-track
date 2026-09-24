@@ -3,12 +3,15 @@
 
 Speaks OAuth (Dynamic Client Registration, Authorization Code + PKCE,
 refresh) and MCP (Streamable HTTP, JSON-RPC) against the official Calamari
-MCP server, see docs/adr/0001. Every command prints exactly one JSON object
+MCP server, see docs/adr/0001, and the REST API with the company API key
+for what MCP cannot do, see docs/adr/0003. Every command prints exactly one JSON object
 on stdout: {"ok": true, ...} or {"ok": false, "error": {"code", "message"}}
 with a non-zero exit code.
 
 Environment:
   CALAMARI_BASE_URL      gateway base URL (tests point it at a fake)
+  CALAMARI_API_URL       REST API base URL (default DEFAULT_API_URL; the
+                         widget setting apiUrl)
   CALAMARI_KEYRING_FILE  keep secrets in this JSON file instead of the
                          Secret Service keyring (tests only)
   CALAMARI_NOW           local time "YYYY-MM-DDTHH:MM[:SS]" instead of the
@@ -20,6 +23,7 @@ import argparse
 import base64
 import datetime
 import fcntl
+import getpass
 import hashlib
 import json
 import os
@@ -34,6 +38,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, quote, urlencode, urlsplit, urlunsplit
 
 DEFAULT_BASE_URL = "https://gateway.eu-west-1.calamari.io"
+DEFAULT_API_URL = "https://cti.calamari.io/api"
 MCP_PATH = "/mcp-server/mcp"
 SCOPE = "mcp"
 KEYRING_SERVICE = "kosh.calamari-tracker"
@@ -63,6 +68,10 @@ def base_url():
 
 def mcp_url():
     return base_url() + MCP_PATH
+
+
+def api_url():
+    return os.environ.get("CALAMARI_API_URL", DEFAULT_API_URL).rstrip("/")
 
 
 def well_known(url, name):
@@ -318,6 +327,8 @@ def login(args):
     store = keyring()
     store.set("client", client)
     store.set("tokens", stored_tokens(payload))
+    # The login may belong to someone else: the REST calls ask for the person again.
+    store.set("person", None)
     return {}
 
 
@@ -491,11 +502,16 @@ def today_and_minute():
 # Commands
 
 
-def whoami(args):
-    profile = with_mcp(lambda c: c.call_tool("getMyProfile", {}))
-    if not isinstance(profile, dict) or not profile.get("name"):
+def my_profile(client):
+    profile = client.call_tool("getMyProfile", {})
+    if not isinstance(profile, dict) or not profile.get("name") or not profile.get("email"):
         raise HelperError("MCP_ERROR", "getMyProfile: unexpected answer %r" % (profile,))
-    return {"name": profile["name"], "email": profile.get("email"), "personUuid": profile.get("personUuid")}
+    return profile
+
+
+def whoami(args):
+    profile = with_mcp(my_profile)
+    return {"name": profile["name"], "email": profile["email"], "personUuid": profile.get("personUuid")}
 
 
 def running_now(client):
@@ -657,6 +673,95 @@ def end_time(args):
     return {"endedAt": with_mcp(search)}
 
 
+# REST API with the company API key, for what the MCP server cannot do
+# (docs/adr/0003). The key lives in the keyring like the OAuth tokens.
+
+
+def api_key(args):
+    """Stores the API key read from stdin; a terminal gets a hidden prompt,
+    so the key never shows up in the shell history."""
+    try:
+        key = getpass.getpass("Calamari API key: ", stream=sys.stderr) if sys.stdin.isatty() else sys.stdin.readline()
+    except EOFError:
+        key = ""
+    key = key.strip()
+    if not key:
+        raise HelperError("USAGE", "no API key on stdin")
+    keyring().set("apiKey", key)
+    return {}
+
+
+class RestClient:
+    """Calls for the user only: the key could act for anyone in the company,
+    so every call names the person from the user's own profile."""
+
+    def __init__(self):
+        store = keyring()
+        key = store.get("apiKey")
+        if not key:
+            raise HelperError("API_KEY_REQUIRED", "no API key, run `calamari api-key`")
+        self.auth = "Basic " + base64.b64encode(("calamari:" + key).encode()).decode()
+        self.person = own_person(store)
+
+    def call(self, path, body=None):
+        """POSTs body plus the own person; returns the parsed answer."""
+        payload = dict(body or {}, person=self.person)
+        headers = {"Content-Type": "application/json", "Accept": "application/json", "Authorization": self.auth}
+        status, _, raw = http(api_url() + path, json.dumps(payload).encode(), headers)
+        if not 200 <= status < 300:
+            raise rest_error(path, status, raw)
+        return json.loads(raw) if raw else None
+
+
+def rest_error(path, status, raw):
+    """Calamari's {message, code, field} as a helper error. None of these
+    means the OAuth login is gone, so none is AUTH_REQUIRED."""
+    try:
+        body = json.loads(raw)
+    except ValueError:
+        body = None
+    body = body if isinstance(body, dict) else {}
+    code = body.get("code")
+    detail = "%s: %s" % (code, body.get("message")) if code else "HTTP %d %s" % (status, raw[:200].decode(errors="replace"))
+    if status == 401:
+        return HelperError("API_KEY_REJECTED", "Calamari rejects the API key (%s), run `calamari api-key`" % detail)
+    if status == 403:
+        return HelperError("API_SCOPE_MISSING", "the API key lacks the scope for %s (%s)" % (path, detail))
+    if status == 429:
+        return HelperError("RATE_LIMITED", "%s: rate limited by Calamari (%s)" % (path, detail))
+    if code == "API_TERMINAL_NOT_AVAILABLE":
+        return HelperError("API_TERMINAL_MISSING", "no API terminal in Clockin for this person (%s)" % detail)
+    return HelperError("API_ERROR", "%s: %s" % (path, detail))
+
+
+def own_person(store):
+    """The e-mail the REST calls act for, from the profile behind the user's
+    login; cached in the keyring until the next login."""
+    person = store.get("person")
+    if not person:
+        person = with_mcp(my_profile)["email"]
+        store.set("person", person)
+    return person
+
+
+def lookup(args):
+    """The projects and break types Calamari offers the user, the names
+    the default project and break type settings can pick from."""
+    client = RestClient()
+
+    def named(path):
+        items = client.call(path)
+        if not isinstance(items, list):
+            raise HelperError("API_ERROR", "%s: unexpected answer %r" % (path, items))
+        return [{"id": i.get("id"), "name": i.get("name")} for i in items if isinstance(i, dict)]
+
+    return {
+        "person": client.person,
+        "projects": named("/clockin/projects/v1/get-projects-for-person"),
+        "breakTypes": named("/clockin/terminal/v1/get-break-types-for-person"),
+    }
+
+
 class _Parser(argparse.ArgumentParser):
     def error(self, message):
         raise HelperError("USAGE", message)
@@ -681,7 +786,7 @@ def parse_args(argv):
 
 COMMANDS = {"login": login, "whoami": whoami, "tools": tools, "status": status, "start-time": start_time,
             "end-time": end_time, "clock-in": clock_in, "clock-out": clock_out, "day-info": day_info,
-            "day-end": day_end}
+            "day-end": day_end, "api-key": api_key, "lookup": lookup}
 
 
 def main(argv):

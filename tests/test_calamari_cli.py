@@ -23,25 +23,26 @@ class CalamariCliTest(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         self.keyring = Path(tmp.name) / "keyring.json"
 
-    def start_helper(self, *args, base_url=None):
+    def start_helper(self, *args, base_url=None, api_url=None):
         env = dict(os.environ,
                    CALAMARI_BASE_URL=base_url or self.fake.base_url,
+                   CALAMARI_API_URL=api_url or self.fake.api_url,
                    CALAMARI_KEYRING_FILE=str(self.keyring),
                    CALAMARI_NOW=self.fake.now,
                    BROWSER="%s %s %%s" % (sys.executable, FAKE_BROWSER))
-        return subprocess.Popen([sys.executable, str(HELPER), *args], env=env,
+        return subprocess.Popen([sys.executable, str(HELPER), *args], env=env, stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
-    def finish_helper(self, proc):
-        stdout, stderr = proc.communicate(timeout=30)
+    def finish_helper(self, proc, input=None):
+        stdout, stderr = proc.communicate(input, timeout=30)
         try:
             out = json.loads(stdout)
         except json.JSONDecodeError:
             self.fail("stdout is not one JSON object: %r (stderr: %s)" % (stdout, stderr))
         return proc.returncode, out
 
-    def run_helper(self, *args, base_url=None):
-        return self.finish_helper(self.start_helper(*args, base_url=base_url))
+    def run_helper(self, *args, base_url=None, api_url=None, input=None):
+        return self.finish_helper(self.start_helper(*args, base_url=base_url, api_url=api_url), input)
 
     def keyring_text(self):
         return self.keyring.read_text()
@@ -469,6 +470,105 @@ class CalamariCliTest(unittest.TestCase):
         self.assertEqual([t["name"] for t in out["tools"]],
                          ["checkTimesheetOverlap", "clockIn", "clockOut", "getMyProfile"])
         self.assertEqual(out["tools"][1]["description"], "fake clockIn")
+
+    # REST API (docs/adr/0003)
+
+    def store_api_key(self):
+        code, out = self.run_helper("api-key", input=self.fake.api_key + "\n")
+        self.assertEqual((code, out["ok"]), (0, True), out)
+
+    def test_api_key_is_read_from_stdin_and_kept_in_the_keyring(self):
+        self.store_api_key()
+
+        self.assertIn(self.fake.api_key, self.keyring_text())
+
+    def test_api_key_must_not_be_empty(self):
+        self.assert_error(self.run_helper("api-key", input="\n"), "USAGE")
+
+    def test_lookup_without_api_key_asks_for_one(self):
+        self.login()
+
+        self.assert_error(self.run_helper("lookup"), "API_KEY_REQUIRED")
+
+    def test_lookup_lists_projects_and_break_types_of_the_own_person(self):
+        self.login()
+        self.store_api_key()
+
+        code, out = self.run_helper("lookup")
+
+        self.assertEqual(code, 0, out)
+        self.assertEqual(out["person"], "erika@example.com")
+        self.assertEqual(out["projects"], [{"id": 7, "name": "Check-in"}, {"id": 9, "name": "Kunde A"}])
+        self.assertEqual(out["breakTypes"], [{"id": 1, "name": "Mittagspause"}, {"id": 2, "name": "Kurze Pause"}])
+        self.assertEqual(self.fake.rest_calls, [
+            ("/clockin/projects/v1/get-projects-for-person", {"person": "erika@example.com"}),
+            ("/clockin/terminal/v1/get-break-types-for-person", {"person": "erika@example.com"}),
+        ])
+
+    def test_the_own_person_is_asked_from_the_profile_only_once(self):
+        self.login()
+        self.store_api_key()
+        self.run_helper("lookup")
+        self.fake.tool_calls.clear()
+
+        code, out = self.run_helper("lookup")
+
+        self.assertEqual((code, out["person"]), (0, "erika@example.com"), out)
+        self.assertEqual(self.fake.tool_calls, [])
+
+    def test_a_new_login_asks_for_the_own_person_again(self):
+        self.login()
+        self.store_api_key()
+        self.run_helper("lookup")
+        self.fake.profile = dict(self.fake.profile, email="max@example.com")
+        self.login()
+
+        code, out = self.run_helper("lookup")
+
+        self.assertEqual((code, out["person"]), (0, "max@example.com"), out)
+
+    def test_a_rejected_api_key_is_no_login_problem(self):
+        self.login()
+        self.run_helper("api-key", input="revoked-key\n")
+
+        self.assert_error(self.run_helper("lookup"), "API_KEY_REJECTED")
+
+    def test_a_key_without_the_scope_says_so(self):
+        self.login()
+        self.store_api_key()
+        self.fake.rest_failure = (403, None)
+
+        self.assert_error(self.run_helper("lookup"), "API_SCOPE_MISSING")
+
+    def test_a_missing_api_terminal_says_so(self):
+        self.login()
+        self.store_api_key()
+        self.fake.rest_failure = (400, "API_TERMINAL_NOT_AVAILABLE")
+
+        self.assert_error(self.run_helper("lookup"), "API_TERMINAL_MISSING")
+
+    def test_rest_rate_limit_is_reported(self):
+        self.login()
+        self.store_api_key()
+        self.fake.rest_failure = (429, "QUOTA_EXCEEDED")
+
+        self.assert_error(self.run_helper("lookup"), "RATE_LIMITED")
+
+    def test_other_rest_errors_carry_calamaris_message(self):
+        self.login()
+        self.store_api_key()
+        self.fake.rest_failure = (400, "INVALID_EMPLOYEE")
+
+        code, out = self.run_helper("lookup")
+
+        self.assert_error((code, out), "API_ERROR")
+        self.assertIn("INVALID_EMPLOYEE", out["error"]["message"])
+
+    def test_unreachable_rest_api_is_a_network_error(self):
+        self.login()
+        self.store_api_key()
+
+        self.assert_error(self.run_helper("lookup", api_url="http://127.0.0.1:9/api"), "NETWORK")
 
     # Other failures
 

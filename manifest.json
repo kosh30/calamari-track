@@ -29,6 +29,7 @@
       "extendMinutes": 60,
       "hardLimitTime": "23:00",
       "webUrl": "",
+      "apiUrl": "https://cti.calamari.io/api",
       "coreMonday": "",
       "coreTuesday": "",
       "coreWednesday": "",
@@ -114,6 +115,13 @@
         "label": "Calamari im Browser (z.B. https://firma.calamari.io)",
         "format": "url",
         "defaultValue": ""
+      },
+      {
+        "key": "apiUrl",
+        "type": "string",
+        "label": "Calamari-REST-API (Key per bin/calamari api-key)",
+        "format": "url",
+        "defaultValue": "https://cti.calamari.io/api"
       },
       {
         "key": "coreMonday",

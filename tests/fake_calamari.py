@@ -16,6 +16,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 
 MCP_PATH = "/mcp-server/mcp"
 AS_PATH = "/auth-server"
+API_PATH = "/api"
 
 
 class FakeCalamari:
@@ -24,6 +25,14 @@ class FakeCalamari:
         self.server.fake = self
         self.base_url = "http://127.0.0.1:%d" % self.server.server_port
         self.mcp_url = self.base_url + MCP_PATH
+        self.api_url = self.base_url + API_PATH
+        # The REST API authenticates with Basic auth, user "calamari".
+        self.api_key = "test-api-key"
+        # Shapes of the real get-projects-for-person / get-break-types-for-person answers.
+        self.projects = [{"id": 7, "name": "Check-in"}, {"id": 9, "name": "Kunde A"}]
+        self.break_types = [{"id": 1, "name": "Mittagspause"}, {"id": 2, "name": "Kurze Pause"}]
+        # Force an answer on REST calls: (HTTP status, error code), e.g. (403, None).
+        self.rest_failure = None
 
         # Knobs for the tests.
         self.response_mode = "json"  # or "sse"
@@ -77,6 +86,7 @@ class FakeCalamari:
         self.token_requests = []
         self.tool_calls = []
         self.overlap_calls = 0
+        self.rest_calls = []
 
     def __enter__(self):
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
@@ -149,7 +159,24 @@ class _Handler(BaseHTTPRequestHandler):
             return self._token({k: v[0] for k, v in parse_qs(self._body().decode()).items()})
         if path == MCP_PATH:
             return self._mcp(json.loads(self._body()))
+        if path.startswith(API_PATH + "/"):
+            return self._rest(path[len(API_PATH):], self._body())
         self._send(404, {"error": "not_found"})
+
+    def _rest(self, path, body):
+        expected = "Basic " + base64.b64encode(("calamari:" + self.fake.api_key).encode()).decode()
+        if self.headers.get("Authorization") != expected:
+            return self._send(401, {"message": "Invalid API key", "code": "AUTH", "field": None})
+        if self.fake.rest_failure:
+            status, code = self.fake.rest_failure
+            return self._send(status, {"message": "forced failure", "code": code, "field": None})
+        req = json.loads(body or b"{}")
+        self.fake.rest_calls.append((path, req))
+        if path == "/clockin/projects/v1/get-projects-for-person":
+            return self._send(200, self.fake.projects)
+        if path == "/clockin/terminal/v1/get-break-types-for-person":
+            return self._send(200, self.fake.break_types)
+        self._send(404, {"message": "Not found", "code": "INVALID_METHOD_URL", "field": None})
 
     def _register(self, req):
         if not req.get("redirect_uris"):
