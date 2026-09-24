@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] `calamari api-key` liest den Key von stdin und legt ihn im Keyring ab; ohne Key antworten REST-Befehle mit einem eigenen Fehlercode
 - [x] Die Basis-URL ist eine Einstellung mit Vorgabe `https://cti.calamari.io/api` und erreicht den Helper
@@ -12,7 +12,7 @@
 - [x] Der lesende Befehl liefert Projekte (`get-projects-for-person`) und Pausentypen (`get-break-types-for-person`) als JSON
 - [x] Fehler von REST (401, 403, 429, `API_TERMINAL_NOT_AVAILABLE`, Netzwerk) haben stabile Codes
 - [x] Tests gegen einen Fake-REST-Server, wie der bestehende Fake für den MCP-Server
-- [ ] Mit dem Benutzer abgenommen: Key eingegeben, der Befehl zeigt die Id von „Check-in“ und die Pausentypen. Beides unter `## Comments` festhalten, samt dem Pausentyp, den Web und Handy standardmäßig setzen
+- [x] Mit dem Benutzer abgenommen: Key eingegeben, der Befehl zeigt die Id von „Check-in“ und die Pausentypen. Beides unter `## Comments` festhalten, samt dem Pausentyp, den Web und Handy standardmäßig setzen
 
 ## Comments
 
@@ -23,3 +23,8 @@
 - Fehlercodes: `API_KEY_REQUIRED`, `API_KEY_REJECTED` (401), `API_SCOPE_MISSING` (403), `API_TERMINAL_MISSING`, `RATE_LIMITED` (429, wie beim MCP), `NETWORK`, sonst `API_ERROR` mit Calamaris Code im Text. Keiner davon ist `AUTH_REQUIRED`, ein Problem mit dem Key schickt also nicht zum OAuth-Login.
 - Einstellung `apiUrl` (Vorgabe `https://cti.calamari.io/api`); der Service gibt sie jedem Helper-Aufruf als `CALAMARI_API_URL` mit, leer heißt Vorgabe des Helpers. Braucht `omarchy-restart-shell`.
 - Abnahme: `bin/calamari api-key` (Key einfügen, Enter), dann `bin/calamari lookup | python3 -m json.tool`.
+
+**2026-09-24 (Agent):** Mit dem Benutzer gegen das echte Calamari abgenommen. Key per `bin/calamari api-key` gespeichert, `bin/calamari lookup` antwortete für die eigene E-Mail:
+- Projekte: „Check-in“ (Id 1), „Doctor visits“ (5), „Standby“ (3). Vorgabe für das Standard-Projekt bleibt „Check-in“.
+- Pausentypen: nur „Break“ (Id 1). Das ist damit auch die Vorgabe für die Einstellung „Pausentyp“ in Ticket 04.
+- Der Key hat die Gruppen für Projekte und Pausentypen. Ob er auch Stempeln (Terminal) und Schichtstatus darf und ob das API Terminal eingerichtet ist, zeigt sich erst in Ticket 02 und 03.
