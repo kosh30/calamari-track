@@ -31,6 +31,11 @@ class ManifestTest(unittest.TestCase):
         (field,) = [f for f in widget["schema"] if f["key"] == "defaultProject"]
         self.assertEqual((field["type"], field["defaultValue"]), ("string", "Check-in"))
 
+    def test_the_break_type_is_break_by_name(self):
+        widget = json.loads((ROOT / "manifest.json").read_text())["barWidget"]
+        (field,) = [f for f in widget["schema"] if f["key"] == "breakType"]
+        self.assertEqual((field["type"], field["defaultValue"]), ("string", "Break"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -31,7 +31,7 @@ class FakeCalamari:
         self.api_key = "test-api-key"
         # Shapes of the real get-projects-for-person / get-break-types-for-person answers.
         self.projects = [{"id": 7, "name": "Check-in"}, {"id": 9, "name": "Kunde A"}]
-        self.break_types = [{"id": 1, "name": "Mittagspause"}, {"id": 2, "name": "Kurze Pause"}]
+        self.break_types = [{"id": 1, "name": "Mittagspause"}, {"id": 3, "name": "Break"}]
         # Force an answer on REST calls: (HTTP status, error code), e.g. (403, None).
         self.rest_failure = None
         # Force the shiftStatus of the clock-in answer, e.g. "FINISHED".
@@ -188,6 +188,8 @@ class _Handler(BaseHTTPRequestHandler):
             return self._send(200, self.fake.break_types)
         if path == "/clockin/terminal/v1/clock-in":
             return self._clock_in(req)
+        if path in ("/clockin/terminal/v1/break-start", "/clockin/terminal/v1/break-stop"):
+            return self._break(path.endswith("start"), req)
         if path == "/clockin/timesheetentries/v1/find":
             return self._find(req)
         if path == "/clockin/shift/status/v1/get-current":
@@ -226,6 +228,28 @@ class _Handler(BaseHTTPRequestHandler):
                             "closed": end is not None, "description": ""})
         # Newest first, like the real answer.
         return self._send(200, list(reversed(entries)))
+
+    def _break(self, start, req):
+        """Like Calamari's terminal: time and a known breakType are required,
+        a break needs a running shift; starting a running break or stopping
+        none is ignored. (The code for "no shift" is a guess.)"""
+        try:
+            datetime.datetime.strptime(req.get("time") or "", "%Y-%m-%dT%H:%M:%S")
+        except ValueError:
+            return self._send(400, {"message": "Incorrect value", "code": None, "field": "time"})
+        if req.get("breakType") not in [t["id"] for t in self.fake.break_types]:
+            return self._send(400, {"message": "Invalid break type", "code": "INVALID_BREAK_TYPE", "field": "breakType"})
+        if not any(end is None for _, _, end in self.fake.shifts):
+            return self._send(400, {"message": "No started shift", "code": "NO_STARTED_SHIFT", "field": None})
+        today, now = self.fake.now.split("T")
+        open_breaks = [i for i, (_, _, end) in enumerate(self.fake.breaks) if end is None]
+        if start and not open_breaks:
+            self.fake.breaks.append((today, now, None))
+        if not start and open_breaks:
+            date, begun, _ = self.fake.breaks[open_breaks[0]]
+            self.fake.breaks[open_breaks[0]] = (date, begun, now)
+        return self._send(200, {"person": {"firstName": "Erika", "lastName": "Mustermann"},
+                                "breakStatus": "STARTED" if start else "FINISHED"})
 
     def _clock_in(self, req):
         """Like Calamari: time is local, without zone or fraction (it answered

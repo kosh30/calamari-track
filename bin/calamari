@@ -46,6 +46,8 @@ DEFAULT_BASE_URL = "https://gateway.eu-west-1.calamari.io"
 DEFAULT_API_URL = "https://cti.calamari.io/api"
 # The project of the own clock-ins, as web and phone set it (widget setting defaultProject).
 DEFAULT_PROJECT = "Check-in"
+# The break type of the own Pauses, the only one Calamari offers (widget setting breakType).
+DEFAULT_BREAK_TYPE = "Break"
 MCP_PATH = "/mcp-server/mcp"
 SCOPE = "mcp"
 KEYRING_SERVICE = "kosh.calamari-tracker"
@@ -744,6 +746,27 @@ def projects(client):
     return id_names(client, "/clockin/projects/v1/get-projects-for-person")
 
 
+def break_types(client):
+    return id_names(client, "/clockin/terminal/v1/get-break-types-for-person")
+
+
+def id_by_name(items, name, code, field, noun, person):
+    """The id of the item named exactly name; else the error code, with the
+    name in the error's field for the plugin's wording."""
+    name = name.strip()
+    found = next((i for i in items if i["name"] == name), None)
+    if found is None:
+        raise HelperError(code, "Calamari has no %s %r for %s" % (noun, name, person), **{field: name})
+    return found["id"]
+
+
+def terminal_time():
+    """Now for the terminal endpoints: local time without zone. Calamari
+    answers "Incorrect value" to Z, +02:00, +0200 and milliseconds (tried
+    2026-09-24)."""
+    return now().strftime("%Y-%m-%dT%H:%M:%S")
+
+
 def id_names(client, path):
     """A REST list of the own person, reduced to [{id, name}]."""
     items = client.call(path)
@@ -759,16 +782,9 @@ def clock_in(args):
     ignores a clock-in during a running shift; its shiftStatus tells how
     things stand afterwards either way."""
     client = RestClient()
-    name = args.project.strip()
-    project = next((p for p in projects(client) if p["name"] == name), None)
-    if project is None:
-        raise HelperError("PROJECT_UNKNOWN", "Calamari has no project %r for %s" % (name, client.person),
-                          project=name)
     body = {
-        # Local time without zone: Calamari answers "Incorrect value" to Z,
-        # +02:00, +0200 and milliseconds (tried 2026-09-24).
-        "time": now().strftime("%Y-%m-%dT%H:%M:%S"),
-        "projectId": project["id"],
+        "time": terminal_time(),
+        "projectId": id_by_name(projects(client), args.project, "PROJECT_UNKNOWN", "project", "project", client.person),
     }
     answer = client.call("/clockin/terminal/v1/clock-in", body)
     log("info", "clock-in: sent %s, got %s" % (json.dumps(body), json.dumps(answer)))
@@ -776,6 +792,34 @@ def clock_in(args):
     if shift not in ("STARTED", "FINISHED"):
         raise HelperError("API_ERROR", "clock-in: unexpected answer %r" % (answer,))
     return {"running": shift == "STARTED"}
+
+
+def break_start(args):
+    return stamp_break(args, "start")
+
+
+def break_stop(args):
+    return stamp_break(args, "stop")
+
+
+def stamp_break(args, which):
+    """Begins or ends a Pause inside the running shift over REST, of the type
+    named by --break-type (docs/adr/0003); the shift goes on. An unknown
+    name stamps nothing; a failure is never retried another way. onBreak is
+    Calamari's breakStatus afterwards."""
+    client = RestClient()
+    body = {
+        "time": terminal_time(),
+        "breakType": id_by_name(break_types(client), args.break_type, "BREAK_TYPE_UNKNOWN", "breakType", "break type",
+                                client.person),
+    }
+    path = "/clockin/terminal/v1/break-" + which
+    answer = client.call(path, body)
+    log("info", "break-%s: sent %s, got %s" % (which, json.dumps(body), json.dumps(answer)))
+    state = answer.get("breakStatus") if isinstance(answer, dict) else None
+    if state not in ("STARTED", "FINISHED"):
+        raise HelperError("API_ERROR", "break-%s: unexpected answer %r" % (which, answer))
+    return {"onBreak": state == "STARTED"}
 
 
 # Calamari's shift status and the plugin's word for it.
@@ -834,7 +878,7 @@ def lookup(args):
     return {
         "person": client.person,
         "projects": projects(client),
-        "breakTypes": id_names(client, "/clockin/terminal/v1/get-break-types-for-person"),
+        "breakTypes": break_types(client),
     }
 
 
@@ -859,12 +903,15 @@ def parse_args(argv):
             sub.add_argument("--date", metavar="YYYY-MM-DD", required=True)
         if name == "clock-in":
             sub.add_argument("--project", metavar="NAME", default=DEFAULT_PROJECT)
+        if name in ("break-start", "break-stop"):
+            sub.add_argument("--break-type", metavar="NAME", default=DEFAULT_BREAK_TYPE)
     return parser.parse_args(argv)
 
 
 COMMANDS = {"login": login, "whoami": whoami, "tools": tools, "status": status, "start-time": start_time,
             "end-time": end_time, "clock-in": clock_in, "clock-out": clock_out, "day-info": day_info,
-            "day-end": day_end, "api-key": api_key, "lookup": lookup}
+            "day-end": day_end, "api-key": api_key, "lookup": lookup,
+            "break-start": break_start, "break-stop": break_stop}
 
 
 def main(argv):

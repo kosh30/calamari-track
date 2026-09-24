@@ -1,6 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { applyDayEnd, applyStamp, breakSinceText, applyStatus, applyStartTime, barView, breakAction, dayOffToday, emptyState, endBreakAsFeierabend, feierabendAction, helperCommand, pendingDayEnd, applyEndTime, restoreState, setDayOff, stampAction, stampLabel, workedMinutes, workedText } from "./shiftclock.mjs"
+import { applyDayEnd, applyStamp, breakSinceText, applyStatus, applyStartTime, barView, breakAction, dayOffToday, emptyState, helperCommand, pendingDayEnd, applyEndTime, restoreState, setDayOff, stampAction, stampLabel, workedMinutes, workedText } from "./shiftclock.mjs"
 import { setIdle } from "./activity.mjs"
 
 const at = (hhmm, date = "2026-09-22") => new Date(`${date}T${hhmm}:00`)
@@ -219,35 +219,43 @@ test("„Heute frei“ gilt nur für den Tag, an dem es gesetzt wurde", () => {
   assert.equal(dayOffToday(state, at("00:01", "2026-09-23")), false)
 })
 
-// Pause
+// Pause (echt, in der laufenden Schicht: break-start / break-stop)
 
-const breakStart = (state, now) => applyStamp(state, "break-start", { ok: true, running: false }, at(now)).state
+const breakStart = (state, now) => applyStamp(state, "break-start", { ok: true, onBreak: true }, at(now)).state
+const breakEnd = (state, now) => applyStamp(state, "break-end", { ok: true, onBreak: false }, at(now)).state
 
-test("eine Pause stempelt aus, ist aber kein Feierabend, und die Bar zeigt ihre Dauer", () => {
+test("eine Pause unterbricht die Schicht, beendet sie nicht, und die Bar zeigt ihre Dauer", () => {
   const state = breakStart(clockIn(emptyState(), "09:00"), "12:00")
+  assert.equal(state.running, true)
+  assert.equal(state.onBreak, true)
+  assert.equal(state.startedAt, "09:00")
   assert.equal(state.breakSince, "12:00")
   assert.equal(state.breakStartUnknown, false)
   assert.equal(state.clockedOutAt, null)
   assert.deepEqual(view(state, "12:12"), { kind: "break", text: "0:12" })
 })
 
-test("Pause beenden stempelt ein, und die Dauer zählt ab dann", () => {
-  let state = breakStart(clockIn(emptyState(), "09:00"), "12:00")
-  state = applyStamp(state, "break-end", { ok: true, running: true }, at("12:30")).state
+test("nach Pause beenden läuft die Schicht mit ihrer Startzeit weiter, die Pause zählt nicht", () => {
+  const state = breakEnd(breakStart(clockIn(emptyState(), "09:00"), "12:00"), "12:30")
+  assert.equal(state.onBreak, false)
   assert.equal(state.breakSince, null)
-  assert.deepEqual(view(state, "12:31"), { kind: "running", text: "0:01" })
+  assert.deepEqual(view(state, "12:31"), { kind: "running", text: "3:31" })
+  assert.equal(workedMinutes(state, at("13:00")), 240 - 30)
 })
 
-test("die Pause übersteht einen Neustart der Shell", () => {
-  const state = breakStart(clockIn(emptyState(), "09:00"), "12:00")
-  assert.deepEqual(view(restoreState(JSON.stringify(state)), "12:10"), { kind: "break", text: "0:10" })
+test("die Pause übersteht einen Neustart der Shell, und der Status bestätigt sie", () => {
+  let state = restoreState(JSON.stringify(breakStart(clockIn(emptyState(), "09:00"), "12:00")))
+  assert.deepEqual(view(state, "12:10"), { kind: "break", text: "0:10" })
+  state = applyStatus(state, "break", at("12:10"), { startedAt: "09:00", breakSince: "12:00" }).state
+  assert.deepEqual(view(state, "12:10"), { kind: "break", text: "0:10" })
 })
 
 test("wer die Pause im Web beendet, ist wieder in der Schicht", () => {
   const state = breakStart(clockIn(emptyState(), "09:00"), "12:00")
   const r = applyStatus(state, "running", at("12:40"))
   assert.equal(r.state.breakSince, null)
-  assert.deepEqual(r.startTimeQuery, { after: "12:01" })
+  assert.equal(r.state.startedAt, "09:00")
+  assert.equal(r.startTimeQuery, null)
 })
 
 test("während einer Schicht bietet das Panel die Pause an, in der Pause ihr Ende", () => {
@@ -256,33 +264,50 @@ test("während einer Schicht bietet das Panel die Pause an, in der Pause ihr End
   assert.equal(stampAction({ kind: "break", text: "0:10" }), "break-end")
 })
 
-test("aus einer Pause lässt sich direkt in den Feierabend gehen, ohne zu stempeln", () => {
-  const state = endBreakAsFeierabend(breakStart(clockIn(emptyState(), "09:00"), "15:00"), at("15:20"))
-  assert.equal(state.breakSince, null)
-  assert.equal(state.clockedOutAt, "15:00")
-  assert.deepEqual(view(state, "15:20"), { kind: "idle", text: "" })
+test("eine fehlgeschlagene Pause nennt die Aktion und lässt den Status stehen", () => {
+  const state = clockIn(emptyState(), "09:00")
+  const fail = action => applyStamp(state, action, { ok: false, error: { code: "NETWORK", message: "" } }, at("12:00"))
+  assert.match(fail("break-start").error, /^Pause beginnen fehlgeschlagen/)
+  assert.match(fail("break-end").error, /^Pause beenden fehlgeschlagen/)
+  assert.equal(fail("break-start").state, state)
 })
 
-test("eine fehlgeschlagene Pause nennt die Aktion", () => {
-  const fail = action => applyStamp(emptyState(), action, { ok: false, error: { code: "NETWORK", message: "" } }, at("12:00")).error
-  assert.match(fail("break-start"), /^Pause beginnen fehlgeschlagen/)
-  assert.match(fail("break-end"), /^Pause beenden fehlgeschlagen/)
+test("ein unbekannter Pausentyp nennt seinen Namen", () => {
+  const r = applyStamp(clockIn(emptyState(), "09:00"), "break-start",
+    { ok: false, error: { code: "BREAK_TYPE_UNKNOWN", message: "raw", breakType: "Siesta" } }, at("12:00"))
+  assert.equal(r.error, "Pause beginnen fehlgeschlagen: Pausentyp „Siesta“ gibt es in Calamari nicht. Es wird nichts nachgereicht.")
 })
 
-test("Pausen-Aktionen stempeln bei Calamari aus bzw. ein", () => {
-  assert.deepEqual(helperCommand("break-start"), ["clock-out"])
-  assert.deepEqual(helperCommand("break-end"), ["clock-in"])
-  assert.deepEqual(helperCommand("clock-in"), ["clock-in"])
+test("meldet Calamari nach Pause beginnen keine Pause, sagt das Panel es und fragt nach", () => {
+  const state = clockIn(emptyState(), "09:00")
+  const r = applyStamp(state, "break-start", { ok: true, onBreak: false }, at("12:00"))
+  assert.equal(view(r.state, "12:00").kind, "running")
+  assert.equal(r.error, "Pause beginnen: Calamari meldet keine Pause. Bitte im Web prüfen.")
+  assert.equal(r.pollNow, true)
 })
 
-test("Einstempeln nennt dem Helper das Standard-Projekt, leer heißt seine Vorgabe", () => {
-  assert.deepEqual(helperCommand("clock-in", "Kunde A"), ["clock-in", "--project", "Kunde A"])
-  assert.deepEqual(helperCommand("break-end", "Check-in"), ["clock-in", "--project", "Check-in"])
-  assert.deepEqual(helperCommand("clock-in", ""), ["clock-in"])
-  assert.deepEqual(helperCommand("clock-in", "  "), ["clock-in"])
-  assert.deepEqual(helperCommand("clock-in", " Kunde A "), ["clock-in", "--project", "Kunde A"])
-  assert.deepEqual(helperCommand("clock-out", "Kunde A"), ["clock-out"])
-  assert.deepEqual(helperCommand("break-start", "Kunde A"), ["clock-out"])
+test("meldet Calamari nach Pause beenden weiter eine Pause, bleibt sie und das Panel sagt es", () => {
+  const state = breakStart(clockIn(emptyState(), "09:00"), "12:00")
+  const r = applyStamp(state, "break-end", { ok: true, onBreak: true }, at("12:30"))
+  assert.deepEqual(view(r.state, "12:30"), { kind: "break", text: "0:30" })
+  assert.equal(r.error, "Pause beenden: Calamari meldet weiter eine Pause. Bitte im Web prüfen.")
+  assert.equal(r.pollNow, true)
+})
+
+test("jede Stempel-Aktion hat ihren Helper-Befehl mit den Namen aus den Einstellungen", () => {
+  const settings = { defaultProject: "Kunde A", breakType: "Mittagspause" }
+  assert.deepEqual(helperCommand("clock-in", settings), ["clock-in", "--project", "Kunde A"])
+  assert.deepEqual(helperCommand("clock-out", settings), ["clock-out"])
+  assert.deepEqual(helperCommand("break-start", settings), ["break-start", "--break-type", "Mittagspause"])
+  assert.deepEqual(helperCommand("break-end", settings), ["break-stop", "--break-type", "Mittagspause"])
+})
+
+test("leere Namen in den Einstellungen heißen die Vorgabe des Helpers", () => {
+  assert.deepEqual(helperCommand("clock-in", {}), ["clock-in"])
+  assert.deepEqual(helperCommand("clock-in", { defaultProject: "  " }), ["clock-in"])
+  assert.deepEqual(helperCommand("clock-in", { defaultProject: " Kunde A " }), ["clock-in", "--project", "Kunde A"])
+  assert.deepEqual(helperCommand("break-start", { breakType: "" }), ["break-start"])
+  assert.deepEqual(helperCommand("break-end", null), ["break-stop"])
 })
 
 test("lief beim Ausstempeln gar keine Schicht, ist es kein Feierabend und das Panel sagt es", () => {
@@ -295,26 +320,10 @@ test("lief beim Ausstempeln gar keine Schicht, ist es kein Feierabend und das Pa
   assert.equal(workedMinutes(r.state, at("16:00")), 0)
 })
 
-test("lief beim Pausenbeginn gar keine Schicht, gibt es keine Pause", () => {
-  const r = applyStamp(clockIn(emptyState(), "09:00"), "break-start", { ok: true, running: false, stamped: false }, at("12:00"))
-  assert.deepEqual(view(r.state, "12:00"), { kind: "idle", text: "" })
-})
-
 test("die Buttons heißen wie die Aktionen", () => {
   assert.equal(stampLabel("break-start"), "Pause beginnen")
   assert.equal(stampLabel("break-end"), "Pause beenden")
   assert.equal(stampLabel("clock-out"), "Ausstempeln")
-})
-
-test("ohne laufende Pause ändert „Feierabend“ nichts", () => {
-  const state = clockOut(clockIn(emptyState(), "09:00"), "15:00")
-  assert.deepEqual(endBreakAsFeierabend(state, at("15:20")), state)
-})
-
-test("„Feierabend“ bietet das Panel nur während einer Pause an", () => {
-  assert.equal(feierabendAction({ kind: "break", text: "0:10" }), "end-break")
-  assert.equal(feierabendAction({ kind: "running", text: "1:00" }), null)
-  assert.equal(feierabendAction({ kind: "idle", text: "" }), null)
 })
 
 test("lief gestern zuletzt eine Schicht, fragt das Plugin morgens nach dem Ende des Vortags", () => {
@@ -376,7 +385,7 @@ test("eine Antwort auf eine andere Frage ändert nichts", () => {
 test("die Gesamtzeit heute zählt beendete und laufende Schichten, auch vor einer Pause", () => {
   let state = clockIn(applyStatus(emptyState(), "stopped", at("08:55")).state, "09:00")
   state = breakStart(state, "12:00")
-  state = applyStamp(state, "break-end", { ok: true, running: true }, at("12:30")).state
+  state = breakEnd(state, "12:30")
   assert.equal(workedMinutes(state, at("13:00")), 180 + 30)
   state = clockOut(state, "16:30")
   assert.equal(workedMinutes(state, at("18:00")), 180 + 240)
@@ -509,12 +518,6 @@ test("die Zeit einer fremden Pause zählt nicht zur Gesamtzeit heute", () => {
   assert.equal(workedMinutes(state, at("12:30")), 180)
 })
 
-test("aus einer fremden Pause bietet das Panel keinen Feierabend ohne Stempeln an", () => {
-  const state = seenBreak("09:00", "12:10")
-  assert.equal(feierabendAction(view(state, "12:20"), state), null)
-  assert.equal(endBreakAsFeierabend(state, at("12:20")), state)
-})
-
 test("nach einer fremden Pause zählt ihre Zeit weiter nicht zur Gesamtzeit heute", () => {
   let state = seenBreak("09:00", "12:00")
   state = applyStatus(state, "running", at("12:30")).state
@@ -526,22 +529,17 @@ test("nach einer fremden Pause zählt ihre Zeit weiter nicht zur Gesamtzeit heut
   assert.equal(workedMinutes(state, at("15:00")), 305 - 30 - 10)
 })
 
-test("meldet Calamari nach Pause beenden weiter eine Pause, zählt sie ab ihrem ersten Sehen weiter", () => {
-  let state = applyStamp(seenBreak("09:00", "12:10"), "break-end", { ok: true, running: true }, at("12:30")).state
-  state = applyStatus(state, "break", at("12:33")).state
-  assert.deepEqual(view(state, "12:40"), { kind: "break", text: "0:30" })
-})
-
 test("die Pause nennt ihren Beginn, oder dass er nicht bekannt ist", () => {
   assert.equal(breakSinceText(breakStart(clockIn(emptyState(), "09:00"), "12:00")), "12:00")
   assert.equal(breakSinceText(seenBreak("09:00", "12:10")), "spätestens 12:10")
 })
 
 test("Pause beenden aus einer fremden Pause behält die Startzeit der Schicht", () => {
-  const r = applyStamp(seenBreak("09:00", "12:10"), "break-end", { ok: true, running: true }, at("12:30"))
-  assert.equal(r.state.startedAt, "09:00")
-  assert.equal(r.state.onBreak, false)
-  assert.equal(view(r.state, "12:31").kind, "running")
+  const state = breakEnd(seenBreak("09:00", "12:10"), "12:30")
+  assert.equal(state.startedAt, "09:00")
+  assert.equal(state.onBreak, false)
+  assert.equal(view(state, "12:31").kind, "running")
+  assert.equal(workedMinutes(state, at("12:30")), 190)
 })
 
 // Beginn von Schicht und Pause aus Calamaris Zeiteintrag

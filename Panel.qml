@@ -23,8 +23,6 @@ Panel {
     readonly property var breakAction: authState === "ok" && view !== null ? ShiftClock.breakAction(view) : null
     // After the final warning: the countdown to the auto-close.
     readonly property string countdown: service ? Reminders.countdownText(service.decision, service.now) : ""
-    readonly property var feierabendAction: authState === "ok" && view !== null && service
-        ? ShiftClock.feierabendAction(view, service.shiftState) : null
 
     // A button's text, with "…" while its own action runs.
     // During the countdown clocking out is "Jetzt ausstempeln".
@@ -181,15 +179,6 @@ Panel {
                         text: root.actionText(root.breakAction)
                         bordered: true
                         onClicked: root.service.stamp(root.breakAction)
-                    }
-
-                    Button {
-                        visible: root.feierabendAction !== null
-                        enabled: root.service !== null && !root.service.busy
-                        text: "Feierabend"
-                        tooltipText: "Die Pause wird zum Feierabend, gestempelt wird nichts"
-                        bordered: true
-                        onClicked: root.service.endBreakAsFeierabend()
                     }
 
                     Button {

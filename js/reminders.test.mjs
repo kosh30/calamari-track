@@ -48,7 +48,7 @@ test("vor der Kernzeit wird zu ihrem Beginn wieder geprüft", () => {
 })
 
 const stamp = (state, action, now) =>
-  applyStamp(state, action, { ok: true, running: action === "clock-in" || action === "break-end" }, at(now)).state
+  applyStamp(state, action, { ok: true, running: action === "clock-in", onBreak: action === "break-start" }, at(now)).state
 
 test("nach einem Feierabend vor Ende der Kernzeit kommt keine Stempel-Erinnerung mehr", () => {
   const state = stamp(stamp(noShift("08:55"), "clock-in", "09:00"), "clock-out", "15:30")
@@ -239,7 +239,7 @@ test("auch am Wochenende erinnert eine lange Pause", () => {
   const saturday = { date: "2026-09-26", workingDay: false, coreStart: null, coreEnd: null, holiday: null, absence: null }
   let state = applyStatus(emptyState(), "stopped", at("09:55", "2026-09-26")).state
   state = applyStamp(state, "clock-in", { ok: true, running: true }, at("10:00", "2026-09-26")).state
-  state = applyStamp(state, "break-start", { ok: true, running: false }, at("11:00", "2026-09-26")).state
+  state = applyStamp(state, "break-start", { ok: true, onBreak: true }, at("11:00", "2026-09-26")).state
   assert.deepEqual(types(decide(at("11:30", "2026-09-26"), saturday, state, breakConfig)), ["break-reminder"])
 })
 

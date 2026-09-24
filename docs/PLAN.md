@@ -21,7 +21,7 @@ Der Plan besteht aus vertikalen Scheiben. Jede Scheibe endet mit etwas, das man 
 - **`bin/calamari`** ist die einzige Stelle, die mit Calamari spricht. Sie kümmert sich um OAuth, das MCP-Protokoll (Streamable HTTP, JSON-RPC) und die Übersetzung der Tools in einfache Befehle. Die Ausgabe ist immer JSON, `{"ok":false,"error":{"code":…}}` bei Fehlern.
 - **`Service.qml`** hält den Laufzeitzustand, ruft den Helfer auf, misst die Aktivität und verschickt Benachrichtigungen. Er trifft selbst keine Entscheidungen, sondern fragt dafür die JS-Logik.
 - **`js/*.mjs`** enthält reine Funktionen ohne Qt, die mit `node --test` getestet werden. Kernstück ist `decide(now, day, state, config) → { barState, actions[] }`.
-- **Lokaler Zustand** liegt in `$XDG_STATE_HOME/calamari-tracker/state.json` (atomic write): Pausenmarkierung, Feierabend, „Heute frei“, verschickte Erinnerungen, letzte Aktivität, bekannte Startzeit, Verschiebungen durch „+1 h“.
+- **Lokaler Zustand** liegt in `$XDG_STATE_HOME/calamari-tracker/state.json` (atomic write): laufende Pause, Feierabend, „Heute frei“, verschickte Erinnerungen, letzte Aktivität, bekannte Startzeit, Verschiebungen durch „+1 h“.
 - **Secrets** liegen im Keyring über `secret-tool` (`service kosh.calamari-tracker`, `key client` / `key tokens`).
 
 ## Scheibe 0: Gerüst
@@ -73,10 +73,10 @@ Der Plan besteht aus vertikalen Scheiben. Jede Scheibe endet mit etwas, das man 
 - Inhalt:
   - Status, Schichtdauer, Gesamtzeit heute (falls in Scheibe 2 machbar)
   - Einstempeln/Ausstempeln (Ausstempeln = Feierabend)
-  - Pause beginnen/beenden, nur bei laufender Schicht (= Ausstempeln + Markierung bzw. Einstempeln)
+  - Pause beginnen/beenden, nur bei laufender Schicht (ursprünglich Ausstempeln + Markierung bzw. Einstempeln; seit ADR 0003 echte Pause per REST `break-start`/`break-stop`)
   - „Heute frei“
   - Fehlerzeile mit „Neu anmelden“, die `bin/calamari login` startet
-- Die Pausenmarkierung und der Feierabend werden im State gespeichert und überleben einen Neustart der Shell.
+- Die laufende Pause und der Feierabend werden im State gespeichert und überleben einen Neustart der Shell.
 
 **Fertig, wenn** alle Buttons wirken und die Pause einen Shell-Neustart übersteht.
 

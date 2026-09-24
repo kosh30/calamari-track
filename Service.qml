@@ -110,8 +110,9 @@ Item {
     }
 
     // "clock-in", "clock-out", "break-start" or "break-end", always now. A
-    // clock-in goes over REST with the default project (docs/adr/0003). A
-    // failure is shown, never queued, and never retried another way.
+    // clock-in (with the default project) and the Pause (with the break
+    // type) go over REST, docs/adr/0003. A failure is shown, never queued,
+    // and never retried another way.
     // notice: the correction hint ({ type, lastActivity }, see
     // js/reminders.mjs notification) to send once the clock-out went through.
     function stamp(action, notice) {
@@ -121,14 +122,8 @@ Item {
         stampProc.action = action
         stampProc.notice = notice || null
         stampProc.pollWhenDone = false
-        stampProc.command = [root.helper].concat(ShiftClock.helperCommand(action, root.setting("defaultProject", "")))
+        stampProc.command = [root.helper].concat(ShiftClock.helperCommand(action, root.config))
         stampProc.running = true
-    }
-
-    // From a Pause straight into the Feierabend; nothing to stamp.
-    function endBreakAsFeierabend() {
-        if (root.stateLoaded)
-            root.setShiftState(ShiftClock.endBreakAsFeierabend(root.shiftState, new Date()))
     }
 
     // The panel switch "Heute frei".

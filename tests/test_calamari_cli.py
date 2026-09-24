@@ -407,6 +407,84 @@ class CalamariCliTest(unittest.TestCase):
         self.assertNotIn("clockIn", [n for n, _ in self.fake.tool_calls])
         self.assertEqual(self.fake.shifts, [])
 
+    # Pause (docs/adr/0003)
+
+    def break_calls(self, which):
+        return [req for path, req in self.fake.rest_calls if path == "/clockin/terminal/v1/break-" + which]
+
+    def test_break_start_begins_a_break_of_the_default_type_inside_the_shift(self):
+        self.login()
+        self.store_api_key()
+        self.fake.now = "2026-09-22T12:00:30"
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+
+        code, out = self.run_helper("break-start")
+
+        self.assertEqual((code, out), (0, {"ok": True, "onBreak": True}))
+        (req,) = self.break_calls("start")
+        self.assertEqual(req, {"person": "erika@example.com", "time": "2026-09-22T12:00:30", "breakType": 3})
+        # The shift goes on; no clock-out.
+        self.assertEqual(self.fake.shifts, [("2026-09-22", "09:40:30", None)])
+        self.assertEqual(self.fake.breaks, [("2026-09-22", "12:00:30", None)])
+        self.assertNotIn("clockOut", [n for n, _ in self.fake.tool_calls])
+
+    def test_break_stop_ends_the_break_and_the_shift_goes_on(self):
+        self.login()
+        self.store_api_key()
+        self.fake.now = "2026-09-22T12:30:10"
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+        self.fake.breaks = [("2026-09-22", "12:00:30", None)]
+
+        code, out = self.run_helper("break-stop")
+
+        self.assertEqual((code, out), (0, {"ok": True, "onBreak": False}))
+        self.assertEqual(self.break_calls("stop")[0]["breakType"], 3)
+        self.assertEqual(self.fake.breaks, [("2026-09-22", "12:00:30", "12:30:10")])
+        self.assertEqual(self.fake.shifts, [("2026-09-22", "09:40:30", None)])
+
+    def test_break_resolves_the_named_break_type(self):
+        self.login()
+        self.store_api_key()
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+
+        code, out = self.run_helper("break-start", "--break-type", "Mittagspause")
+
+        self.assertEqual(code, 0, out)
+        self.assertEqual(self.break_calls("start")[0]["breakType"], 1)
+
+    def test_break_with_an_unknown_type_stamps_nothing(self):
+        self.login()
+        self.store_api_key()
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+
+        code, out = self.run_helper("break-start", "--break-type", "Siesta")
+
+        self.assert_error((code, out), "BREAK_TYPE_UNKNOWN")
+        self.assertIn("Siesta", out["error"]["message"])
+        self.assertEqual(out["error"]["breakType"], "Siesta")
+        self.assertEqual((self.break_calls("start"), self.fake.breaks), ([], []))
+
+    def test_a_failed_break_is_not_retried_another_way(self):
+        self.login()
+        self.store_api_key()
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+        self.fake.rest_failure = (400, "API_TERMINAL_NOT_AVAILABLE")
+
+        for command in ("break-start", "break-stop"):
+            with self.subTest(command):
+                self.assert_error(self.run_helper(command), "API_TERMINAL_MISSING")
+        self.assertEqual(self.fake.breaks, [])
+        self.assertEqual([n for n, _ in self.fake.tool_calls if n != "getMyProfile"], [])
+
+    def test_a_break_without_running_shift_is_calamaris_error(self):
+        self.login()
+        self.store_api_key()
+
+        code, out = self.run_helper("break-start")
+
+        self.assert_error((code, out), "API_ERROR")
+        self.assertIn("NO_STARTED_SHIFT", out["error"]["message"])
+
     def test_clock_out_ends_the_running_shift(self):
         self.login()
         self.fake.now = "2026-09-22T17:30:30"
@@ -591,7 +669,7 @@ class CalamariCliTest(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertEqual(out["person"], "erika@example.com")
         self.assertEqual(out["projects"], [{"id": 7, "name": "Check-in"}, {"id": 9, "name": "Kunde A"}])
-        self.assertEqual(out["breakTypes"], [{"id": 1, "name": "Mittagspause"}, {"id": 2, "name": "Kurze Pause"}])
+        self.assertEqual(out["breakTypes"], [{"id": 1, "name": "Mittagspause"}, {"id": 3, "name": "Break"}])
         self.assertEqual(self.fake.rest_calls, [
             ("/clockin/projects/v1/get-projects-for-person", {"person": "erika@example.com"}),
             ("/clockin/terminal/v1/get-break-types-for-person", {"person": "erika@example.com"}),

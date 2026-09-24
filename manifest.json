@@ -31,6 +31,7 @@
       "webUrl": "",
       "apiUrl": "https://cti.calamari.io/api",
       "defaultProject": "Check-in",
+      "breakType": "Break",
       "coreMonday": "",
       "coreTuesday": "",
       "coreWednesday": "",
@@ -129,6 +130,12 @@
         "type": "string",
         "label": "Standard-Projekt beim Einstempeln (Name in Calamari, leer = Check-in)",
         "defaultValue": "Check-in"
+      },
+      {
+        "key": "breakType",
+        "type": "string",
+        "label": "Pausentyp (Name in Calamari, leer = Break)",
+        "defaultValue": "Break"
       },
       {
         "key": "coreMonday",
