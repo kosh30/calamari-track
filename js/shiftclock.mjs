@@ -12,7 +12,8 @@
 //   clockedOutAt  HH:MM of the own clock-out that began the Feierabend today
 //   breakSince HH:MM of the own clock-out that began the running Pause
 //   stoppedAt  HH:MM of the last own clock-out of any kind (status lag)
-//   overnight  true while the running shift began on an earlier day
+//   unclosed   YYYY-MM-DD of a day the plugin left with a running shift,
+//              until `day-end` said how that day ended (pendingDayEnd)
 //   shifts     [{ start, end }] HH:MM of today's ended shifts the plugin saw
 //              (the observed total of today, see workedMinutes)
 //   pendingEnd HH:MM start of a shift that ended outside the plugin and
@@ -22,13 +23,15 @@
 //   postponedTo  HH:MM the next final warning was moved to by "+1 h"
 //              (js/reminders.mjs postpone)
 //   sent       { reminder type: HH:MM last sent today }, see js/reminders.mjs
-//   lastSeen, idle, awaySince  the user's activity, see js/activity.mjs;
-//              unlike the rest they carry over to the next day
+//   lastSeen, idle, awaySince, awayUntil  the user's activity, see
+//              js/activity.mjs; unlike the rest they carry over to the
+//              next day
 //
 // Known limit: the start of a follow-up shift is only found if the plugin
 // saw the gap before it (searchAfter). A break the plugin never observed (shell
 // off, suspend) leaves the cached start of the earlier shift.
 
+import { awayCovers, lastActivity } from "./activity.mjs"
 import { minuteOfDay, pad, toHhmm, toMinutes, ymd } from "./daytime.mjs"
 
 // `status` looks back this many minutes, so a shift that just ended can
@@ -36,33 +39,35 @@ import { minuteOfDay, pad, toHhmm, toMinutes, ymd } from "./daytime.mjs"
 const STATUS_WINDOW = 2
 
 export function emptyState() {
-  return { date: "", running: null, startedAt: null, searchAfter: null, clockedOutAt: null, breakSince: null, stoppedAt: null, overnight: false, stampedToday: false, dayOff: false, postponedTo: null, sent: {}, shifts: [], pendingEnd: null,
-    lastSeen: null, idle: false, awaySince: null }
+  return { date: "", running: null, startedAt: null, searchAfter: null, clockedOutAt: null, breakSince: null, stoppedAt: null, unclosed: null, stampedToday: false, dayOff: false, postponedTo: null, sent: {}, shifts: [], pendingEnd: null,
+    lastSeen: null, idle: false, awaySince: null, awayUntil: null }
 }
 
 function forToday(state, now) {
   const today = ymd(now)
   if (state && state.date === today) return Object.assign({}, state)
-  // A new day: yesterday's polls say nothing about today's shift, but
-  // whether one still runs and when the user was last active still hold.
+  // A new day: yesterday's polls say nothing about today, and no shift
+  // survives midnight (Calamari ends an open one at 23:59), so the status
+  // is unknown again. A day left with a running shift is noted for
+  // pendingDayEnd; when the user was last active still holds.
   const carried = emptyState()
-  for (const key of ["running", "lastSeen", "idle", "awaySince"])
+  for (const key of ["lastSeen", "idle", "awaySince", "awayUntil"])
     if (state && key in state) carried[key] = state[key]
+  if (state && state.running === true && state.date) carried.unclosed = state.date
+  else if (state && state.unclosed) carried.unclosed = state.unclosed
   return Object.assign(carried, { date: today })
 }
 
-// Applies an answer of `status` (overnight: `status --overnight` found
-// yesterday's shift still running). Returns { state, startTimeQuery,
+// Applies an answer of `status`. Returns { state, startTimeQuery,
 // endTimeQuery }: startTimeQuery is null or { after: "HH:MM" | null }, the
 // --after argument for `start-time` when the start of the running shift is
 // unknown; endTimeQuery is null or { after: "HH:MM" }, for `end-time` when
 // a shift of known start ended outside the plugin (web, phone).
-export function applyStatus(state, running, now, overnight = false) {
+export function applyStatus(state, running, now) {
   const next = forToday(state, now)
-  const before = { running: next.running, startedAt: next.startedAt, overnight: next.overnight }
-  // Right after the own clock-out (Feierabend, Pause, overnight close) the
-  // ended shift still overlaps the status window; the clock-out is the
-  // newer truth.
+  const before = { running: next.running, startedAt: next.startedAt }
+  // Right after the own clock-out (Feierabend, Pause) the ended shift still
+  // overlaps the status window; the clock-out is the newer truth.
   if (running && next.stoppedAt && minuteOfDay(now) - toMinutes(next.stoppedAt) <= STATUS_WINDOW)
     running = false
   // In the minute of the own clock-in the status window, which ends at the
@@ -71,22 +76,19 @@ export function applyStatus(state, running, now, overnight = false) {
   if (!running && next.running && next.startedAt && minuteOfDay(now) === toMinutes(next.startedAt))
     running = true
   next.running = running
-  next.overnight = false
   if (!running) {
     next.startedAt = null
     // No shift overlapped the window, so any earlier one ended before it.
     next.searchAfter = laterOf(next.searchAfter, toHhmm(Math.max(minuteOfDay(now) - STATUS_WINDOW, 0)))
     // A shift of known start ended outside the plugin (web, phone); asked
     // again on every poll until end-time answered.
-    if (before.running === true && before.startedAt && !before.overnight) next.pendingEnd = before.startedAt
+    if (before.running === true && before.startedAt) next.pendingEnd = before.startedAt
     return { state: next, startTimeQuery: null, endTimeQuery: next.pendingEnd ? { after: next.pendingEnd } : null }
   }
   // A shift runs again (stamped in the web or on the phone): the
   // Feierabend or the Pause is over.
   next.clockedOutAt = null
   next.breakSince = null
-  // Yesterday's shift is no stamp of today; it is to be closed at once.
-  if (overnight) return { state: Object.assign(next, { overnight: true }), startTimeQuery: null, endTimeQuery: null }
   next.stampedToday = true
   if (next.startedAt) return { state: next, startTimeQuery: null, endTimeQuery: null }
   return { state: next, startTimeQuery: { after: next.searchAfter }, endTimeQuery: null }
@@ -112,20 +114,41 @@ export function workedText(state, now) {
 }
 
 // Minutes worked today as far as the plugin saw: its ended shifts plus
-// the running one (yesterday's overnight shift does not count).
+// the running one.
 export function workedMinutes(state, now) {
   if (state.date !== ymd(now)) return 0
   let total = 0
   for (const shift of state.shifts) total += toMinutes(shift.end) - toMinutes(shift.start)
-  if (state.running && state.startedAt && !state.overnight)
+  if (state.running && state.startedAt)
     total += Math.max(minuteOfDay(now) - toMinutes(state.startedAt), 0)
   return total
 }
 
-// Whether the next `status` needs --overnight: a shift was running in the
-// state of an earlier day, or yesterday's shift is still open.
-export function needsOvernightCheck(state, now) {
-  return state.running === true && (state.date !== ymd(now) || state.overnight === true)
+// The minute Calamari ends an open shift in (docs/adr/0002); the day-end
+// question asks whether the shift still reached it.
+const CLOSE_MOMENT = "T23:58"
+
+// The date to ask `day-end` for: a day the plugin left with a running
+// shift, until the answer came. Null when there is nothing to ask.
+export function pendingDayEnd(state, now) {
+  if (state.date && state.date !== ymd(now) && state.running === true) return state.date
+  return state.unclosed || null
+}
+
+// Records the answer of `day-end` for that date and returns { state,
+// notice }. A shift that ran to the end of the day was ended by Calamari
+// at 23:59, not by the user, so its end time is wrong: the notice asks for
+// the correction (js/reminders.mjs notification). One the user ended
+// themselves needs nothing. An answer to another question changes nothing.
+export function applyDayEnd(state, date, ranToMidnight, now) {
+  if (pendingDayEnd(state, now) !== date) return { state, notice: null }
+  const next = Object.assign(forToday(state, now), { unclosed: null })
+  if (!ranToMidnight) return { state: next, notice: null }
+  // The last activity is an end time only if the user was away while
+  // Calamari closed. Someone who came back and kept working gets the hint
+  // without one: their earlier absence says nothing about the end.
+  const away = awayCovers(state, date + CLOSE_MOMENT) ? lastActivity(state) : null
+  return { state: next, notice: { type: "day-end-closed", date, lastActivity: away } }
 }
 
 function laterOf(a, b) {
@@ -161,10 +184,10 @@ function stopShift(state, now) {
   const next = forToday(state, now)
   const minute = minuteOfDay(now)
   // The own clock-out knows the end of today's shift right away.
-  if (next.running && next.startedAt && !next.overnight) addShift(next, next.startedAt, toHhmm(minute))
+  if (next.running && next.startedAt) addShift(next, next.startedAt, toHhmm(minute))
   // The ended shift reaches into the minute of the clock-out.
   return Object.assign(next, {
-    running: false, startedAt: null, clockedOutAt: null, breakSince: null, overnight: false,
+    running: false, startedAt: null, clockedOutAt: null, breakSince: null,
     stoppedAt: toHhmm(minute), searchAfter: toHhmm(Math.min(minute + 1, 24 * 60 - 1)),
   })
 }
@@ -226,7 +249,6 @@ function duration(since, now) {
 const STAMP_ACTIONS = {
   "clock-in": "Einstempeln", "clock-out": "Ausstempeln",
   "break-start": "Pause beginnen", "break-end": "Pause beenden",
-  "overnight-close": "Übernacht-Abschluss",
 }
 
 // The panel's button text for a stamp action.
@@ -237,7 +259,6 @@ export function stampLabel(action) {
 // The helper command behind a stamp action: a Pause is a clock-out plus
 // the local mark, its end a clock-in (ADR 0001).
 export function helperCommand(action) {
-  if (action === "overnight-close") return ["clock-out", "--overnight"]
   if (action === "break-start") return ["clock-out"]
   return [action === "break-end" ? "clock-in" : action]
 }
@@ -292,9 +313,7 @@ export function applyStamp(state, action, out, now) {
     }
   }
   if (helperCommand(action)[0] === "clock-out") {
-    // The overnight close ends yesterday's shift; today has no Feierabend yet.
-    const next = action === "break-start" ? applyBreakStart(state, now)
-      : action === "overnight-close" ? stopShift(state, now) : applyClockOut(state, now)
+    const next = action === "break-start" ? applyBreakStart(state, now) : applyClockOut(state, now)
     return { state: next, error: "", pollNow: false }
   }
   if (out.running) return { state: applyClockIn(state, now), error: "", pollNow: false }

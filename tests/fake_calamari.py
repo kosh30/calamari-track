@@ -289,7 +289,8 @@ class _Handler(BaseHTTPRequestHandler):
         """clockIn opens an entry at now, clockOut ends the running one. Both
         refuse when there is nothing to do, as a stamp clock would."""
         today, now = self.fake.now.split("T")
-        # A shift begun yesterday may still run (overnight case).
+        # An entry of an earlier day can still be open here; whether one
+        # exists is up to the test (Calamari ends one at 23:59, ADR 0002).
         running = [i for i, (_, _, end) in enumerate(self.fake.shifts) if end is None]
         if (name == "clockIn") == bool(running):
             text = "shift already started" if running else "no started shift"

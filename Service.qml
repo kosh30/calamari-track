@@ -76,7 +76,7 @@ Item {
     property string stampError: ""
     readonly property bool stamping: stampProc.running
     readonly property string stampingAction: stampProc.running ? stampProc.action : ""
-    readonly property bool busy: stampProc.running || statusProc.running || startTimeProc.running || endTimeProc.running
+    readonly property bool busy: stampProc.running || statusProc.running || startTimeProc.running || endTimeProc.running || dayEndProc.running
 
     readonly property int pollInterval: root.setting("pollIntervalMinutes", 3) * 60 * 1000
     readonly property string helper: Qt.resolvedUrl("bin/calamari").toString().replace(/^file:\/\//, "")
@@ -92,8 +92,17 @@ Item {
     function poll() {
         if (!root.stateLoaded || root.busy)
             return
-        var overnight = ShiftClock.needsOvernightCheck(root.shiftState, new Date())
-        statusProc.command = overnight ? [root.helper, "status", "--overnight"] : [root.helper, "status"]
+        // A day the plugin left with a running shift is settled first: no
+        // shift survives midnight, but its end time may need a correction.
+        // A failed question waits for the next tick, so it never keeps the
+        // status from being asked (waking up, the network is often late).
+        var pending = dayEndProc.blocked ? null : ShiftClock.pendingDayEnd(root.shiftState, new Date())
+        if (pending) {
+            dayEndProc.date = pending
+            dayEndProc.command = [root.helper, "day-end", "--date", pending]
+            dayEndProc.running = true
+            return
+        }
         statusProc.running = true
     }
 
@@ -232,7 +241,7 @@ Item {
         if (root.authState !== "ok")
             root.refreshIdentity()
         root.fetchDayInfo()
-        var result = ShiftClock.applyStatus(root.shiftState, out.running, root.now, out.overnight === true)
+        var result = ShiftClock.applyStatus(root.shiftState, out.running, root.now)
         root.setShiftState(result.state)
         if (result.startTimeQuery) {
             var after = result.startTimeQuery.after
@@ -244,6 +253,20 @@ Item {
             endTimeProc.command = [root.helper, "end-time", "--after", result.endTimeQuery.after]
             endTimeProc.running = true
         }
+    }
+
+    // How a day ended that the plugin left with a running shift. Calamari
+    // ends an open shift at 23:59 (docs/adr/0002), so nothing is stamped
+    // here; only the end time in Calamari may need the user's correction.
+    // A failure leaves the question open for the next poll.
+    function applyDayEnd(date, out) {
+        dayEndProc.blocked = !out.ok
+        if (!out.ok)
+            return applyError(out)
+        var result = ShiftClock.applyDayEnd(root.shiftState, date, out.ranToMidnight === true, new Date())
+        root.setShiftState(result.state)
+        if (result.notice)
+            root.notify(result.notice)
     }
 
     // The end of a shift that ended outside the plugin, for today's total.
@@ -317,6 +340,19 @@ Item {
         stdout: StdioCollector {
             onStreamFinished: root.applyEndTime(endTimeProc.after, root.parse(text))
         }
+    }
+
+    Process {
+        id: dayEndProc
+        property string date: ""
+        // Set by a failed question, cleared by the next tick of the timer.
+        property bool blocked: false
+        stdout: StdioCollector {
+            onStreamFinished: root.applyDayEnd(dayEndProc.date, root.parse(text))
+        }
+        // The status of today is asked once the day before is settled, and
+        // after a failure too (blocked then skips the question).
+        onRunningChanged: if (!running) root.poll()
     }
 
     Process {
@@ -405,7 +441,10 @@ Item {
         interval: root.pollInterval
         running: true
         repeat: true
-        onTriggered: root.poll()
+        onTriggered: {
+            dayEndProc.blocked = false
+            root.poll()
+        }
     }
 
     IdleMonitor {

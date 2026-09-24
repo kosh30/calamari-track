@@ -26,6 +26,10 @@ _Avoid_: Break (im Deutschen), Calamari-Pause
 Der Zustand nach dem Ausstempeln an einem Arbeitstag. Ab dann gibt es an diesem Tag keine Stempel-Erinnerungen mehr. Erneutes Einstempeln bleibt möglich.
 _Avoid_: Tagesende, Abmelden
 
+**Tagesende-Abschluss**:
+Calamari beendet jede um 23:59 noch offene Schicht selbst (Regel der Firma). Deshalb überlebt keine Schicht Mitternacht. Der Eintrag eines solchen Tages hat eine falsche Endzeit, die der Benutzer im Web korrigiert; das Plugin erinnert ihn am nächsten Morgen daran. Siehe [ADR 0002](docs/adr/0002-kein-uebernacht-abschluss.md).
+_Avoid_: Übernacht-Abschluss (das Plugin stempelt hier nichts), Mitternachts-Abschluss
+
 **Calamari**:
 Die einzige Quelle der Wahrheit für den Schichtstatus. Das Plugin hält keinen eigenen Status, der Calamari widerspricht.
 

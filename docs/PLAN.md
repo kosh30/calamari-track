@@ -83,7 +83,7 @@ Der Plan besteht aus vertikalen Scheiben. Jede Scheibe endet mit etwas, das man 
 ## Scheibe 5: Erinnerungslogik (TDD, reine Funktionen)
 
 - `js/daycalendar.mjs`: Arbeitstag, Kernzeit (inkl. halbem Feiertag), freier Tag, lokale Überschreibungen aus der Config.
-- `js/reminders.mjs`: `decide(now, day, state, config)` liefert fällige Aktionen: `stamp-reminder`, `break-reminder`, `soft-hint`, `final-warning`, `auto-close`, `overnight-close`. Dazu den Bar-Zustand und den Zeitpunkt der nächsten Prüfung.
+- `js/reminders.mjs`: `decide(now, day, state, config)` liefert fällige Aktionen: `stamp-reminder`, `break-reminder`, `soft-hint`, `final-warning`, `auto-close`. Dazu den Bar-Zustand und den Zeitpunkt der nächsten Prüfung.
 - Testfälle, mindestens:
   - Kernzeit ohne Schicht: sofort erinnern, dann alle 5 Min, bis zum Ende der Kernzeit.
   - Feierabend um 15:30: keine Erinnerungen mehr, auch nicht bis 16:45.
@@ -93,7 +93,7 @@ Der Plan besteht aus vertikalen Scheiben. Jede Scheibe endet mit etwas, das man 
   - Sanfter Hinweis genau einmal, 30 Min nach Ende der Kernzeit.
   - Letzte Warnung um 19:00, Auto-Abschluss 15 Min später, „+1 h“ verschiebt beides, Obergrenze 23:00.
   - Wochenende mit laufender Schicht: kein Stempel-Hinweis, aber letzte Warnung und Auto-Abschluss.
-  - Schicht vom Vortag läuft noch: `overnight-close`.
+  - Schicht vom Vortag lief bis zum Tagesende: Korrektur-Hinweis, kein Stempeln (ADR 0002).
 - Alle Zeiten kommen aus der Config (Werte siehe Zusammenfassung in CONTEXT/Grilling).
 
 **Fertig, wenn** alle Tests grün sind und das Modul keine Qt-Abhängigkeit hat.
@@ -113,11 +113,11 @@ Der Plan besteht aus vertikalen Scheiben. Jede Scheibe endet mit etwas, das man 
 
 **Fertig, wenn** der ganze Ablauf mit verkürzten Zeiten gegen echte Calamari-Stempelungen einmal durchgelaufen ist (mit dir abgestimmt).
 
-## Scheibe 8: Letzte Aktivität und Übernacht-Fall
+## Scheibe 8: Letzte Aktivität und Tagesende-Abschluss
 
 - `IdleMonitor` (Quickshell.Wayland) mit dem Lock-Timeout aus der omarchy-shell-Idle-Config: Beginnt der Leerlauf, wird die Zeit als letzte Aktivität gespeichert.
 - Ein Heartbeat schreibt jede Minute `lastSeen` in den State. Liegt beim nächsten Tick eine Lücke von mehr als 5 Min, war das Gerät im Suspend, und die letzte Aktivität ist der letzte Heartbeat vor der Lücke.
-- Resume oder Shell-Start: Läuft eine Schicht von einem früheren Tag noch (Status läuft, Startzeit liegt vor heute bzw. der State kennt den Vortag), gibt es einen Übernacht-Abschluss mit Korrektur-Hinweis.
+- Resume oder Shell-Start: Kennt der State eine laufende Schicht von einem früheren Tag, fragt `day-end`, ob sie bis zum Tagesende lief. Wenn ja, hat Calamari sie um 23:59 beendet und es gibt einen Korrektur-Hinweis, kein Stempeln (ADR 0002).
   - *Zu prüfen in der Scheibe:* Zählt eine über Mitternacht laufende Schicht beim Overlap-Check für „heute“? Falls nicht, wird der Vortag geprüft.
 
 **Fertig, wenn** das Szenario „Deckel zu mit laufender Schicht, später wieder auf“ den richtigen Hinweis mit der richtigen Uhrzeit bringt.

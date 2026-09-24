@@ -187,45 +187,49 @@ class CalamariCliTest(unittest.TestCase):
 
         self.assertEqual((code, out), (0, {"ok": True, "running": True}))
 
-    def test_status_overnight_sees_a_shift_still_running_from_yesterday(self):
-        # Whether Calamari counts such a shift for today is unverified, so
-        # the helper also looks at the end of yesterday.
+    def test_day_end_sees_a_shift_that_was_still_open_at_the_end_of_the_day(self):
+        # Calamari ends an open shift at 23:59 (company policy), so the entry
+        # of such a day has a wrong end time and the user has to correct it.
         self.login()
         self.fake.now = "2026-09-23T07:30:00"
-        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+        self.fake.shifts = [("2026-09-22", "09:40:30", "23:59:00")]
 
-        code, out = self.run_helper("status", "--overnight")
+        code, out = self.run_helper("day-end", "--date", "2026-09-22")
 
-        self.assertEqual((code, out), (0, {"ok": True, "running": True, "overnight": True}))
+        self.assertEqual((code, out), (0, {"ok": True, "ranToMidnight": True}))
 
-    def test_status_overnight_without_a_shift_from_yesterday(self):
+    def test_day_end_with_a_shift_the_user_ended_earlier(self):
         self.login()
         self.fake.now = "2026-09-23T07:30:00"
-        self.fake.shifts = [("2026-09-22", "09:40:30", "18:00:00"), ("2026-09-23", "07:00:10", None)]
+        self.fake.shifts = [("2026-09-22", "09:40:30", "18:00:00")]
 
-        code, out = self.run_helper("status", "--overnight")
+        code, out = self.run_helper("day-end", "--date", "2026-09-22")
 
-        self.assertEqual((code, out), (0, {"ok": True, "running": True, "overnight": False}))
+        self.assertEqual((code, out), (0, {"ok": True, "ranToMidnight": False}))
 
-    def test_status_overnight_does_not_take_todays_own_shift_for_yesterdays(self):
-        # Yesterday's shift reached 23:59 (closed later in the web), today a
-        # new one runs since 07:00: that one must not be closed.
+    def test_day_end_takes_one_call_and_never_stamps(self):
         self.login()
         self.fake.now = "2026-09-23T07:30:00"
-        self.fake.shifts = [("2026-09-22", "09:40:30", None), ("2026-09-23", "07:00:10", None)]
+        self.fake.shifts = [("2026-09-22", "09:40:30", "23:59:00")]
 
-        code, out = self.run_helper("status", "--overnight")
+        self.run_helper("day-end", "--date", "2026-09-22")
 
-        self.assertEqual((code, out), (0, {"ok": True, "running": True, "overnight": False}))
+        self.assertEqual(self.fake.overlap_calls, 1)
+        self.assertEqual([n for n, _ in self.fake.tool_calls], ["checkTimesheetOverlap"])
 
-    def test_status_overnight_when_calamari_counts_the_shift_for_today_too(self):
+    def test_day_end_needs_a_date(self):
         self.login()
-        self.fake.now = "2026-09-23T07:30:00"
-        self.fake.shifts = [("2026-09-22", "09:40:30", None), ("2026-09-23", "00:00:00", None)]
 
-        code, out = self.run_helper("status", "--overnight")
+        code, out = self.run_helper("day-end")
 
-        self.assertEqual((code, out), (0, {"ok": True, "running": True, "overnight": True}))
+        self.assertEqual((code, out["error"]["code"]), (1, "USAGE"))
+
+    def test_day_end_rejects_a_bad_date(self):
+        self.login()
+
+        code, out = self.run_helper("day-end", "--date", "22.09.2026")
+
+        self.assertEqual((code, out["error"]["code"]), (1, "USAGE"))
 
     def test_start_time_finds_the_start_minute_of_the_running_shift(self):
         self.login()
@@ -330,26 +334,6 @@ class CalamariCliTest(unittest.TestCase):
         self.fake.shifts = [("2026-09-22", "08:00:00", "13:59:10")]
 
         code, out = self.run_helper("clock-out")
-
-        self.assertEqual((code, out["stamped"]), (0, False))
-        self.assertNotIn("clockOut", [n for n, _ in self.fake.tool_calls])
-
-    def test_clock_out_overnight_stamps_yesterdays_shift(self):
-        self.login()
-        self.fake.now = "2026-09-23T07:30:30"
-        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
-
-        code, out = self.run_helper("clock-out", "--overnight")
-
-        self.assertEqual((code, out), (0, {"ok": True, "running": False, "stamped": True}))
-        self.assertIn("clockOut", [n for n, _ in self.fake.tool_calls])
-
-    def test_clock_out_overnight_without_a_shift_from_yesterday_does_not_stamp(self):
-        self.login()
-        self.fake.now = "2026-09-23T07:30:30"
-        self.fake.shifts = [("2026-09-22", "09:40:30", "18:00:00")]
-
-        code, out = self.run_helper("clock-out", "--overnight")
 
         self.assertEqual((code, out["stamped"]), (0, False))
         self.assertNotIn("clockOut", [n for n, _ in self.fake.tool_calls])

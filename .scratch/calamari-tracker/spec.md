@@ -88,12 +88,12 @@ Mit Calamari spricht das Plugin ausschließlich über den offiziellen MCP-Server
 46. Als Benutzer möchte ich nach einem Auto-Abschluss eine Benachrichtigung mit der Uhrzeit des Abschlusses und meiner letzten Aktivität, damit ich die Endzeit in Calamari korrigieren kann.
 47. Als Benutzer möchte ich, dass ein Klick auf diese Benachrichtigung Calamari im Browser öffnet, damit die Korrektur schnell geht.
 
-### Letzte Aktivität und Übernacht-Fall
+### Letzte Aktivität und Tagesende-Abschluss
 
 48. Als Benutzer möchte ich, dass das Plugin sich meine letzte Aktivität merkt (Beginn des Leerlaufs mit dem gleichen Timeout wie die Bildschirmsperre, oder der letzte Heartbeat vor einem Suspend), damit der Korrektur-Hinweis eine realistische Endzeit nennt.
-49. Als Benutzer möchte ich, dass beim Aufwachen oder Start des Rechners eine noch laufende Schicht vom Vortag erkannt und sofort per Auto-Abschluss beendet wird, damit ich nicht mit einer 14-Stunden-Schicht in den Tag starte.
-50. Als Benutzer möchte ich nach einem solchen Übernacht-Abschluss den Hinweis „bitte Endzeit auf HH:MM korrigieren“ mit meiner letzten Aktivität vom Vortag, damit ich den Eintrag schnell richtigstelle.
-51. Als Benutzer möchte ich, dass nach einem Übernacht-Abschluss der neue Tag normal beginnt und die Stempel-Erinnerungen ab Beginn der Kernzeit kommen, damit der alte Tag den neuen nicht blockiert.
+49. Als Benutzer möchte ich beim Aufwachen oder Start des Rechners erfahren, dass Calamari eine vergessene Schicht des Vortags um 23:59 selbst beendet hat, damit ich nicht mit einer 14-Stunden-Schicht in der Zeiterfassung dastehe.
+50. Als Benutzer möchte ich in diesem Hinweis „bitte Endzeit auf HH:MM korrigieren“ meine letzte Aktivität von jenem Tag genannt bekommen, damit ich den Eintrag schnell richtigstelle.
+51. Als Benutzer möchte ich, dass danach der neue Tag normal beginnt und die Stempel-Erinnerungen ab Beginn der Kernzeit kommen, damit der alte Tag den neuen nicht blockiert.
 
 ### Konfiguration und Robustheit
 
@@ -130,15 +130,17 @@ Mit Calamari spricht das Plugin ausschließlich über den offiziellen MCP-Server
   - Schlägt das Ausstempeln fehl, wird es alle 5 Min wiederholt. Das ist keine Warteschlange, sondern die fällige Aktion, solange die Schicht läuft.
   - Den sanften Hinweis gibt es nur an Tagen mit Kernzeit, letzte Warnung und Auto-Abschluss an jedem Tag.
   - Die Adresse von Calamari im Browser ist firmenspezifisch und steht deshalb nicht im Repo, sondern in der Einstellung `webUrl`. Ist sie leer, hat der Korrektur-Hinweis keine Klick-Aktion.
-- **Letzte Aktivität und Übernacht-Fall:**
+- **Letzte Aktivität und Tagesende-Abschluss:**
   - Der Zustand kennt `lastSeen` (Heartbeat im 15-s-Takt, minutengenau gespeichert), `idle` und `awaySince`, den Beginn der letzten Abwesenheit. Diese Felder bleiben über den Tageswechsel erhalten.
   - `awaySince` ist der Beginn des Leerlaufs (Meldung des Idle-Monitors minus Lock-Timeout) oder, bei einer Heartbeat-Lücke über 5 Min ohne Leerlauf, der letzte Heartbeat davor. Der erste Heartbeat nach dem Aufwachen überschreibt es nicht, damit ein Abschluss nach dem Aufwachen die Abwesenheit davor nennt, auch wenn das Netz erst später wieder da ist.
   - Der Korrektur-Hinweis nach dem Auto-Abschluss nennt die letzte Aktivität nur, wenn der Benutzer gerade im Leerlauf ist. Sonst ist er da, und die Endzeit stimmt.
-  - Stand die Schicht im gespeicherten Zustand eines früheren Tages auf „läuft“, fragt die erste Abfrage des neuen Tages `status --overnight`. Das prüft zusätzlich das Fenster 23:57–23:59 des Vortags, weil ungeprüft ist, ob Calamari eine Schicht über Mitternacht für „heute“ zählt. Läuft sie noch, folgt sofort der Übernacht-Abschluss: `clock-out` ohne Feierabend, damit der neue Tag normal beginnt, und ein Korrektur-Hinweis mit der letzten Aktivität vom Vortag.
-  - Zeigt „heute“ eine laufende Schicht, gilt sie nur als die vom Vortag, wenn sie schon um 00:00 lief. Sonst ist es eine heute begonnene, und die gestrige erreichte nur Mitternacht.
-  - Solange eine Übernacht-Schicht offen ist, fragt jede Abfrage `--overnight`. Die letzte Aktivität im Übernacht-Hinweis wird nur genannt, wenn sie vor heute liegt.
-  - Grenzen: Wer um Mitternacht noch arbeitet, wird bei der ersten Abfrage nach 00:00 ausgestempelt (keine Schicht über Mitternacht). Eine gestern kurz vor Mitternacht beendete Schicht kann einen vergeblichen Übernacht-Abschluss auslösen. Calamari lehnt `clockOut` dann ab, und das Panel zeigt den Fehler.
-  - *Noch zu prüfen bei der Abnahme:* ob `checkTimesheetOverlap` für „heute“ eine Schicht zeigt, die gestern begann.
+  - Keine Schicht überlebt Mitternacht: Calamari beendet jede um 23:59 noch offene Schicht selbst (Regel der Firma, [ADR 0002](../../docs/adr/0002-kein-uebernacht-abschluss.md)). Das Plugin stempelt morgens deshalb nichts aus.
+  - Stand die Schicht im gespeicherten Zustand eines früheren Tages auf „läuft“, fragt das Plugin einmalig `day-end --date <Tag>` (ein Overlap-Aufruf auf 23:58–23:59), bevor es den Status von heute abfragt. Reichte die Schicht bis dorthin, war es der Tagesende-Abschluss: ein Korrektur-Hinweis nennt die letzte Aktivität von jenem Tag als richtige Endzeit. Endete sie früher, hat der Benutzer selbst ausgestempelt und es passiert nichts.
+  - Das Datum steht als `unclosed` im Zustand, bis die Antwort da ist, und übersteht den Tageswechsel und einen Neustart. Scheitert die Abfrage, versucht es die nächste Abfrage erneut.
+  - Die letzte Aktivität im Korrektur-Hinweis wird nur genannt, wenn sie von jenem Tag stammt. Wer morgens aufwacht und weggeht, bevor die Antwort da ist, bekommt den Hinweis ohne Uhrzeit.
+  - Mit dem Tageswechsel ist der Status wieder unbekannt; die Erinnerungslogik schweigt, bis die erste Abfrage des neuen Tages geantwortet hat.
+  - Die Uhrzeit nennt der Hinweis nur, wenn die letzte Abwesenheit den Abschluss überdeckt. Wer mittags weg war, danach aber weitergearbeitet hat, bekommt den Hinweis ohne Uhrzeit: seine Abwesenheit sagt nichts über das Ende.
+  - Grenzen: Wer um Mitternacht noch arbeitet, dessen Schicht beendet Calamari um 23:59. Das Fenster 23:58–23:59 kann ein Ausstempeln in der Minute 23:58 nicht vom Abschluss durch Calamari unterscheiden; ein überflüssiger Hinweis ist die Folge. Für eine Firma ohne diese Regel ist ungeprüft, ob `checkTimesheetOverlap` eine über Mitternacht laufende Schicht für „heute“ zeigt; mit der Regel lässt sich das auch nicht prüfen, weil es keine solche Schicht geben kann (siehe ADR 0002).
 - **Gesamtzeit heute (beobachtet):**
   - Eine exakte Summe aller Schichten von heute lässt sich über `checkTimesheetOverlap` nicht effizient ermitteln. Per Intervallhalbierung findet man mit je ca. 11 Aufrufen nur den ersten Beginn und das letzte Ende in einem Fenster. Lücken zwischen Schichten findet man nur durch Abtasten: bei Minutengenauigkeit bis zu ca. 600 Aufrufe pro Arbeitstag, bei 5-Minuten-Genauigkeit noch ca. 120. `worked-today` ist deshalb verworfen.
   - Stattdessen summiert das Plugin die Schichten, die es selbst gesehen hat (`shifts` im Zustand). Eigenes Aus- und Einstempeln kostet dabei keinen Aufruf. Endet eine Schicht außerhalb des Plugins, sucht `end-time --after <Beginn>` ihr Ende, ebenso `start-time` den Beginn einer im Web begonnenen Schicht. Gemessen gegen den Fake brauchte das 5–11 Overlap-Aufrufe je Suche, gegen echtes Calamari 10 für `start-time`. Ein typischer Tag mit 1–3 Schichten kostet so 0 Aufrufe (im Plugin gestempelt) bis etwa 60 (alles im Web gestempelt), zusätzlich zur Statusabfrage (etwa 160 pro Tag bei 3 Min). Scheitert `end-time`, fragt die nächste Abfrage erneut (`pendingEnd`).
@@ -164,19 +166,20 @@ Mit Calamari spricht das Plugin ausschließlich über den offiziellen MCP-Server
 - **Stempeln:** `clockIn`/`clockOut` nehmen keine Uhrzeit an, es wird also immer „jetzt“ gestempelt. `clock-in` und `clock-out` liefern `{"running": bool}`:
   - `clock-in` fragt danach die laufende Minute ab (`[jetzt, jetzt+1]`). Das Status-Fenster endet an der vollen Minute und sieht die eben begonnene Schicht noch nicht. Scheitert nur diese Abfrage, gilt das angenommene `clockIn` trotzdem. Aus demselben Grund ignoriert der Service in der Minute des eigenen Einstempelns eine Abfrage, die „läuft nicht“ meldet.
   - `clock-out` fragt danach nicht ab, denn die eben beendete Schicht überlappt jedes Fenster bis „jetzt“. Maßgeblich ist, dass `clockOut` nicht abgelehnt wurde. Bis 2 Min nach dem eigenen Ausstempeln ignoriert der Service eine laufend gemeldete Schicht, und eine Folgeschicht sucht er erst ab der Minute nach dem Ausstempeln.
-  - `clock-out` sendet `clockOut` nur, wenn eine Schicht in die laufende Minute reicht (mit `--overnight` auch die Schicht vom Vortag, die bis Mitternacht lief). Grund: `clockOut` ohne laufende Schicht wird zwar abgelehnt, hinterlässt in Calamari aber trotzdem einen Eintrag von Sekunden (beobachtet 2026-09-22, Einträge ohne Projekt um 11:17 und 16:05). Die Antwort sagt mit `stamped`, ob gestempelt wurde. Ohne Stempelung gibt es keinen Feierabend, keine Pause und keinen Korrektur-Hinweis.
+  - `clock-out` sendet `clockOut` nur, wenn eine Schicht in die laufende Minute reicht. Grund: `clockOut` ohne laufende Schicht wird zwar abgelehnt, hinterlässt in Calamari aber trotzdem einen Eintrag von Sekunden (beobachtet 2026-09-22, Einträge ohne Projekt um 11:17 und 16:05). Die Antwort sagt mit `stamped`, ob gestempelt wurde. Ohne Stempelung gibt es keinen Feierabend, keine Pause und keinen Korrektur-Hinweis.
   - Nach dem Start der Shell entscheidet die Erinnerungslogik erst, wenn die erste Statusabfrage geantwortet hat, wie nach dem Aufwachen. Der gespeicherte Zustand kann Stunden alt sein.
   - Der Feierabend entsteht nur durch Ausstempeln im Plugin. Ein Ausstempeln im Web ist von einer Pause nicht zu unterscheiden. Eine danach laufend gemeldete Schicht (Plugin, Web, Handy) hebt den Feierabend auf. Eine Pause ist Ausstempeln plus Markierung im lokalen Zustand. Das Ende der Pause ist Einstempeln. Einen Pausentyp gibt es nicht.
 - **Auto-Abschluss:** stempelt zum Zeitpunkt des Abschlusses aus und schickt anschließend eine Benachrichtigung mit der letzten Aktivität zur manuellen Korrektur im Web. Zurückdatieren über `createTimesheetEntries` ist bewusst nicht vorgesehen.
-- **Schnittstelle der Erinnerungslogik:** Eingabe ist Zeitpunkt, Tagesinformation (wie vom Helfer geliefert, plus lokale Überschreibungen), lokaler Zustand und Config. Ausgabe ist der Bar-Zustand (`idle` | `running` | `break` | `reminder` | `error`, dazu `auth` bei nötiger Anmeldung und `unknown` vor der ersten Abfrage), eine Liste fälliger Aktionen (`stamp-reminder`, `break-reminder`, `soft-hint`, `final-warning`, `auto-close`, `overnight-close`) und der Zeitpunkt der nächsten nötigen Prüfung. Die Logik ist idempotent: Bereits verschickte Erinnerungen stehen im Zustand und werden nicht doppelt ausgelöst.
+- **Schnittstelle der Erinnerungslogik:** Eingabe ist Zeitpunkt, Tagesinformation (wie vom Helfer geliefert, plus lokale Überschreibungen), lokaler Zustand und Config. Ausgabe ist der Bar-Zustand (`idle` | `running` | `break` | `reminder` | `error`, dazu `auth` bei nötiger Anmeldung und `unknown` vor der ersten Abfrage), eine Liste fälliger Aktionen (`stamp-reminder`, `break-reminder`, `soft-hint`, `final-warning`, `auto-close`) und der Zeitpunkt der nächsten nötigen Prüfung. Die Logik ist idempotent: Bereits verschickte Erinnerungen stehen im Zustand und werden nicht doppelt ausgelöst.
 - **Lokaler Zustand** (JSON-Datei unter XDG-State, atomar geschrieben):
   - Pausenmarkierung mit Beginn
   - Feierabend-Datum
   - „Heute frei“-Datum
   - verschickte Erinnerungen pro Tag
   - Verschiebung durch „+1 h“
-  - letzte Aktivität
+  - letzte Aktivität (als Intervall: Beginn und Ende der letzten Abwesenheit)
   - letzter Heartbeat
+  - Datum eines Tages, den das Plugin mit laufender Schicht verlassen hat (`unclosed`)
   - bekannte Startzeit und Datum der laufenden Schicht
 - **Standardwerte der Config:**
 
@@ -213,7 +216,7 @@ Mit Calamari spricht das Plugin ausschließlich über den offiziellen MCP-Server
   - letzte Warnung → Auto-Abschluss nach Wartezeit
   - „+1 h“ verschiebt, Obergrenze gewinnt
   - Wochenende mit laufender Schicht
-  - Übernacht-Fall
+  - Tagesende-Abschluss
   - Start mitten in der Kernzeit
   - Idempotenz (zweimal derselbe Zeitpunkt löst nichts doppelt aus)
 - **Seam B: Kommandozeilen-Interface des Calamari-Helfers**, getestet mit `unittest` aus der Python-Standardbibliothek gegen einen lokalen Fake-HTTP-Server. Der bildet Protected-Resource- und Authorization-Server-Metadaten, Registrierung, Token-Endpoint und MCP-Endpoint nach (JSON- und SSE-Antworten). Der Keyring wird per Umgebungsvariable durch einen Datei-Speicher ersetzt, und die Basis-URL ist per Umgebungsvariable überschreibbar. Dazu kommen die aktuelle Uhrzeit (`CALAMARI_NOW`), damit Fake und Helfer dasselbe „jetzt“ sehen, und der Browser (`$BROWSER`, übliche Konvention), damit der Login-Test dem Redirect folgen kann. Das sind die einzigen zusätzlichen Nähte. Geprüft werden:

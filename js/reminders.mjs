@@ -58,8 +58,7 @@ export function decide(now, day, state, settings) {
   const config = withDefaults(settings)
   // A state of another date (right after midnight, before the first poll
   // of the new day) or an unknown status must not remind.
-  if (state.failed || state.date !== ymd(now)) return quiet()
-  if (state.running && state.overnight) return decideOvernight(now, state)
+  if (state.failed || state.running === null || state.date !== ymd(now)) return quiet()
   if (state.breakSince && !state.running) return decideBreak(now, state, config)
   if (state.running) return decideShift(now, day, state, config)
   return decideStamp(now, day, state, config)
@@ -132,15 +131,6 @@ function decideEvening(now, state, config) {
   return Object.assign(repeating(now, state, close, AUTO_CLOSE_RETRY, closeMinute, null), { autoCloseAt: r.autoCloseAt })
 }
 
-// A shift still running from an earlier day is closed at once (retried
-// like the auto-close), reporting the last activity for the correction.
-function decideOvernight(now, state) {
-  // Only an absence that began before today tells when yesterday ended.
-  const away = lastActivity(state)
-  const before = away && away < `${ymd(now)}T00:00` ? away : null
-  return repeating(now, state, { type: "overnight-close", lastActivity: before }, AUTO_CLOSE_RETRY, 0, null)
-}
-
 // "+1 h weiterarbeiten": the next final warning comes extendMinutes from
 // now (and the auto-close a wait after it); the hard limit still wins.
 export function postpone(state, settings, now) {
@@ -199,9 +189,10 @@ export function markSent(state, type, now) {
 }
 
 // Headline, body and click target ("panel" or "calamari", the web app) of
-// the notification for an action of decide(), or for the correction hints
-// { type: "auto-closed" | "overnight-closed", at: "HH:MM", lastActivity }
-// once the close stamped out.
+// the notification for an action of decide(), for the correction hint
+// { type: "auto-closed", at: "HH:MM", lastActivity } once the auto-close
+// stamped out, or for { type: "day-end-closed", date, lastActivity }, the
+// hint about a day Calamari itself ended (js/shiftclock.mjs applyDayEnd).
 export function notification(action, day, state, settings) {
   const panel = (headline, body) => ({ headline, body, click: "panel" })
   if (action.type === "soft-hint")
@@ -215,10 +206,11 @@ export function notification(action, day, state, settings) {
       : `Um ${action.at} ausgestempelt. Bitte die Endzeit in Calamari korrigieren.`
     return { headline: "Schicht automatisch beendet", body, click: "calamari" }
   }
-  if (action.type === "overnight-closed") {
+  if (action.type === "day-end-closed") {
+    const intro = `Die Schicht vom ${dayOf(action.date)} lief bis zum Tagesende, Calamari hat sie um 23:59 beendet.`
     const body = action.lastActivity
-      ? `Heute um ${action.at} ausgestempelt. Bitte die Endzeit in Calamari auf ${clockOf(action.lastActivity)} am ${dayOf(action.lastActivity)} korrigieren (letzte Aktivität).`
-      : `Heute um ${action.at} ausgestempelt. Bitte die Endzeit in Calamari korrigieren.`
+      ? `${intro} Bitte die Endzeit dort auf ${clockOf(action.lastActivity)} korrigieren (letzte Aktivität).`
+      : `${intro} Bitte die Endzeit dort korrigieren.`
     return { headline: "Schicht vom Vortag beendet", body, click: "calamari" }
   }
   if (action.type === "break-reminder")
@@ -230,8 +222,9 @@ function clockOf(stamp) {
   return toHhmm(minuteOfDay(fromMoment(stamp)))
 }
 
+// "DD.MM." of a "YYYY-MM-DD" date or a "YYYY-MM-DDTHH:MM" moment.
 function dayOf(stamp) {
-  const d = fromMoment(stamp)
+  const d = fromMoment(`${String(stamp).slice(0, 10)}T00:00`)
   return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.`
 }
 
@@ -253,7 +246,5 @@ export function extendLabel(settings) {
 export function closeFor(action) {
   if (action.type === "auto-close")
     return { stamp: "clock-out", notice: { type: "auto-closed", lastActivity: action.lastActivity } }
-  if (action.type === "overnight-close")
-    return { stamp: "overnight-close", notice: { type: "overnight-closed", lastActivity: action.lastActivity } }
   return null
 }

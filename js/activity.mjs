@@ -7,6 +7,10 @@
 //   lastSeen   YYYY-MM-DDTHH:MM of the last heartbeat
 //   idle       true while the idle monitor says so
 //   awaySince  YYYY-MM-DDTHH:MM the latest absence began (null before any)
+//   awayUntil  YYYY-MM-DDTHH:MM it ended, null while it still runs. Together
+//              with awaySince it is the latest absence as an interval, which
+//              awayCovers() asks about: awaySince alone is not the user's
+//              last activity once they came back and kept working.
 
 import { fromMoment, momentOf } from "./daytime.mjs"
 
@@ -21,7 +25,11 @@ export function heartbeat(state, now) {
   if (state.lastSeen === seen) return state
   const next = Object.assign({}, state, { lastSeen: seen })
   const gap = state.lastSeen ? (now - fromMoment(state.lastSeen)) / 60000 : 0
-  if (gap > SUSPEND_GAP_MINUTES && !state.idle) next.awaySince = state.lastSeen
+  // The gap is an absence that is over: this very heartbeat ends it.
+  if (gap > SUSPEND_GAP_MINUTES && !state.idle) {
+    next.awaySince = state.lastSeen
+    next.awayUntil = seen
+  }
   return next
 }
 
@@ -29,12 +37,21 @@ export function heartbeat(state, now) {
 // Coming back from idle is activity now, so a suspend gap it ends (the key
 // press may beat the first tick after waking) keeps the idle start.
 export function setIdle(state, idle, now, timeoutSeconds) {
-  if (!idle) return state.idle ? Object.assign({}, state, { idle: false, lastSeen: momentOf(now) }) : state
+  if (!idle)
+    return state.idle ? Object.assign({}, state, { idle: false, lastSeen: momentOf(now), awayUntil: momentOf(now) }) : state
   const since = new Date(now.getTime() - timeoutSeconds * 1000)
-  return Object.assign({}, state, { idle: true, awaySince: momentOf(since) })
+  return Object.assign({}, state, { idle: true, awaySince: momentOf(since), awayUntil: null })
 }
 
 // YYYY-MM-DDTHH:MM the latest absence began, or null if none is known.
 export function lastActivity(state) {
   return state.awaySince || null
+}
+
+// Whether the latest absence was running at that moment, so that the user
+// was demonstrably not at the machine then. A still running absence covers
+// everything after its start.
+export function awayCovers(state, moment) {
+  if (!state.awaySince || state.awaySince > moment) return false
+  return !state.awayUntil || state.awayUntil >= moment
 }

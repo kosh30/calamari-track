@@ -513,25 +513,20 @@ def tools(args):
 
 
 def status(args):
-    """With --overnight also asks whether yesterday's shift still runs: it
-    reaches past midnight, and whether Calamari counts it for today is
-    unverified, so the end of yesterday is checked as well. A shift running
-    today only counts as yesterday's if it already ran at 00:00; otherwise
-    it is today's own (yesterday's then merely reached midnight)."""
-    if not args.overnight:
-        return {"running": with_mcp(running_now)}
+    return {"running": with_mcp(running_now)}
 
-    def work(client):
-        date, _ = today_and_minute()
-        yesterday = (now().date() - datetime.timedelta(days=1)).isoformat()
-        day_end = 24 * 60 - 1
-        today = running_now(client)
-        reached_midnight = overlaps(client, yesterday, day_end - STATUS_WINDOW, day_end)
-        overnight = reached_midnight and (not today or overlaps(client, date, 0, 1))
-        return today, overnight
 
-    today, overnight = with_mcp(work)
-    return {"running": today or overnight, "overnight": overnight}
+def day_end(args):
+    """Whether a shift was still open at the end of that day. Calamari ends
+    an open shift at 23:59 (company policy), so the next morning nothing
+    runs any more, but the entry's end time is wrong. The last two minutes
+    of the day tell that apart from a shift the user ended themselves."""
+    try:
+        date = datetime.date.fromisoformat(args.date).isoformat()
+    except ValueError:
+        raise HelperError("USAGE", "expected YYYY-MM-DD, got %r" % args.date)
+    last = 24 * 60 - 1
+    return {"ranToMidnight": with_mcp(lambda c: overlaps(c, date, last - 1, last))}
 
 
 def clock_in(args):
@@ -557,18 +552,13 @@ def clock_out(args):
     """Stamps now, but only while a shift runs: a clockOut without one still
     leaves a seconds-long entry in Calamari (seen 2026-09-22). "Runs" means
     it reaches into the current minute, which a shift ended a minute ago
-    (still inside the status window) does not. With --overnight yesterday's
-    shift counts too, if it reached midnight. stamped tells whether clockOut
+    (still inside the status window) does not. stamped tells whether clockOut
     was sent. There is no check afterwards: the shift just ended still
     overlaps every window up to now (docs/adr/0001)."""
     def work(client):
         date, minute = today_and_minute()
         start = min(minute, 24 * 60 - 2)
         running = overlaps(client, date, start, start + 1)
-        if not running and args.overnight:
-            yesterday = (now().date() - datetime.timedelta(days=1)).isoformat()
-            day_end = 24 * 60 - 1
-            running = overlaps(client, yesterday, day_end - STATUS_WINDOW, day_end)
         if running:
             client.call_tool("clockOut", {})
         return running
@@ -684,13 +674,14 @@ def parse_args(argv):
             sub.add_argument("--after", metavar="HH:MM", required=True)
         if name == "day-info":
             sub.add_argument("--date", metavar="YYYY-MM-DD")
-        if name in ("status", "clock-out"):
-            sub.add_argument("--overnight", action="store_true")
+        if name == "day-end":
+            sub.add_argument("--date", metavar="YYYY-MM-DD", required=True)
     return parser.parse_args(argv)
 
 
 COMMANDS = {"login": login, "whoami": whoami, "tools": tools, "status": status, "start-time": start_time,
-            "end-time": end_time, "clock-in": clock_in, "clock-out": clock_out, "day-info": day_info}
+            "end-time": end_time, "clock-in": clock_in, "clock-out": clock_out, "day-info": day_info,
+            "day-end": day_end}
 
 
 def main(argv):

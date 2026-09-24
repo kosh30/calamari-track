@@ -1,6 +1,7 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { applyStamp, applyStatus, applyStartTime, barView, breakAction, dayOffToday, emptyState, endBreakAsFeierabend, feierabendAction, helperCommand, needsOvernightCheck, applyEndTime, restoreState, setDayOff, stampAction, stampLabel, workedMinutes, workedText } from "./shiftclock.mjs"
+import { applyDayEnd, applyStamp, applyStatus, applyStartTime, barView, breakAction, dayOffToday, emptyState, endBreakAsFeierabend, feierabendAction, helperCommand, pendingDayEnd, applyEndTime, restoreState, setDayOff, stampAction, stampLabel, workedMinutes, workedText } from "./shiftclock.mjs"
+import { setIdle } from "./activity.mjs"
 
 const at = (hhmm, date = "2026-09-22") => new Date(`${date}T${hhmm}:00`)
 
@@ -262,11 +263,10 @@ test("eine fehlgeschlagene Pause nennt die Aktion", () => {
   assert.match(fail("break-end"), /^Pause beenden fehlgeschlagen/)
 })
 
-test("Pausen-Aktionen stempeln bei Calamari aus bzw. ein, der Übernacht-Abschluss auch die Schicht vom Vortag", () => {
+test("Pausen-Aktionen stempeln bei Calamari aus bzw. ein", () => {
   assert.deepEqual(helperCommand("break-start"), ["clock-out"])
   assert.deepEqual(helperCommand("break-end"), ["clock-in"])
   assert.deepEqual(helperCommand("clock-in"), ["clock-in"])
-  assert.deepEqual(helperCommand("overnight-close"), ["clock-out", "--overnight"])
 })
 
 test("lief beim Ausstempeln gar keine Schicht, ist es kein Feierabend und das Panel sagt es", () => {
@@ -301,22 +301,58 @@ test("„Feierabend“ bietet das Panel nur während einer Pause an", () => {
   assert.equal(feierabendAction({ kind: "idle", text: "" }), null)
 })
 
-test("lief gestern zuletzt eine Schicht, fragt die erste Abfrage des Tages auch nach dem Vortag", () => {
+test("lief gestern zuletzt eine Schicht, fragt das Plugin morgens nach dem Ende des Vortags", () => {
   const yesterday = applyStatus(emptyState(), true, at("17:00", "2026-09-21")).state
-  assert.equal(needsOvernightCheck(yesterday, at("07:30")), true)
-  assert.equal(needsOvernightCheck(applyStatus(yesterday, false, at("07:30")).state, at("07:33")), false)
+  assert.equal(pendingDayEnd(yesterday, at("07:30")), "2026-09-21")
+  // Still yesterday: nothing to ask, the shift is simply running.
+  assert.equal(pendingDayEnd(yesterday, at("17:05", "2026-09-21")), null)
   const idleYesterday = applyStatus(emptyState(), false, at("17:00", "2026-09-21")).state
-  assert.equal(needsOvernightCheck(idleYesterday, at("07:30")), false)
+  assert.equal(pendingDayEnd(idleYesterday, at("07:30")), null)
 })
 
-test("solange die Schicht vom Vortag offen ist, fragt jede Abfrage auch nach dem Vortag", () => {
+test("die Frage nach dem Vortag übersteht den Tageswechsel im Zustand", () => {
   const yesterday = applyStatus(emptyState(), true, at("17:00", "2026-09-21")).state
-  const overnight = applyStatus(yesterday, true, at("07:30"), true).state
-  assert.equal(needsOvernightCheck(overnight, at("07:35")), true)
-  assert.equal(overnight.stampedToday, false)
-  const gone = applyStatus(overnight, false, at("07:36"), false).state
-  assert.equal(gone.overnight, false)
-  assert.equal(needsOvernightCheck(gone, at("07:40")), false)
+  // A poll of the new day rolls the state over before the answer arrives.
+  const today = applyStatus(yesterday, false, at("07:30")).state
+  assert.equal(pendingDayEnd(today, at("07:33")), "2026-09-21")
+  const answered = applyDayEnd(today, "2026-09-21", false, at("07:33")).state
+  assert.equal(pendingDayEnd(answered, at("07:40")), null)
+})
+
+test("lief die Schicht bis zum Tagesende, bittet ein Hinweis um die Korrektur der Endzeit", () => {
+  let state = applyStatus(emptyState(), true, at("17:00", "2026-09-21")).state
+  state = setIdle(state, true, at("18:00", "2026-09-21"), 300)
+  const r = applyDayEnd(state, "2026-09-21", true, at("07:30"))
+  assert.deepEqual(r.notice, { type: "day-end-closed", date: "2026-09-21", lastActivity: "2026-09-21T17:55" })
+  assert.equal(r.state.running, null)
+  assert.equal(r.state.stampedToday, false)
+})
+
+test("hat der Benutzer gestern selbst ausgestempelt, kommt kein Hinweis", () => {
+  const state = applyStatus(emptyState(), true, at("17:00", "2026-09-21")).state
+  assert.equal(applyDayEnd(state, "2026-09-21", false, at("07:30")).notice, null)
+})
+
+test("eine letzte Aktivität von heute gehört nicht in den Hinweis für gestern", () => {
+  // Woke up at 07:30 and walked away before the answer came back.
+  let state = applyStatus(emptyState(), true, at("17:00", "2026-09-21")).state
+  state = setIdle(state, true, at("07:40"), 300)
+  assert.equal(applyDayEnd(state, "2026-09-21", true, at("07:45")).notice.lastActivity, null)
+})
+
+test("wer wieder da war und weitergearbeitet hat, bekommt den Hinweis ohne Uhrzeit", () => {
+  // Away at lunch, back at 13:00: 12:30 is no end time for that day.
+  let state = applyStatus(emptyState(), true, at("09:00", "2026-09-21")).state
+  state = setIdle(state, true, at("12:35", "2026-09-21"), 300)
+  state = setIdle(state, false, at("13:00", "2026-09-21"), 300)
+  assert.equal(applyDayEnd(state, "2026-09-21", true, at("07:30")).notice.lastActivity, null)
+})
+
+test("eine Antwort auf eine andere Frage ändert nichts", () => {
+  const state = applyStatus(emptyState(), true, at("17:00", "2026-09-21")).state
+  const r = applyDayEnd(state, "2026-09-20", true, at("07:30"))
+  assert.equal(r.notice, null)
+  assert.equal(r.state, state)
 })
 
 // Gesamtzeit heute (beobachtet)
@@ -356,9 +392,8 @@ test("die Gesamtzeit übersteht einen Neustart und beginnt am nächsten Tag neu"
 })
 
 test("die Schicht vom Vortag zählt nicht zur Gesamtzeit heute", () => {
-  let state = applyStatus(emptyState(), true, at("22:00", "2026-09-21")).state
-  state = applyStatus(state, true, at("07:30"), true).state
-  state = applyStamp(state, "overnight-close", { ok: true, running: false }, at("07:31")).state
+  const yesterday = applyStatus(emptyState(), true, at("22:00", "2026-09-21")).state
+  const state = applyDayEnd(yesterday, "2026-09-21", true, at("07:30")).state
   assert.equal(workedMinutes(state, at("08:00")), 0)
 })
 
