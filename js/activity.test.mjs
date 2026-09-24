@@ -4,7 +4,7 @@ import { awayCovers, heartbeat, lastActivity, setIdle } from "./activity.mjs"
 import { applyStatus, emptyState, restoreState } from "./shiftclock.mjs"
 
 const at = (hhmm, date = "2026-09-22") => new Date(`${date}T${hhmm}:00`)
-const running = now => applyStatus(emptyState(), true, at(now)).state
+const running = now => applyStatus(emptyState(), "running", at(now)).state
 
 test("nach einer Heartbeat-Lücke über 5 Minuten gilt der Heartbeat davor als letzte Aktivität", () => {
   let state = heartbeat(heartbeat(running("17:00"), at("17:58")), at("17:59"))
@@ -30,7 +30,7 @@ test("eine kurze Lücke ist kein Suspend", () => {
 test("die letzte Aktivität übersteht einen Neustart der Shell und den Tageswechsel", () => {
   let state = heartbeat(heartbeat(running("17:00"), at("17:59")), at("07:30", "2026-09-23"))
   state = restoreState(JSON.stringify(state))
-  state = applyStatus(state, true, at("07:31", "2026-09-23")).state
+  state = applyStatus(state, "running", at("07:31", "2026-09-23")).state
   assert.equal(lastActivity(state), "2026-09-22T17:59")
 })
 

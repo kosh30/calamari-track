@@ -245,7 +245,7 @@ Item {
         if (root.authState !== "ok")
             root.refreshIdentity()
         root.fetchDayInfo()
-        var result = ShiftClock.applyStatus(root.shiftState, out.running, root.now)
+        var result = ShiftClock.applyStatus(root.shiftState, out.shift, root.now)
         root.setShiftState(result.state)
         if (result.startTimeQuery) {
             var after = result.startTimeQuery.after

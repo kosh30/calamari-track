@@ -484,11 +484,9 @@ def with_mcp(work):
     raise HelperError("AUTH_REQUIRED", "Calamari rejects the refreshed token, run `calamari login`")
 
 
-# Schichtstatus via checkTimesheetOverlap, see docs/adr/0001: a running shift
-# counts as an entry up to now, so an overlap with the last minutes means it
-# runs. Windows are whole minutes; touching ends do not overlap.
-
-STATUS_WINDOW = 2
+# Start and end times via checkTimesheetOverlap, see docs/adr/0001: a
+# running shift counts as an entry up to now. Windows are whole minutes;
+# touching ends do not overlap.
 
 
 def now():
@@ -538,22 +536,12 @@ def whoami(args):
     return {"name": profile["name"], "email": profile["email"], "personUuid": profile.get("personUuid")}
 
 
-def running_now(client):
-    date, minute = today_and_minute()
-    end = max(minute, 1)
-    return overlaps(client, date, max(end - STATUS_WINDOW, 0), end)
-
-
 def tools(args):
     """The MCP server's tool list, sorted by name. docs/mcp-tools.json holds
     a snapshot; a diff against it shows when Calamari changes the tools
     this plugin works around (docs/adr/0001)."""
     result = with_mcp(lambda c: c.request("tools/list", {})[0])
     return {"tools": sorted(result.get("tools", []), key=lambda t: t.get("name", ""))}
-
-
-def status(args):
-    return {"running": with_mcp(running_now)}
 
 
 def day_end(args):
@@ -573,9 +561,9 @@ def clock_out(args):
     """Stamps now, but only while a shift runs: a clockOut without one still
     leaves a seconds-long entry in Calamari (seen 2026-09-22). "Runs" means
     it reaches into the current minute, which a shift ended a minute ago
-    (still inside the status window) does not. stamped tells whether clockOut
-    was sent. There is no check afterwards: the shift just ended still
-    overlaps every window up to now (docs/adr/0001)."""
+    does not. stamped tells whether clockOut was sent. There is no check
+    afterwards: the shift just ended still overlaps every window up to now
+    (docs/adr/0001)."""
     def work(client):
         date, minute = today_and_minute()
         start = min(minute, 24 * 60 - 2)
@@ -788,6 +776,20 @@ def clock_in(args):
     if shift not in ("STARTED", "FINISHED"):
         raise HelperError("API_ERROR", "clock-in: unexpected answer %r" % (answer,))
     return {"running": shift == "STARTED"}
+
+
+# Calamari's shift status and the plugin's word for it.
+SHIFT_STATUS = {"STARTED": "running", "BREAK": "break", "STOPPED": "stopped"}
+
+
+def status(args):
+    """The shift status over REST (docs/adr/0003): "running", "break" (a
+    Pause inside the running shift) or "stopped"."""
+    answer = RestClient().call("/clockin/shift/status/v1/get-current")
+    shift = SHIFT_STATUS.get(answer.get("status")) if isinstance(answer, dict) else None
+    if shift is None:
+        raise HelperError("API_ERROR", "get-current: unexpected answer %r" % (answer,))
+    return {"shift": shift}
 
 
 def lookup(args):

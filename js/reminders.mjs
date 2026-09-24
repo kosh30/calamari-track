@@ -14,6 +14,7 @@
 import { lastActivity } from "./activity.mjs"
 import { coreTime } from "./daycalendar.mjs"
 import { fromMoment, minuteOfDay, pad, toHhmm, toMinutes, ymd } from "./daytime.mjs"
+import { breakSinceText, inPause } from "./shiftclock.mjs"
 
 // A failed auto-close is tried again after this many minutes.
 const AUTO_CLOSE_RETRY = 5
@@ -59,7 +60,7 @@ export function decide(now, day, state, settings) {
   // A state of another date (right after midnight, before the first poll
   // of the new day) or an unknown status must not remind.
   if (state.failed || state.running === null || state.date !== ymd(now)) return quiet()
-  if (state.breakSince && !state.running) return decideBreak(now, state, config)
+  if (inPause(state)) return decideBreak(now, state, config)
   if (state.running) return decideShift(now, day, state, config)
   return decideStamp(now, day, state, config)
 }
@@ -214,7 +215,7 @@ export function notification(action, day, state, settings) {
     return { headline: "Schicht vom Vortag beendet", body, click: "calamari" }
   }
   if (action.type === "break-reminder")
-    return panel("Pause läuft noch", `Die Pause läuft seit ${state.breakSince}.`)
+    return panel("Pause läuft noch", `Die Pause läuft seit ${breakSinceText(state)}.`)
   return panel("Noch nicht eingestempelt", `Die Kernzeit läuft seit ${day.coreStart}.`)
 }
 

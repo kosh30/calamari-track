@@ -170,29 +170,56 @@ class CalamariCliTest(unittest.TestCase):
 
     def test_status_sees_a_running_shift(self):
         self.login()
+        self.store_api_key()
         self.fake.shifts = [("2026-09-22", "09:40:30", None)]
 
         code, out = self.run_helper("status")
 
-        self.assertEqual((code, out), (0, {"ok": True, "running": True}))
+        self.assertEqual((code, out), (0, {"ok": True, "shift": "running"}))
+        self.assertEqual(self.fake.rest_calls[-1],
+                         ("/clockin/shift/status/v1/get-current", {"person": "erika@example.com"}))
 
-    def test_status_without_shift_is_not_running(self):
+    def test_status_without_shift_is_stopped(self):
         self.login()
+        self.store_api_key()
         self.fake.shifts = [("2026-09-22", "08:00:00", "12:00:00")]
 
         code, out = self.run_helper("status")
 
-        self.assertEqual((code, out), (0, {"ok": True, "running": False}))
+        self.assertEqual((code, out), (0, {"ok": True, "shift": "stopped"}))
 
-    def test_status_still_sees_a_shift_ended_a_minute_ago(self):
-        # Accepted lag of the overlap trick (docs/adr/0001): the window looks
-        # back two minutes.
+    def test_status_sees_a_break(self):
         self.login()
+        self.store_api_key()
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+        self.fake.on_break = True
+
+        code, out = self.run_helper("status")
+
+        self.assertEqual((code, out), (0, {"ok": True, "shift": "break"}))
+
+    def test_status_no_longer_sees_a_shift_ended_a_minute_ago(self):
+        # REST knows the status; the lag of the overlap trick is gone.
+        self.login()
+        self.store_api_key()
         self.fake.shifts = [("2026-09-22", "08:00:00", "13:59:00")]
 
         code, out = self.run_helper("status")
 
-        self.assertEqual((code, out), (0, {"ok": True, "running": True}))
+        self.assertEqual((code, out), (0, {"ok": True, "shift": "stopped"}))
+        self.assertEqual(self.fake.overlap_calls, 0)
+
+    def test_status_with_an_unexpected_answer_is_an_api_error(self):
+        self.login()
+        self.store_api_key()
+        self.fake.shift_status = "PAUSED"
+
+        self.assert_error(self.run_helper("status"), "API_ERROR")
+
+    def test_status_without_api_key_asks_for_one(self):
+        self.login()
+
+        self.assert_error(self.run_helper("status"), "API_KEY_REQUIRED")
 
     def test_day_end_sees_a_shift_that_was_still_open_at_the_end_of_the_day(self):
         # Calamari ends an open shift at 23:59 (company policy), so the entry

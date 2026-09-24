@@ -23,7 +23,8 @@ Panel {
     readonly property var breakAction: authState === "ok" && view !== null ? ShiftClock.breakAction(view) : null
     // After the final warning: the countdown to the auto-close.
     readonly property string countdown: service ? Reminders.countdownText(service.decision, service.now) : ""
-    readonly property var feierabendAction: authState === "ok" && view !== null ? ShiftClock.feierabendAction(view) : null
+    readonly property var feierabendAction: authState === "ok" && view !== null && service
+        ? ShiftClock.feierabendAction(view, service.shiftState) : null
 
     // A button's text, with "…" while its own action runs.
     // During the countdown clocking out is "Jetzt ausstempeln".
@@ -132,7 +133,7 @@ Panel {
                         text: !view || view.kind === "unknown" ? "Schichtstatus wird abgefragt …"
                             : view.kind === "error" ? "Schichtstatus unbekannt"
                             : view.kind === "reminder" ? "Noch nicht eingestempelt, die Kernzeit läuft"
-                            : view.kind === "break" ? "Pause seit " + shift.breakSince + " (" + view.text + ")"
+                            : view.kind === "break" ? "Pause seit " + ShiftClock.breakSinceText(shift) + " (" + view.text + ")"
                             : view.kind === "idle" ? (shift.clockedOutAt ? "Feierabend seit " + shift.clockedOutAt : "Keine laufende Schicht")
                             : shift.startedAt ? "Schicht läuft seit " + shift.startedAt + " (" + view.text + ")"
                             : "Schicht läuft"

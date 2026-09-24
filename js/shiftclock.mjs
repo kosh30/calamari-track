@@ -4,14 +4,21 @@
 //
 // State (persisted by the service):
 //   date       YYYY-MM-DD the state belongs to
-//   running    last known answer of `status` (null before the first one)
+//   running    whether a shift runs in Calamari, in a Pause too (null
+//              before the first answer of `status`)
+//   onBreak    true while Calamari reports the running shift in a Pause
+//              (web, phone); the shift and its start stay
 //   startedAt  HH:MM start of the running shift, cached until it ends
 //   searchAfter  HH:MM from which no earlier shift of today reaches on:
 //              the --after of the next start-time search. Set by a poll
 //              that saw no shift and by the own clock-out.
 //   clockedOutAt  HH:MM of the own clock-out that began the Feierabend today
-//   breakSince HH:MM of the own clock-out that began the running Pause
-//   stoppedAt  HH:MM of the last own clock-out of any kind (status lag)
+//   breakSince HH:MM since when the running Pause is known: the own
+//              clock-out that began it, or the poll that first saw onBreak
+//   breakStartUnknown  true when breakSince is only that first sight: the
+//              real start of the Pause is unknown
+//   breakMinutes  minutes of today's ended Pauses inside running shifts
+//              (they are in the shifts' spans, but no work)
 //   unclosed   YYYY-MM-DD of a day the plugin left with a running shift,
 //              until `day-end` said how that day ended (pendingDayEnd)
 //   shifts     [{ start, end }] HH:MM of today's ended shifts the plugin saw
@@ -34,12 +41,8 @@
 import { awayCovers, lastActivity } from "./activity.mjs"
 import { minuteOfDay, pad, toHhmm, toMinutes, ymd } from "./daytime.mjs"
 
-// `status` looks back this many minutes, so a shift that just ended can
-// still look running for that long.
-const STATUS_WINDOW = 2
-
 export function emptyState() {
-  return { date: "", running: null, startedAt: null, searchAfter: null, clockedOutAt: null, breakSince: null, stoppedAt: null, unclosed: null, stampedToday: false, dayOff: false, postponedTo: null, sent: {}, shifts: [], pendingEnd: null,
+  return { date: "", running: null, onBreak: false, startedAt: null, searchAfter: null, clockedOutAt: null, breakSince: null, breakStartUnknown: false, breakMinutes: 0, unclosed: null, stampedToday: false, dayOff: false, postponedTo: null, sent: {}, shifts: [], pendingEnd: null,
     lastSeen: null, idle: false, awaySince: null, awayUntil: null }
 }
 
@@ -58,37 +61,42 @@ function forToday(state, now) {
   return Object.assign(carried, { date: today })
 }
 
-// Applies an answer of `status`. Returns { state, startTimeQuery,
-// endTimeQuery }: startTimeQuery is null or { after: "HH:MM" | null }, the
-// --after argument for `start-time` when the start of the running shift is
-// unknown; endTimeQuery is null or { after: "HH:MM" }, for `end-time` when
-// a shift of known start ended outside the plugin (web, phone).
-export function applyStatus(state, running, now) {
+// Applies an answer of `status`: shift is "running", "break" (a Pause
+// inside the running shift) or "stopped". Calamari's answer is exact, so
+// it counts as it is. Returns { state, startTimeQuery, endTimeQuery }:
+// startTimeQuery is null or { after: "HH:MM" | null }, the --after argument
+// for `start-time` when the start of the running shift is unknown;
+// endTimeQuery is null or { after: "HH:MM" }, for `end-time` when a shift
+// of known start ended outside the plugin (web, phone).
+export function applyStatus(state, shift, now) {
   const next = forToday(state, now)
-  const before = { running: next.running, startedAt: next.startedAt }
-  // Right after the own clock-out (Feierabend, Pause) the ended shift still
-  // overlaps the status window; the clock-out is the newer truth.
-  if (running && next.stoppedAt && minuteOfDay(now) - toMinutes(next.stoppedAt) <= STATUS_WINDOW)
-    running = false
-  // In the minute of the own clock-in the status window, which ends at the
-  // full minute, cannot see the new shift yet. (A start found by start-time
-  // always lies in an earlier minute.)
-  if (!running && next.running && next.startedAt && minuteOfDay(now) === toMinutes(next.startedAt))
-    running = true
-  next.running = running
-  if (!running) {
+  const before = { running: next.running, startedAt: next.startedAt, breakSince: next.breakSince }
+  const minute = minuteOfDay(now)
+  next.running = shift !== "stopped"
+  next.onBreak = shift === "break"
+  // A Pause inside a running shift (not the own clock-out, ADR 0001) is
+  // over: its time is no work. The first poll that tells may come late.
+  const pauseInShift = before.running === true && before.breakSince
+  if (pauseInShift && !next.onBreak) {
+    next.breakMinutes += Math.max(minute - toMinutes(before.breakSince), 0)
+    Object.assign(next, { breakSince: null, breakStartUnknown: false })
+  }
+  if (!next.running) {
     next.startedAt = null
-    // No shift overlapped the window, so any earlier one ended before it.
-    next.searchAfter = laterOf(next.searchAfter, toHhmm(Math.max(minuteOfDay(now) - STATUS_WINDOW, 0)))
+    // No shift ran at this poll; one that ended earlier in this minute
+    // still reaches into it.
+    next.searchAfter = laterOf(next.searchAfter, toHhmm(Math.min(minute + 1, 24 * 60 - 1)))
     // A shift of known start ended outside the plugin (web, phone); asked
     // again on every poll until end-time answered.
     if (before.running === true && before.startedAt) next.pendingEnd = before.startedAt
     return { state: next, startTimeQuery: null, endTimeQuery: next.pendingEnd ? { after: next.pendingEnd } : null }
   }
-  // A shift runs again (stamped in the web or on the phone): the
-  // Feierabend or the Pause is over.
+  // A shift runs (maybe stamped in the web or on the phone): the
+  // Feierabend is over, and so is the own Pause. A Pause Calamari reports
+  // counts from its first sight; its real start is unknown.
   next.clockedOutAt = null
-  next.breakSince = null
+  if (!next.onBreak) Object.assign(next, { breakSince: null, breakStartUnknown: false })
+  else if (!pauseInShift) Object.assign(next, { breakSince: toHhmm(minute), breakStartUnknown: true })
   next.stampedToday = true
   if (next.startedAt) return { state: next, startTimeQuery: null, endTimeQuery: null }
   return { state: next, startTimeQuery: { after: next.searchAfter }, endTimeQuery: null }
@@ -119,9 +127,11 @@ export function workedMinutes(state, now) {
   if (state.date !== ymd(now)) return 0
   let total = 0
   for (const shift of state.shifts) total += toMinutes(shift.end) - toMinutes(shift.start)
+  // The time of a Pause is no work.
+  const until = state.onBreak && state.breakSince ? toMinutes(state.breakSince) : minuteOfDay(now)
   if (state.running && state.startedAt)
-    total += Math.max(minuteOfDay(now) - toMinutes(state.startedAt), 0)
-  return total
+    total += Math.max(until - toMinutes(state.startedAt), 0)
+  return Math.max(total - (state.breakMinutes || 0), 0)
 }
 
 // The minute Calamari ends an open shift in (docs/adr/0002); the day-end
@@ -172,11 +182,15 @@ export function restoreState(text) {
 }
 
 // The own clock-in succeeded and Calamari sees the shift: it started now,
-// and a Feierabend earlier today is over.
+// and a Feierabend earlier today is over. Out of a Pause Calamari reported,
+// the shift goes on with its start; the Pause is kept until a poll tells
+// whether the clock-in ended it (applyStatus).
 function applyClockIn(state, now) {
   const next = forToday(state, now)
-  const minute = toHhmm(minuteOfDay(now))
-  return Object.assign(next, { running: true, startedAt: minute, clockedOutAt: null, breakSince: null, stampedToday: true })
+  if (next.onBreak && next.startedAt)
+    return Object.assign(next, { running: true, onBreak: false, clockedOutAt: null, stampedToday: true })
+  return Object.assign(next, { running: true, onBreak: false, startedAt: toHhmm(minuteOfDay(now)), clockedOutAt: null,
+    breakSince: null, breakStartUnknown: false, stampedToday: true })
 }
 
 // The own clock-out succeeded: no shift runs.
@@ -185,10 +199,11 @@ function stopShift(state, now) {
   const minute = minuteOfDay(now)
   // The own clock-out knows the end of today's shift right away.
   if (next.running && next.startedAt) addShift(next, next.startedAt, toHhmm(minute))
+  if (next.running && next.breakSince) next.breakMinutes += Math.max(minute - toMinutes(next.breakSince), 0)
   // The ended shift reaches into the minute of the clock-out.
   return Object.assign(next, {
-    running: false, startedAt: null, clockedOutAt: null, breakSince: null,
-    stoppedAt: toHhmm(minute), searchAfter: toHhmm(Math.min(minute + 1, 24 * 60 - 1)),
+    running: false, onBreak: false, startedAt: null, clockedOutAt: null, breakSince: null, breakStartUnknown: false,
+    searchAfter: toHhmm(Math.min(minute + 1, 24 * 60 - 1)),
   })
 }
 
@@ -203,12 +218,13 @@ function applyBreakStart(state, now) {
   return Object.assign(stopShift(state, now), { breakSince: toHhmm(minuteOfDay(now)) })
 }
 
-// Going home straight from a Pause: nothing to stamp (the shift already
-// ended when the Pause began), so the Feierabend starts back then.
+// Going home straight from the own Pause: nothing to stamp (the shift
+// already ended when the Pause began), so the Feierabend starts back then.
+// A Pause Calamari reports keeps its shift running, so nothing happens.
 export function endBreakAsFeierabend(state, now) {
   const next = forToday(state, now)
   if (!next.breakSince || next.running) return state
-  return Object.assign(next, { clockedOutAt: next.breakSince, breakSince: null })
+  return Object.assign(next, { clockedOutAt: next.breakSince, breakSince: null, breakStartUnknown: false })
 }
 
 // The panel switch "Heute frei". Like everything in the state it belongs
@@ -235,10 +251,21 @@ export function barView({ state, now, authState, failed, reminding }) {
   if (authState === "required") return { kind: "auth", text: "" }
   if (failed) return { kind: "error", text: "" }
   if (!state || state.running === null) return { kind: "unknown", text: "" }
-  if (!state.running && state.breakSince) return { kind: "break", text: duration(state.breakSince, now) }
+  if (inPause(state)) return { kind: "break", text: duration(state.breakSince, now) }
   if (!state.running) return { kind: reminding ? "reminder" : "idle", text: "" }
   if (!state.startedAt) return { kind: "running", text: "" }
   return { kind: "running", text: duration(state.startedAt, now) }
+}
+
+// When the running Pause began, as far as the plugin knows.
+export function breakSinceText(state) {
+  return `${state.breakStartUnknown ? "spätestens " : ""}${state.breakSince}`
+}
+
+// Whether a Pause runs: the own one (a clock-out, ADR 0001) or one
+// Calamari reports.
+export function inPause(state) {
+  return Boolean(state.breakSince) && (state.running === false || state.onBreak === true)
 }
 
 function duration(since, now) {
@@ -297,9 +324,10 @@ export function breakAction(view) {
   return view.kind === "running" ? "break-start" : null
 }
 
-// "end-break" (endBreakAsFeierabend) the panel offers during a Pause.
-export function feierabendAction(view) {
-  return view.kind === "break" ? "end-break" : null
+// "end-break" (endBreakAsFeierabend) the panel offers during the own
+// Pause; during one Calamari reports it would stamp nothing.
+export function feierabendAction(view, state) {
+  return view.kind === "break" && !(state && state.onBreak) ? "end-break" : null
 }
 
 // Applies an answer of `clock-in` / `clock-out` for a stamp action.
@@ -327,7 +355,7 @@ export function applyStamp(state, action, out, now) {
   if (out.running) return { state: applyClockIn(state, now), error: "", pollNow: false }
   // Calamari took the clock-in but shows no shift: say so, and look again.
   return {
-    state: applyStatus(state, false, now).state,
+    state: applyStatus(state, "stopped", now).state,
     error: `${STAMP_ACTIONS[action]}: Calamari meldet keine laufende Schicht. Bitte im Web prüfen.`,
     pollNow: true,
   }

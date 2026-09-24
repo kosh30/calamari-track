@@ -8,7 +8,7 @@ import { heartbeat, setIdle } from "./activity.mjs"
 const at = (hhmm, date = "2026-09-22") => new Date(`${date}T${hhmm}:00`)
 const workday = { date: "2026-09-22", workingDay: true, coreStart: "09:00", coreEnd: "16:45" }
 const config = { stampReminderMinutes: 5 }
-const noShift = now => applyStatus(emptyState(), false, at(now)).state
+const noShift = now => applyStatus(emptyState(), "stopped", at(now)).state
 const types = r => r.actions.map(a => a.type)
 const quietDay = { barState: null, actions: [], nextCheckAt: null, autoCloseAt: null, canExtend: false }
 
@@ -59,8 +59,8 @@ test("nach einem Feierabend vor Ende der Kernzeit kommt keine Stempel-Erinnerung
 
 test("wer heute schon eingestempelt war, bekommt keine Stempel-Erinnerung", () => {
   // Stamped in and out in the web: no Feierabend, but not "noch gar nicht eingestempelt".
-  let state = applyStatus(noShift("08:55"), true, at("09:10")).state
-  state = applyStatus(state, false, at("12:00")).state
+  let state = applyStatus(noShift("08:55"), "running", at("09:10")).state
+  state = applyStatus(state, "stopped", at("12:00")).state
   assert.deepEqual(types(decide(at("12:05"), workday, state, config)), [])
 })
 
@@ -79,7 +79,7 @@ test("wer mitten in der Kernzeit startet, wird sofort erinnert", () => {
 
 test("am Wochenende gibt es keine Stempel-Erinnerung", () => {
   const saturday = { date: "2026-09-26", workingDay: false, coreStart: null, coreEnd: null }
-  const r = decide(at("10:00", "2026-09-26"), saturday, applyStatus(emptyState(), false, at("10:00", "2026-09-26")).state, config)
+  const r = decide(at("10:00", "2026-09-26"), saturday, applyStatus(emptyState(), "stopped", at("10:00", "2026-09-26")).state, config)
   assert.deepEqual(r, quietDay)
 })
 
@@ -122,7 +122,7 @@ test("an einem Feiertag gibt es keine Stempel-Erinnerung", () => {
 
 test("ein halber Feiertag am Nachmittag lässt die Kernzeit um 12:00 enden", () => {
   const eve = withDay({ date: "2026-12-24", holiday: { name: "Heiligabend (PM)", halfDay: true, halfdayPeriod: "PM" } })
-  const state = applyStatus(emptyState(), false, at("11:50", "2026-12-24")).state
+  const state = applyStatus(emptyState(), "stopped", at("11:50", "2026-12-24")).state
   assert.deepEqual(types(decide(at("11:50", "2026-12-24"), eve, state, config)), ["stamp-reminder"])
   assert.deepEqual(decide(at("12:00", "2026-12-24"), eve, state, config), quietDay)
 })
@@ -161,8 +161,8 @@ test("„Heute frei“ lässt sich zurücknehmen", () => {
 })
 
 test("„Heute frei“ gilt am nächsten Tag nicht mehr", () => {
-  const monday = setDayOff(applyStatus(emptyState(), false, at("08:00", "2026-09-21")).state, true, at("08:00", "2026-09-21"))
-  const tuesday = applyStatus(monday, false, at("10:00")).state
+  const monday = setDayOff(applyStatus(emptyState(), "stopped", at("08:00", "2026-09-21")).state, true, at("08:00", "2026-09-21"))
+  const tuesday = applyStatus(monday, "stopped", at("10:00")).state
   assert.deepEqual(types(decide(at("10:00"), withDay({}), tuesday, config)), ["stamp-reminder"])
 })
 
@@ -177,7 +177,7 @@ test("eine Arbeitsplan-Überschreibung gilt für ihren Wochentag", () => {
 
 test("eine Arbeitsplan-Überschreibung macht einen arbeitsfreien Wochentag zum Arbeitstag", () => {
   const saturday = { date: "2026-09-26", workingDay: false, coreStart: null, coreEnd: null, holiday: null, absence: null }
-  const state = applyStatus(emptyState(), false, at("10:00", "2026-09-26")).state
+  const state = applyStatus(emptyState(), "stopped", at("10:00", "2026-09-26")).state
   const own = Object.assign({}, config, { coreSaturday: "09:00-12:00" })
   assert.deepEqual(types(decide(at("10:00", "2026-09-26"), saturday, state, own)), ["stamp-reminder"])
 })
@@ -237,7 +237,7 @@ test("die Pausen-Erinnerung einer früheren Pause zählt bei der nächsten nicht
 
 test("auch am Wochenende erinnert eine lange Pause", () => {
   const saturday = { date: "2026-09-26", workingDay: false, coreStart: null, coreEnd: null, holiday: null, absence: null }
-  let state = applyStatus(emptyState(), false, at("09:55", "2026-09-26")).state
+  let state = applyStatus(emptyState(), "stopped", at("09:55", "2026-09-26")).state
   state = applyStamp(state, "clock-in", { ok: true, running: true }, at("10:00", "2026-09-26")).state
   state = applyStamp(state, "break-start", { ok: true, running: false }, at("11:00", "2026-09-26")).state
   assert.deepEqual(types(decide(at("11:30", "2026-09-26"), saturday, state, breakConfig)), ["break-reminder"])
@@ -344,7 +344,7 @@ test("eine erst abends begonnene Schicht bekommt keinen sanften Hinweis", () => 
 
 test("am Wochenende mit laufender Schicht kommen letzte Warnung und Auto-Abschluss, aber kein sanfter Hinweis", () => {
   const saturday = { date: "2026-09-26", workingDay: false, coreStart: null, coreEnd: null, holiday: null, absence: null }
-  let state = applyStatus(emptyState(), false, at("09:55", "2026-09-26")).state
+  let state = applyStatus(emptyState(), "stopped", at("09:55", "2026-09-26")).state
   state = applyStamp(state, "clock-in", { ok: true, running: true }, at("10:00", "2026-09-26")).state
   assert.deepEqual(types(decide(at("18:00", "2026-09-26"), saturday, state, eveningConfig)), [])
   assert.deepEqual(types(decide(at("19:00", "2026-09-26"), saturday, state, eveningConfig)), ["final-warning"])
@@ -430,7 +430,7 @@ test("nach dem Korrektur-Hinweis für den Vortag beginnt der neue Tag normal", (
   const state = applyDayEnd(morningAfter(), "2026-09-22", true, at("07:30", "2026-09-23")).state
   assert.equal(state.clockedOutAt, null)
   assert.deepEqual(types(decide(at("07:30", "2026-09-23"), wednesday, state, eveningConfig)), [])
-  const later = applyStatus(state, false, at("09:00", "2026-09-23")).state
+  const later = applyStatus(state, "stopped", at("09:00", "2026-09-23")).state
   assert.deepEqual(types(decide(at("09:00", "2026-09-23"), wednesday, later, eveningConfig)), ["stamp-reminder"])
   assert.equal(later.stampedToday, false)
 })
@@ -484,6 +484,32 @@ test("solange der Beginn einer im Web begonnenen Schicht unbekannt ist, wird nic
   let state = markSent(postpone(markSent(hinted(), "final-warning", at("19:00")), eveningConfig, at("19:00")), "final-warning", at("20:00"))
   state = stamp(markSent(state, "auto-close", at("20:15")), "clock-out", "20:15")
   // Clocked in on the phone; the poll sees it, start-time has not answered yet.
-  state = applyStatus(state, true, at("20:40")).state
+  state = applyStatus(state, "running", at("20:40")).state
   assert.deepEqual(types(decide(at("20:40"), workday, state, eveningConfig)), [])
+})
+
+// Pause, die Calamari meldet (im Web, auf dem Handy)
+
+const seenBreak = (seen, begun = "09:00") => applyStatus(working(begun), "break", at(seen)).state
+
+test("in einer fremden Pause kommt keine Stempel-Erinnerung und kein sanfter Hinweis", () => {
+  assert.deepEqual(types(decide(at("12:10"), workday, seenBreak("12:00"), breakConfig)), [])
+  assert.deepEqual(types(decide(at("17:20"), workday, seenBreak("17:10"), eveningConfig)), [])
+})
+
+test("die Pausen-Erinnerung einer fremden Pause zählt ab dem ersten Sehen", () => {
+  let state = seenBreak("12:10")
+  state = applyStatus(state, "break", at("12:30")).state
+  assert.deepEqual(types(decide(at("12:39"), workday, state, breakConfig)), [])
+  assert.deepEqual(types(decide(at("12:40"), workday, state, breakConfig)), ["break-reminder"])
+})
+
+test("die Pausen-Erinnerung einer fremden Pause sagt, dass ihr Beginn nicht bekannt ist", () => {
+  assert.deepEqual(notification({ type: "break-reminder" }, workday, seenBreak("12:10")),
+    { headline: "Pause läuft noch", body: "Die Pause läuft seit spätestens 12:10.", click: "panel" })
+})
+
+test("nach einer fremden Pause läuft die Schicht mit ihren Erinnerungen weiter", () => {
+  const state = applyStatus(seenBreak("12:10"), "running", at("12:40")).state
+  assert.deepEqual(types(decide(at("17:15"), workday, state, eveningConfig)), ["soft-hint"])
 })

@@ -36,6 +36,10 @@ class FakeCalamari:
         self.rest_failure = None
         # Force the shiftStatus of the clock-in answer, e.g. "FINISHED".
         self.clock_in_status = None
+        # The running shift is in a break (get-current says BREAK).
+        self.on_break = False
+        # Force the status of the get-current answer, e.g. "PAUSED".
+        self.shift_status = None
 
         # Knobs for the tests.
         self.response_mode = "json"  # or "sse"
@@ -181,6 +185,12 @@ class _Handler(BaseHTTPRequestHandler):
             return self._send(200, self.fake.break_types)
         if path == "/clockin/terminal/v1/clock-in":
             return self._clock_in(req)
+        if path == "/clockin/shift/status/v1/get-current":
+            running = any(end is None for _, _, end in self.fake.shifts)
+            status = "BREAK" if running and self.fake.on_break else "STARTED" if running else "STOPPED"
+            return self._send(200, {"person": {"firstName": "Erika", "lastName": "Mustermann",
+                                               "email": req.get("person")},
+                                    "status": self.fake.shift_status or status})
         self._send(404, {"message": "Not found", "code": "INVALID_METHOD_URL", "field": None})
 
     def _clock_in(self, req):
