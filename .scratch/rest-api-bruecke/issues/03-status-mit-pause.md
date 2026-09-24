@@ -4,7 +4,7 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** resolved
 
 - [x] `status` liefert einen von drei Werten statt `running: bool`
 - [x] Der lokale Zustand unterscheidet „Schicht läuft“ und „Schicht läuft, Pause“; eine Pause beendet die Schicht nicht
@@ -12,7 +12,7 @@
 - [x] Die Korrekturen für das Overlap-Fenster (Nachlauf nach dem eigenen Ausstempeln, Minute des Einstempelns) gelten nur noch, wo der Status noch vom Overlap kommt, oder fallen weg
 - [x] Stempel-Erinnerung, sanfter Hinweis und Gesamtzeit heute verhalten sich in einer Pause wie bisher
 - [x] Tests für die Zustandsübergänge mit Pause, auch nach Tageswechsel und Neustart
-- [ ] Mit dem Benutzer abgenommen: Pause im Web begonnen, die Bar zeigt sie; im Web beendet, die Bar zeigt wieder die laufende Schicht
+- [x] Mit dem Benutzer abgenommen: Pause im Web begonnen, die Bar zeigt sie; im Web beendet, die Bar zeigt wieder die laufende Schicht
 
 ## Comments
 
@@ -29,3 +29,6 @@
 - Bekannte Zeiten ersetzen im Plugin das erste Sehen und die Startzeit-Suche, auch eine veraltete gecachte Startzeit. „seit spätestens“ erscheint nur noch ohne diese Zeiten.
 - Die Startzeit-/Endzeit-Suche und der Tagesende-Check per MCP bleiben, sie ließen sich mit denselben Einträgen ersetzen (Phase 2).
 - Gegen das echte Calamari: `{"shift": "break", "startedAt": "11:24", "breakSince": "11:46"}`.
+
+**2026-09-24 (Agent):** Mit dem Benutzer gegen das echte Calamari abgenommen. Pause im Web begonnen: das Panel zeigte „Pause seit 11:46“ (echter Beginn aus dem Zeiteintrag). Im Web beendet: laufende Schicht seit 11:24, die Pause (19 Min) zählt nicht zur Gesamtzeit.
+- Lehre fürs Einspielen: Ändert sich die Antwort eines Helper-Befehls, den der Service liest, gilt der neue Helper sofort, der Service erst nach `omarchy-restart-shell`. In der Zwischenzeit las der alte Service `running` aus der neuen `status`-Antwort als fehlend, hielt die Schicht für beendet und trug eine Schicht 11:24–11:30 in `shifts` ein (Gesamtzeit heute 6 Min zu hoch, weg mit dem Tageswechsel). Bei solchen Änderungen den Neustart direkt nach dem Commit machen.
