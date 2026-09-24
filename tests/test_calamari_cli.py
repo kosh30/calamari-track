@@ -23,12 +23,14 @@ class CalamariCliTest(unittest.TestCase):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         self.keyring = Path(tmp.name) / "keyring.json"
+        self.log = Path(tmp.name) / "journal.log"
 
     def start_helper(self, *args, base_url=None, api_url=None):
         env = dict(os.environ,
                    CALAMARI_BASE_URL=base_url or self.fake.base_url,
                    CALAMARI_API_URL=api_url or self.fake.api_url,
                    CALAMARI_KEYRING_FILE=str(self.keyring),
+                   CALAMARI_LOG_FILE=str(self.log),
                    CALAMARI_NOW=self.fake.now,
                    BROWSER="%s %s %%s" % (sys.executable, FAKE_BROWSER))
         return subprocess.Popen([sys.executable, str(HELPER), *args], env=env, stdin=subprocess.PIPE,
@@ -44,6 +46,9 @@ class CalamariCliTest(unittest.TestCase):
 
     def run_helper(self, *args, base_url=None, api_url=None, input=None):
         return self.finish_helper(self.start_helper(*args, base_url=base_url, api_url=api_url), input)
+
+    def log_text(self):
+        return self.log.read_text() if self.log.exists() else ""
 
     def keyring_text(self):
         return self.keyring.read_text()
@@ -614,6 +619,41 @@ class CalamariCliTest(unittest.TestCase):
         self.store_api_key()
 
         self.assert_error(self.run_helper("lookup", api_url="http://127.0.0.1:9/api"), "NETWORK")
+
+    # Journal
+
+    def test_every_failure_is_logged_with_command_and_code(self):
+        code, out = self.run_helper("whoami")
+
+        self.assertIn("err whoami failed: AUTH_REQUIRED " + out["error"]["message"], self.log_text())
+
+    def test_a_rest_failure_logs_what_was_sent_but_never_the_key(self):
+        self.login()
+        self.store_api_key()
+        self.fake.rest_failure = (400, "INVALID_TIME")
+
+        self.run_helper("clock-in")
+
+        log = self.log_text()
+        self.assertIn("/clockin/projects/v1/get-projects-for-person", log)
+        self.assertIn('"person": "erika@example.com"', log)
+        self.assertIn("INVALID_TIME", log)
+        self.assertNotIn(self.fake.api_key, log)
+
+    def test_a_stamp_is_logged(self):
+        self.login()
+        self.store_api_key()
+
+        self.run_helper("clock-in")
+
+        self.assertRegex(self.log_text(), r'info clock-in: .*"projectId": 7.*STARTED')
+
+    def test_success_without_stamp_is_not_logged(self):
+        self.login()
+
+        self.run_helper("whoami")
+
+        self.assertEqual(self.log_text(), "")
 
     # Other failures
 

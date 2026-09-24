@@ -5,6 +5,7 @@ Omarchy-Shell-Plugin (Quickshell), das die eigene Arbeitszeit in Calamari über 
 ## Befehle
 
 - Tests: `node --test js/` und `python3 -m unittest`
+- Log des Helpers (Fehler, gesendete REST-Anfragen, Stempelungen): `journalctl -t calamari-tracker`
 - Lint: `/usr/lib/qt6/bin/qmllint -I lint *.qml` (Snapshots auffrischen: `lint/refresh.sh`)
 - Installiert per Symlink `~/.config/omarchy/plugins/kosh.calamari-tracker`. Widget und Panel laden beim Speichern neu. `Service.qml` ist `keepLoaded` und braucht `omarchy-restart-shell`.
 
