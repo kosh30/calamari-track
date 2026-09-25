@@ -1,0 +1,254 @@
+#!/usr/bin/env python3
+"""Cut a release: tools/release X.Y.Z [--dry-run]
+
+Checks everything first (branch, tag, changelog, local checks, gh login,
+the GitHub CI run of the commit), then makes the release commit
+"Release vX.Y.Z" (manifest.json and CHANGELOG.md only) and the annotated
+tag, pushes main and the tag, fast-forwards the default branch stable to
+the tag and creates the GitHub release from the changelog section.
+Nothing is public before the local commit and tag exist. If a later step
+fails, the remaining commands are printed instead of rolling back.
+
+--dry-run prints the changelog section, the diff and the planned
+commands, reports the CI run without waiting for it, and changes nothing.
+See CONTRIBUTING.md, "Releasing".
+"""
+
+import argparse
+import datetime
+import difflib
+import glob
+import json
+import os
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+
+REPO_URL = "https://github.com/kosh30/calamari-track"
+WORKFLOW = "ci.yml"
+VERSION_RE = re.compile(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)")
+UNRELEASED_HEADING = "## [Unreleased]"
+LINK_RE = re.compile(r"^\[[^\]]+\]: ", re.M)
+
+
+class Abort(Exception):
+    """A precondition failed; the message tells what to do."""
+
+
+# The parts that decide
+
+
+def parse_version(text):
+    match = VERSION_RE.fullmatch(text)
+    if not match:
+        raise Abort("%r is not a version of the form X.Y.Z" % text)
+    return tuple(int(part) for part in match.groups())
+
+
+def check_version(version, current, tag_exists):
+    """version must be greater than the manifest's, or equal to it while its tag is missing (the first release)."""
+    new, old = parse_version(version), parse_version(current)
+    if tag_exists:
+        raise Abort("tag v%s already exists" % version)
+    if new < old:
+        raise Abort("%s is smaller than the current version %s in manifest.json" % (version, current))
+
+
+def release_changelog(text, version, date):
+    """Returns (new CHANGELOG.md text, release notes): [Unreleased] becomes [version] - date, links follow."""
+    start = text.find(UNRELEASED_HEADING + "\n")
+    if start < 0:
+        raise Abort("CHANGELOG.md has no %s section" % UNRELEASED_HEADING)
+    body_start = start + len(UNRELEASED_HEADING) + 1
+    ends = [m.start() for m in re.finditer(r"^## \[", text[body_start:], re.M)]
+    link = LINK_RE.search(text, body_start)
+    ends += [link.start() - body_start] if link else []
+    body_end = body_start + min(ends) if ends else len(text)
+    notes = text[body_start:body_end].strip()
+    if not re.search(r"^[-*] ", notes, re.M):
+        raise Abort("the %s section of CHANGELOG.md has no entries" % UNRELEASED_HEADING)
+
+    previous = re.search(r"^## \[(\d+\.\d+\.\d+)\]", text[body_end:], re.M)
+    head = text[:start] + "%s\n\n## [%s] - %s\n\n%s\n\n" % (UNRELEASED_HEADING, version, date, notes)
+    rest = re.sub(r"^\[Unreleased\]: .*\n?", "", text[body_end:], flags=re.M)
+    first_link = LINK_RE.search(rest)
+    links = "[Unreleased]: %s/compare/v%s...HEAD\n" % (REPO_URL, version)
+    if previous:
+        links += "[%s]: %s/compare/v%s...v%s\n" % (version, REPO_URL, previous.group(1), version)
+    else:
+        links += "[%s]: %s/releases/tag/v%s\n" % (version, REPO_URL, version)
+    if first_link:
+        rest = rest[: first_link.start()] + links + rest[first_link.start() :]
+    else:
+        rest = rest.rstrip("\n") + ("\n\n" if rest.strip() else "") + links
+    return head + rest.lstrip("\n"), notes
+
+
+def bump_manifest(text, version):
+    """Only the version string changes, so the file keeps its layout."""
+    new, count = re.subn(r'^(\s*"version":\s*)"[^"]*"', r'\g<1>"%s"' % version, text, count=1, flags=re.M)
+    if count != 1:
+        raise Abort("manifest.json has no top-level version")
+    return new
+
+
+def qt_pin(ci_yml):
+    match = re.search(r"install-qt-action@.*?\n\s+with:\s*\n(?:\s+.*\n)*?\s+version:\s*[\"']?([\d.]+)", ci_yml)
+    if not match:
+        raise Abort("no Qt version pinned in .github/workflows/%s" % WORKFLOW)
+    return match.group(1)
+
+
+def qmllint_version(output):
+    return output.split()[-1]
+
+
+def ci_verdict(runs):
+    """runs: gh run list --json databaseId,status,conclusion for one commit, newest first."""
+    if not runs:
+        raise Abort("no %s run for this commit on GitHub; push main and wait for CI" % WORKFLOW)
+    run = runs[0]
+    if run["status"] != "completed":
+        return "running"
+    if run["conclusion"] != "success":
+        raise Abort("the %s run %s of this commit concluded %s" % (WORKFLOW, run["databaseId"], run["conclusion"]))
+    return "green"
+
+
+# Talking to git, gh and the checks
+
+
+def run(*argv, check=True, capture=True, input=None):
+    proc = subprocess.run(argv, capture_output=capture, text=True, input=input)
+    if check and proc.returncode != 0:
+        raise Abort("%s failed:\n%s" % (shlex.join(argv), (proc.stderr or proc.stdout or "").strip()))
+    return proc.stdout.strip() if capture else ""
+
+
+def qt_tool(name):
+    return shutil.which(name) or "/usr/lib/qt6/bin/" + name
+
+
+def check_branch():
+    if run("git", "branch", "--show-current") != "main":
+        raise Abort("releases are cut from main")
+    if run("git", "status", "--porcelain", "--untracked-files=no"):
+        raise Abort("the worktree is not clean")
+    run("git", "fetch", "--quiet", "origin")
+    if run("git", "rev-parse", "main") != run("git", "rev-parse", "origin/main"):
+        raise Abort("main differs from origin/main; push or pull first")
+    if not run("git", "ls-remote", "--heads", "origin", "stable"):
+        raise Abort("origin has no branch stable; do the one-time setup in CONTRIBUTING.md first")
+
+
+def tag_exists(tag):
+    local = run("git", "rev-parse", "--quiet", "--verify", "refs/tags/" + tag, check=False)
+    return bool(local or run("git", "ls-remote", "--tags", "origin", "refs/tags/" + tag))
+
+
+def run_checks():
+    qmllint = qt_tool("qmllint")
+    checks = [
+        ["node", "--test", *sorted(glob.glob("js/*.test.mjs"))],
+        [sys.executable, "-m", "unittest"],
+        [qmllint, "-I", "lint", *sorted(glob.glob("*.qml"))],
+        ["tools/format", "--check"],
+    ]
+    for argv in checks:
+        print("check: " + shlex.join(argv[:3]) + (" …" if len(argv) > 3 else ""))
+        run(*argv)
+    local, pinned = qmllint_version(run(qmllint, "--version")), qt_pin(read(".github/workflows/" + WORKFLOW))
+    if local != pinned:
+        print("warning: local qmllint is %s, CI pins Qt %s; bump the pin in %s" % (local, pinned, WORKFLOW))
+
+
+def check_ci(sha, dry_run):
+    out = run("gh", "run", "list", "--workflow", WORKFLOW, "--commit", sha, "--json", "databaseId,status,conclusion")
+    runs = json.loads(out or "[]")
+    verdict = ci_verdict(runs)
+    print("CI: run %s of %s is %s" % (runs[0]["databaseId"], sha[:12], verdict))
+    if verdict == "running" and not dry_run:
+        print("waiting for it …")
+        if subprocess.run(["gh", "run", "watch", str(runs[0]["databaseId"]), "--exit-status"]).returncode != 0:
+            raise Abort("the %s run %s of this commit failed" % (WORKFLOW, runs[0]["databaseId"]))
+
+
+def read(path):
+    try:
+        with open(path) as f:
+            return f.read()
+    except OSError as e:
+        raise Abort("cannot read %s: %s" % (path, e.strerror))
+
+
+def diff(name, old, new):
+    return "".join(difflib.unified_diff(old.splitlines(True), new.splitlines(True), "a/" + name, "b/" + name))
+
+
+def release(version, dry_run):
+    tag = "v" + version
+    manifest_text = read("manifest.json")
+    current = json.loads(manifest_text)["version"]
+    changelog_text = read("CHANGELOG.md")
+
+    check_branch()
+    check_version(version, current, tag_exists(tag))
+    new_changelog, notes = release_changelog(changelog_text, version, datetime.date.today().isoformat())
+    new_manifest = bump_manifest(manifest_text, version)
+    run_checks()
+    run("gh", "auth", "status")
+    check_ci(run("git", "rev-parse", "main"), dry_run)
+
+    steps = [
+        ["git", "push", "--atomic", "origin", "main", "refs/tags/" + tag],
+        ["git", "push", "origin", tag + "^{commit}:refs/heads/stable"],
+        ["gh", "release", "create", tag, "--verify-tag", "--latest", "--title", tag, "--notes-file", "-"],
+    ]
+    if dry_run:
+        print("\nRelease notes of %s:\n\n%s\n" % (tag, notes))
+        print(diff("manifest.json", manifest_text, new_manifest) + diff("CHANGELOG.md", changelog_text, new_changelog))
+        print("Planned commands:")
+        for argv in [
+            ["git", "commit", "-m", "Release " + tag, "manifest.json", "CHANGELOG.md"],
+            ["git", "tag", "-a", tag, "-m", tag],
+            *steps,
+        ]:
+            print("  " + shlex.join(argv))
+        return
+
+    with open("manifest.json", "w") as f:
+        f.write(new_manifest)
+    with open("CHANGELOG.md", "w") as f:
+        f.write(new_changelog)
+    run("git", "commit", "--quiet", "-m", "Release " + tag, "manifest.json", "CHANGELOG.md")
+    run("git", "tag", "-a", tag, "-m", tag)
+    for i, argv in enumerate(steps):
+        print(shlex.join(argv))
+        proc = subprocess.run(argv, text=True, input=notes if argv[0] == "gh" else None)
+        if proc.returncode != 0:
+            print("\nFailed. The commit and tag exist locally; run the rest by hand:", file=sys.stderr)
+            for rest in steps[i:]:
+                suffix = " <<'EOF'\n%s\nEOF" % notes if rest[0] == "gh" else ""
+                print("  " + shlex.join(rest) + suffix, file=sys.stderr)
+            sys.exit(1)
+    print("Released %s." % tag)
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(prog="tools/release", description="Cut a release, see CONTRIBUTING.md.")
+    parser.add_argument("version", help="X.Y.Z, greater than the version in manifest.json")
+    parser.add_argument("--dry-run", action="store_true", help="show what would happen, change nothing")
+    args = parser.parse_args(argv)
+    os.chdir(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
+    try:
+        release(args.version, args.dry_run)
+    except Abort as e:
+        print("tools/release: " + str(e), file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

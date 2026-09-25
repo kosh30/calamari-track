@@ -7,7 +7,7 @@ set -uo pipefail
 PRETTIER=prettier@3.9.9
 RUFF=ruff@0.16.9
 JS_FILES=(js)
-PYTHON_FILES=(bin/calamari tests)
+PYTHON_FILES=(bin/calamari tools/release tests)
 QML_OPTIONS=(--semicolon-rule essential)
 
 cd "$(dirname "$0")/.." || exit 1
