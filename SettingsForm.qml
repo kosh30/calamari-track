@@ -16,6 +16,7 @@ Column {
 
     readonly property var schema: root.service && root.service.manifest && root.service.manifest.barWidget
         ? root.service.manifest.barWidget.schema || [] : []
+    readonly property string version: root.service && root.service.manifest ? root.service.manifest.version || "" : ""
     // Filled when the page opens, then edited in place; errors after "Speichern".
     property var fields: []
     property var texts: ({})
@@ -144,7 +145,6 @@ Column {
         color: Color.muted
         font.family: Style.font.family
         font.pixelSize: Style.font.bodySmall
-        text: root.service && root.service.manifest && root.service.manifest.version
-            ? "Calamari Tracker " + root.service.manifest.version : ""
+        text: root.version ? "Calamari Tracker " + root.version : ""
     }
 }

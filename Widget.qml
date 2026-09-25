@@ -17,6 +17,38 @@ BarWidget {
     readonly property bool alerting: view.kind === "auth" || view.kind === "error"
     readonly property color barForeground: bar ? bar.barForeground : Color.foreground
 
+    function viewForeground() {
+        switch (root.view.kind) {
+        case "running":
+            return root.themeGreen
+        case "break":
+            return root.themeYellow
+        case "reminder":
+            return Color.urgent
+        case "idle":
+            return Color.muted
+        }
+        return root.barForeground
+    }
+
+    function viewTooltip() {
+        switch (root.view.kind) {
+        case "auth":
+            return "Calamari: Anmeldung nötig"
+        case "error":
+            return root.service.errorTooltip
+        case "running":
+            return "Calamari: Schicht läuft"
+        case "reminder":
+            return "Calamari: noch nicht eingestempelt"
+        case "break":
+            return "Calamari: Pause"
+        case "idle":
+            return "Calamari: keine laufende Schicht"
+        }
+        return "Calamari Tracker"
+    }
+
     // The theme's green and yellow from colors.toml; the shell palette has none.
     property color themeGreen: "#5faf5f"
     property color themeYellow: "#d7af5f"
@@ -116,17 +148,9 @@ BarWidget {
         readonly property string glyph: root.view.kind === "break" ? "󰅶" : "󰔟"
         text: root.alerting ? "󰀦" : (root.view.text ? glyph + " " + root.view.text : glyph)
         active: root.alerting
-        foreground: root.view.kind === "running" ? root.themeGreen
-            : root.view.kind === "break" ? root.themeYellow
-            : root.view.kind === "reminder" ? Color.urgent
-            : root.view.kind === "idle" ? Color.muted : root.barForeground
+        foreground: root.viewForeground()
         dimmed: root.view.kind === "unknown"
-        tooltipText: root.opened ? "" : root.view.kind === "auth" ? "Calamari: Anmeldung nötig"
-            : root.view.kind === "error" ? root.service.errorTooltip
-            : root.view.kind === "running" ? "Calamari: Schicht läuft"
-            : root.view.kind === "reminder" ? "Calamari: noch nicht eingestempelt"
-            : root.view.kind === "break" ? "Calamari: Pause"
-            : root.view.kind === "idle" ? "Calamari: keine laufende Schicht" : "Calamari Tracker"
+        tooltipText: root.opened ? "" : root.viewTooltip()
 
         onPressed: function (b) {
             if (b === Qt.LeftButton)
