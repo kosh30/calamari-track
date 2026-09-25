@@ -31,9 +31,10 @@ A finished spec of the release process for this plugin on GitHub: every step, co
 - [What are the changelog rules, and where do they and the release instructions live?](issues/07-changelog-rules.md): the model's user-facing rules, entry in the same commit; all contribution and release rules in a new English `CONTRIBUTING.md`, `CLAUDE.md` points to it
 - [How does the Omarchy marketplace list, install and update a plugin?](issues/09-marketplace-mechanics.md): listing is an issue plus maintainer approval (needs root `LICENSE`, README with install and removal); `listingValidatedCommit` pins nothing, installs follow the default branch, so with `stable` the listing turns "Update unverified" only at releases; each release may get an optional `[Verify]` issue with the tagged SHA (median ~41 h); no rule against API keys, Python helpers, network or German UI
 - [Does a release wait for green CI, and which branches are protected?](issues/08-ci-as-gate.md): `tools/release` requires the `ci.yml` run on the commit it releases from to be green (waits if it is running, aborts if it failed or is missing); rulesets with no bypass block force pushes and deletion on `stable`, `main` and `v*` tags; no required checks; kept as JSON in `.github/rulesets/`, applied with `gh api` during the one-time setup
+- [Do we list the plugin in the Omarchy marketplace?](issues/10-marketplace-decision.md): not at `v0.1.0`, at 1.0 (someone besides the author uses it); `v0.1.0` ships a README removal section and a short `SECURITY.md` (private vulnerability reporting switched on in the one-time setup); no preview image yet
 
 ## Not yet specified
 
-- **Extra repo files**: `SECURITY.md`, a preview image for the README. Depends on "Do we list the plugin in the Omarchy marketplace?" (the repo is already public). `CONTRIBUTING.md` is decided (see the changelog rules).
-
 ## Out of scope
+
+- Listing in the Omarchy marketplace (submission, category and tags, `preview.png`, card summary language, `[Verify]` step, freezing the plugin id): deferred to 1.0, beyond the `v0.1.0` destination; see [Do we list the plugin in the Omarchy marketplace?](issues/10-marketplace-decision.md)
