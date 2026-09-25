@@ -1,0 +1,7 @@
+line-length = 120
+# Omarchy snapshots, tickets, docs and agent worktrees are not ours to format.
+extend-exclude = ["lint", ".scratch", "docs", ".claude"]
+
+[lint]
+# The pre-0.16 default set: real errors only, no style opinions.
+select = ["E4", "E7", "E9", "F"]

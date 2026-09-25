@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Formats the code, or with --check only checks it and exits non-zero on any
+# difference. This is the one place that pins the formatter versions; qmlformat
+# comes with Qt (see the Qt pin in .github/workflows/ci.yml).
+set -uo pipefail
+
+PRETTIER=prettier@3.9.9
+RUFF=ruff@0.16.9
+JS_FILES=(js)
+PYTHON_FILES=(bin/calamari tests)
+QML_OPTIONS=(--semicolon-rule essential)
+
+cd "$(dirname "$0")/.." || exit 1
+
+check=false
+case "${1:-}" in
+    "") ;;
+    --check) check=true ;;
+    *) echo "usage: tools/format [--check]" >&2; exit 2 ;;
+esac
+
+qmlformat=$(command -v qmlformat || echo /usr/lib/qt6/bin/qmlformat)
+qml_files=(*.qml)
+failed=0
+
+run() {
+    "$@" || failed=1
+}
+
+if $check; then
+    run npx --yes "$PRETTIER" --check "${JS_FILES[@]}"
+    run uvx "$RUFF" format --check "${PYTHON_FILES[@]}"
+    run uvx "$RUFF" check "${PYTHON_FILES[@]}"
+    for f in "${qml_files[@]}"; do
+        if ! "$qmlformat" "${QML_OPTIONS[@]}" "$f" | cmp -s - "$f"; then
+            echo "qmlformat: $f is not formatted" >&2
+            failed=1
+        fi
+    done
+else
+    run npx --yes "$PRETTIER" --write --log-level warn "${JS_FILES[@]}"
+    run uvx "$RUFF" format "${PYTHON_FILES[@]}"
+    run uvx "$RUFF" check --fix "${PYTHON_FILES[@]}"
+    run "$qmlformat" -i "${QML_OPTIONS[@]}" "${qml_files[@]}"
+fi
+
+exit $failed
