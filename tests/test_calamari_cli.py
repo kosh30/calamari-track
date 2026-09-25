@@ -3,6 +3,8 @@
 import datetime
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -14,6 +16,7 @@ from tests.fake_calamari import FakeCalamari
 ROOT = Path(__file__).resolve().parent.parent
 HELPER = ROOT / "bin" / "calamari"
 FAKE_BROWSER = Path(__file__).resolve().parent / "fake_browser.py"
+MANIFEST_VERSION = json.loads((ROOT / "manifest.json").read_text())["version"]
 
 
 class CalamariCliTest(unittest.TestCase):
@@ -25,7 +28,7 @@ class CalamariCliTest(unittest.TestCase):
         self.keyring = Path(tmp.name) / "keyring.json"
         self.log = Path(tmp.name) / "journal.log"
 
-    def start_helper(self, *args, base_url=None, api_url=None):
+    def start_helper(self, *args, base_url=None, api_url=None, helper=HELPER):
         env = dict(os.environ,
                    CALAMARI_BASE_URL=base_url or self.fake.base_url,
                    CALAMARI_API_URL=self.fake.api_url if api_url is None else api_url,
@@ -33,7 +36,7 @@ class CalamariCliTest(unittest.TestCase):
                    CALAMARI_LOG_FILE=str(self.log),
                    CALAMARI_NOW=self.fake.now,
                    BROWSER="%s %s %%s" % (sys.executable, FAKE_BROWSER))
-        return subprocess.Popen([sys.executable, str(HELPER), *args], env=env, stdin=subprocess.PIPE,
+        return subprocess.Popen([sys.executable, str(helper), *args], env=env, stdin=subprocess.PIPE,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
     def finish_helper(self, proc, input=None):
@@ -44,8 +47,8 @@ class CalamariCliTest(unittest.TestCase):
             self.fail("stdout is not one JSON object: %r (stderr: %s)" % (stdout, stderr))
         return proc.returncode, out
 
-    def run_helper(self, *args, base_url=None, api_url=None, input=None):
-        return self.finish_helper(self.start_helper(*args, base_url=base_url, api_url=api_url), input)
+    def run_helper(self, *args, base_url=None, api_url=None, input=None, helper=HELPER):
+        return self.finish_helper(self.start_helper(*args, base_url=base_url, api_url=api_url, helper=helper), input)
 
     def log_text(self):
         return self.log.read_text() if self.log.exists() else ""
@@ -855,7 +858,41 @@ class CalamariCliTest(unittest.TestCase):
     def test_every_failure_is_logged_with_command_and_code(self):
         code, out = self.run_helper("whoami")
 
-        self.assertIn("err whoami failed: AUTH_REQUIRED " + out["error"]["message"], self.log_text())
+        self.assertIn("err [%s] whoami failed: AUTH_REQUIRED %s" % (MANIFEST_VERSION, out["error"]["message"]),
+                      self.log_text())
+
+    def test_every_journal_line_starts_with_the_version_from_the_manifest(self):
+        self.login()
+        self.store_api_key()
+        self.fake.rest_failure = (400, "INVALID_TIME")
+
+        self.run_helper("clock-in")
+
+        lines = self.log_text().splitlines()
+        self.assertTrue(lines)
+        for line in lines:
+            self.assertRegex(line, r"^(err|info) \[%s\] " % re.escape(MANIFEST_VERSION))
+
+    def test_the_mcp_client_reports_the_version_from_the_manifest(self):
+        self.login()
+
+        self.run_helper("whoami")
+
+        self.assertEqual(self.fake.client_infos[-1], {"name": "calamari-tracker", "version": MANIFEST_VERSION})
+
+    def test_without_a_readable_manifest_the_version_is_unknown_and_that_is_logged(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        helper = Path(tmp.name) / "bin" / "calamari"
+        helper.parent.mkdir()
+        shutil.copy(HELPER, helper)
+        (Path(tmp.name) / "manifest.json").write_text("{not json")
+
+        self.assert_error(self.run_helper("whoami", helper=helper), "AUTH_REQUIRED")
+
+        log = self.log_text()
+        self.assertIn("err [unknown] cannot read the version from", log)
+        self.assertIn("err [unknown] whoami failed: AUTH_REQUIRED", log)
 
     def test_a_rest_failure_logs_what_was_sent_but_never_the_key(self):
         self.login()
@@ -876,7 +913,7 @@ class CalamariCliTest(unittest.TestCase):
 
         self.run_helper("clock-in")
 
-        self.assertRegex(self.log_text(), r'info clock-in: .*"projectId": 7.*STARTED')
+        self.assertRegex(self.log_text(), r'info \[[^]]+\] clock-in: .*"projectId": 7.*STARTED')
 
     def test_success_without_stamp_is_not_logged(self):
         self.login()

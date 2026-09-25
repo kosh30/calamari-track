@@ -53,11 +53,23 @@ KEYRING_SERVICE = "kosh.calamari-tracker"
 LOG_IDENT = "calamari-tracker"
 MCP_PROTOCOL_VERSION = "2025-06-18"
 CLIENT_NAME = "Calamari Tracker (Omarchy)"
-VERSION = "0.1.0"
 HTTP_TIMEOUT = 20
 LOGIN_TIMEOUT = 300
 # Refresh a little before the server would reject the token.
 EXPIRY_MARGIN = 60
+
+
+def read_version():
+    """Returns (version, problem). manifest.json next to bin/ is the only copy of the version."""
+    path = os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "manifest.json")
+    try:
+        with open(path) as f:
+            return str(json.load(f)["version"]), None
+    except (OSError, ValueError, KeyError, TypeError) as e:
+        return "unknown", "cannot read the version from %s: %s: %s" % (path, type(e).__name__, e)
+
+
+VERSION, VERSION_PROBLEM = read_version()
 
 
 class HelperError(Exception):
@@ -166,6 +178,7 @@ def lock_path():
 
 def log(level, text):
     """level "err" or "info". Never pass secrets: the journal is readable."""
+    text = "[%s] %s" % (VERSION, text)
     path = os.environ.get("CALAMARI_LOG_FILE")
     if path:
         with open(path, "a") as f:
@@ -978,6 +991,11 @@ COMMANDS = {"login": login, "whoami": whoami, "tools": tools, "status": status, 
 
 
 def main(argv):
+    if VERSION_PROBLEM:
+        try:
+            log("err", VERSION_PROBLEM)
+        except OSError:
+            pass
     try:
         args = parse_args(argv)
         out = dict(ok=True, **args.run(args))

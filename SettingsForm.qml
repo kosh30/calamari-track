@@ -136,4 +136,15 @@ Column {
             onClicked: root.save()
         }
     }
+
+    // The version comes from manifest.json, its only copy.
+    Text {
+        width: parent.width
+        visible: text !== ""
+        color: Color.muted
+        font.family: Style.font.family
+        font.pixelSize: Style.font.bodySmall
+        text: root.service && root.service.manifest && root.service.manifest.version
+            ? "Calamari Tracker " + root.service.manifest.version : ""
+    }
 }

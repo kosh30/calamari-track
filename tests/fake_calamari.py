@@ -95,6 +95,7 @@ class FakeCalamari:
         self.refresh_tokens = set()
         self.sessions = set()
         self.initialized_sessions = set()
+        self.client_infos = []  # clientInfo of every initialize, in order
         self.session_versions = {}
         self.token_requests = []
         self.tool_calls = []
@@ -351,6 +352,7 @@ class _Handler(BaseHTTPRequestHandler):
         method = msg.get("method")
         session = self.headers.get("Mcp-Session-Id")
         if method == "initialize":
+            self.fake.client_infos.append(msg["params"]["clientInfo"])
             session = secrets.token_hex(8)
             self.fake.sessions.add(session)
             version = self.fake.protocol_version or msg["params"]["protocolVersion"]
