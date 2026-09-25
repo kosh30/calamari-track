@@ -10,8 +10,8 @@ with a non-zero exit code.
 
 Environment:
   CALAMARI_BASE_URL      gateway base URL (tests point it at a fake)
-  CALAMARI_API_URL       REST API base URL (default DEFAULT_API_URL; the
-                         widget setting apiUrl)
+  CALAMARI_API_URL       REST API base URL, e.g. https://<company>.calamari.io/api
+                         (the widget setting apiUrl; no default)
   CALAMARI_KEYRING_FILE  keep secrets in this JSON file instead of the
                          Secret Service keyring (tests only)
   CALAMARI_LOG_FILE      append log lines to this file instead of the
@@ -43,7 +43,6 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, quote, urlencode, urlsplit, urlunsplit
 
 DEFAULT_BASE_URL = "https://gateway.eu-west-1.calamari.io"
-DEFAULT_API_URL = "https://cti.calamari.io/api"
 # The project of the own clock-ins, as web and phone set it (widget setting defaultProject).
 DEFAULT_PROJECT = "Check-in"
 # The break type of the own Pauses, the only one Calamari offers (widget setting breakType).
@@ -83,7 +82,11 @@ def mcp_url():
 
 
 def api_url():
-    return os.environ.get("CALAMARI_API_URL", DEFAULT_API_URL).rstrip("/")
+    """The REST API lives under the company's own address, so there is no default."""
+    url = os.environ.get("CALAMARI_API_URL", "").strip().rstrip("/")
+    if not url:
+        raise HelperError("API_URL_REQUIRED", "no REST API URL, set apiUrl (e.g. https://<company>.calamari.io/api)")
+    return url
 
 
 def well_known(url, name):
@@ -523,6 +526,14 @@ def today_and_minute():
     return t.strftime("%Y-%m-%d"), t.hour * 60 + t.minute
 
 
+def overlaps_now(client):
+    """Whether an entry reaches into the current minute: a running shift
+    does, one ended a minute ago does not."""
+    date, minute = today_and_minute()
+    start = min(minute, 24 * 60 - 2)
+    return overlaps(client, date, start, start + 1)
+
+
 # Commands
 
 
@@ -567,15 +578,28 @@ def clock_out(args):
     afterwards: the shift just ended still overlaps every window up to now
     (docs/adr/0001)."""
     def work(client):
-        date, minute = today_and_minute()
-        start = min(minute, 24 * 60 - 2)
-        running = overlaps(client, date, start, start + 1)
+        running = overlaps_now(client)
         if running:
             client.call_tool("clockOut", {})
             log("info", "clock-out: clockOut sent")
         return running
 
     return {"running": False, "stamped": with_mcp(work)}
+
+
+def check_overlap(args):
+    """The manual check whether checkTimesheetOverlap still counts a running
+    shift up to now, the undocumented behaviour behind start-time, end-time,
+    day-end and clock-out (docs/adr/0001). Calamari's REST status tells
+    whether a shift runs; only then can the check tell (unchanged null
+    otherwise). A changed behaviour is the error OVERLAP_CHANGED. Only
+    reads."""
+    shift = current_shift(RestClient())
+    overlapping = with_mcp(overlaps_now)
+    if shift == "running" and not overlapping:
+        raise HelperError("OVERLAP_CHANGED", "checkTimesheetOverlap no longer counts the running shift up to now; "
+                          "start-time, end-time, day-end and clock-out are unreliable (docs/adr/0001)")
+    return {"shift": shift, "overlapsNow": overlapping, "unchanged": True if shift == "running" else None}
 
 
 def first_minute(lo, hi, holds):
@@ -692,6 +716,7 @@ class RestClient:
     so every call names the person from the user's own profile."""
 
     def __init__(self):
+        self.url = api_url()
         store = keyring()
         key = store.get("apiKey")
         if not key:
@@ -703,7 +728,7 @@ class RestClient:
         """POSTs body plus the own person; returns the parsed answer."""
         payload = dict(body or {}, person=self.person)
         headers = {"Content-Type": "application/json", "Accept": "application/json", "Authorization": self.auth}
-        status, _, raw = http(api_url() + path, json.dumps(payload).encode(), headers)
+        status, _, raw = http(self.url + path, json.dumps(payload).encode(), headers)
         if not 200 <= status < 300:
             log("err", "REST %s sent %s, got HTTP %d %s"
                 % (path, json.dumps(payload), status, raw[:500].decode(errors="replace")))
@@ -948,7 +973,8 @@ def parse_args(argv):
 COMMANDS = {"login": login, "whoami": whoami, "tools": tools, "status": status, "start-time": start_time,
             "end-time": end_time, "clock-in": clock_in, "clock-out": clock_out, "day-info": day_info,
             "day-end": day_end, "api-key": api_key, "lookup": lookup,
-            "break-start": break_start, "break-stop": break_stop, "clock-out-break": clock_out_break}
+            "break-start": break_start, "break-stop": break_stop, "clock-out-break": clock_out_break,
+            "check-overlap": check_overlap}
 
 
 def main(argv):

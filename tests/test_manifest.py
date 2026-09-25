@@ -20,10 +20,10 @@ class ManifestTest(unittest.TestCase):
         self.assertIn("breakLimitMinutes", schema)
         self.assertIn("breakReminderMinutes", schema)
 
-    def test_the_rest_api_url_defaults_to_the_company_tenant(self):
+    def test_the_rest_api_url_names_no_company(self):
         widget = json.loads((ROOT / "manifest.json").read_text())["barWidget"]
         (field,) = [f for f in widget["schema"] if f["key"] == "apiUrl"]
-        self.assertEqual(field["defaultValue"], "https://cti.calamari.io/api")
+        self.assertEqual(field["defaultValue"], "")
         self.assertEqual(field["format"], "url")
 
     def test_the_default_project_is_check_in_by_name(self):

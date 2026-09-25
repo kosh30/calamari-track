@@ -177,6 +177,8 @@ test("scheitert das Einstempeln über REST, nennt das Panel die Ursache verstän
     "Einstempeln fehlgeschlagen: kein API-Key, bitte bin/calamari api-key ausführen. Es wird nichts nachgereicht.")
   assert.equal(fail("API_KEY_REJECTED"),
     "Einstempeln fehlgeschlagen: Calamari lehnt den API-Key ab. Es wird nichts nachgereicht.")
+  assert.equal(fail("API_URL_REQUIRED"),
+    "Einstempeln fehlgeschlagen: keine REST-API-URL, bitte in den Einstellungen setzen. Es wird nichts nachgereicht.")
   assert.equal(fail("PROJECT_UNKNOWN", { project: "Kunde B" }),
     "Einstempeln fehlgeschlagen: Projekt „Kunde B“ gibt es in Calamari nicht. Es wird nichts nachgereicht.")
 })

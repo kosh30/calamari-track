@@ -29,7 +29,7 @@
       "extendMinutes": 60,
       "hardLimitTime": "23:00",
       "webUrl": "",
-      "apiUrl": "https://cti.calamari.io/api",
+      "apiUrl": "",
       "defaultProject": "Check-in",
       "breakType": "Break",
       "coreMonday": "",
@@ -121,9 +121,9 @@
       {
         "key": "apiUrl",
         "type": "string",
-        "label": "Calamari-REST-API (Key per bin/calamari api-key)",
+        "label": "Calamari-REST-API, z.B. https://firma.calamari.io/api (Key per bin/calamari api-key)",
         "format": "url",
-        "defaultValue": "https://cti.calamari.io/api"
+        "defaultValue": ""
       },
       {
         "key": "defaultProject",

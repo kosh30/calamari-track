@@ -32,7 +32,7 @@ test("gültige Eingaben werden zu Einstellungen, Zahlen als Zahlen", () => {
 
 test("ungültige Eingaben nennen, was erwartet wird", () => {
   const r = readForm(schema, texts({ stampReminderMinutes: "0", pollIntervalMinutes: "drei", finalWarningTime: "25:00",
-    coreFriday: "13:00-08:00", webUrl: "cti.calamari.io" }))
+    coreFriday: "13:00-08:00", webUrl: "firma.calamari.io" }))
   assert.equal(r.settings, null)
   assert.deepEqual(r.errors, {
     stampReminderMinutes: "Eine ganze Zahl von 1 bis 60",

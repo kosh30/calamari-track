@@ -5,6 +5,7 @@ import Quickshell.Wayland
 import "js/shiftclock.mjs" as ShiftClock
 import "js/reminders.mjs" as Reminders
 import "js/activity.mjs" as Activity
+import "js/backoff.mjs" as Backoff
 
 // Headless singleton for the plugin. Owns the runtime state, the poll timer
 // and the calls to bin/calamari (keepLoaded: code changes here need a shell
@@ -21,6 +22,9 @@ Item {
     property string authState: "unknown"
     property string userName: ""
     property string errorMessage: ""
+    // The code of the last failure ("" once an answer came through), for
+    // the bar's tooltip.
+    property string errorCode: ""
     readonly property bool authRequired: authState === "required"
     readonly property bool loggingIn: loginProc.running
 
@@ -78,10 +82,17 @@ Item {
     readonly property string stampingAction: stampProc.running ? stampProc.action : ""
     readonly property bool busy: stampProc.running || statusProc.running || startTimeProc.running || endTimeProc.running || dayEndProc.running
 
-    readonly property int pollInterval: root.setting("pollIntervalMinutes", 3) * 60 * 1000
+    // Network failures and rate limits in a row stretch the poll interval
+    // (js/backoff.mjs); the first answer that comes through resets it. Every
+    // helper call of a poll counts (status, day-end, start-time, end-time).
+    property int pollFailures: 0
+    readonly property int retryMinutes: Backoff.pollMinutes(root.setting("pollIntervalMinutes", 3), root.pollFailures)
+    readonly property int pollInterval: root.retryMinutes * 60 * 1000
+    readonly property string errorTooltip: Backoff.errorTooltip(root.errorCode, root.retryMinutes)
     readonly property string helper: Qt.resolvedUrl("bin/calamari").toString().replace(/^file:\/\//, "")
     // Added to the shell's environment for every helper call: the REST API
-    // of the setting apiUrl (docs/adr/0003); empty leaves the helper's default.
+    // of the setting apiUrl (docs/adr/0003); without one the REST commands
+    // fail with API_URL_REQUIRED.
     readonly property var helperEnv: ({ CALAMARI_API_URL: root.setting("apiUrl", "") || null })
     readonly property string stateDir: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/calamari-tracker"
 
@@ -218,6 +229,12 @@ Item {
         var code = out.error.code
         root.authState = code === "AUTH_REQUIRED" || code === "LOGIN_FAILED" ? "required" : "error"
         root.errorMessage = out.error.message || out.error.code
+        root.errorCode = code
+    }
+
+    function clearError() {
+        root.errorMessage = ""
+        root.errorCode = ""
     }
 
     function applyIdentity(out) {
@@ -225,18 +242,19 @@ Item {
             return applyError(out)
         root.authState = "ok"
         root.userName = out.name || ""
-        root.errorMessage = ""
+        root.clearError()
     }
 
     function applyStatus(out) {
         root.now = new Date()
+        root.pollFailures = Backoff.failuresAfter(root.pollFailures, out)
         if (!out.ok) {
             root.statusFailed = true
             return applyError(out)
         }
         root.statusFailed = false
         root.statusStale = false
-        root.errorMessage = ""
+        root.clearError()
         if (root.authState !== "ok")
             root.refreshIdentity()
         root.fetchDayInfo()
@@ -261,6 +279,7 @@ Item {
     // A failure leaves the question open for the next poll.
     function applyDayEnd(date, out) {
         dayEndProc.blocked = !out.ok
+        root.pollFailures = Backoff.failuresAfter(root.pollFailures, out)
         if (!out.ok)
             return applyError(out)
         var result = ShiftClock.applyDayEnd(root.shiftState, date, out.ranToMidnight === true, new Date())
@@ -272,11 +291,13 @@ Item {
     // The end of a shift that ended outside the plugin, for today's total.
     // A failure is asked again with the next poll (pendingEnd).
     function applyEndTime(start, out) {
+        root.pollFailures = Backoff.failuresAfter(root.pollFailures, out)
         if (out.ok)
             root.setShiftState(ShiftClock.applyEndTime(root.shiftState, start, out.endedAt))
     }
 
     function applyStartTime(out) {
+        root.pollFailures = Backoff.failuresAfter(root.pollFailures, out)
         if (!out.ok) {
             root.statusFailed = true
             return applyError(out)
@@ -291,7 +312,7 @@ Item {
         stampProc.pollWhenDone = result.pollNow
         if (out.ok) {
             root.statusFailed = false
-            root.errorMessage = ""
+            root.clearError()
         }
         root.setShiftState(result.state)
         // A close that found no shift stamped nothing, and one at the start
@@ -446,6 +467,7 @@ Item {
         onLoadFailed: root.loadShiftState("")
     }
 
+    // A changed interval (backoff, settings) restarts the wait from now.
     Timer {
         interval: root.pollInterval
         running: true

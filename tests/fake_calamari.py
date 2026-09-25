@@ -52,6 +52,9 @@ class FakeCalamari:
         self.protocol_version = None  # answer initialize with this version instead of echoing
         self.tool_error = False
         self.overlap_error = False  # only checkTimesheetOverlap fails
+        # False: a running entry no longer reaches up to now in
+        # checkTimesheetOverlap, as if Calamari changed that (docs/adr/0001).
+        self.running_reaches_now = True
         self.mcp_status = None  # force an HTTP status on MCP calls, e.g. 429
         # Timesheet entries as (date, "HH:MM:SS" start, "HH:MM:SS" end or None
         # while running). A running entry lasts until `now`, which the tests
@@ -415,6 +418,8 @@ class _Handler(BaseHTTPRequestHandler):
                 return self._reply(msg_id, {"isError": True, "content": [{"type": "text", "text": "bad entry %r" % e}]})
             for date, start, end in self.fake.shifts:
                 end_s = secs(end) if end else (secs(now) if date == today else 86400)
+                if end is None and not self.fake.running_reaches_now:
+                    end_s = secs(start)
                 if date == e["date"] and a < end_s and secs(start) < b and date not in dates:
                     dates.append(date)
         self.fake.overlap_calls += 1

@@ -28,7 +28,7 @@ class CalamariCliTest(unittest.TestCase):
     def start_helper(self, *args, base_url=None, api_url=None):
         env = dict(os.environ,
                    CALAMARI_BASE_URL=base_url or self.fake.base_url,
-                   CALAMARI_API_URL=api_url or self.fake.api_url,
+                   CALAMARI_API_URL=self.fake.api_url if api_url is None else api_url,
                    CALAMARI_KEYRING_FILE=str(self.keyring),
                    CALAMARI_LOG_FILE=str(self.log),
                    CALAMARI_NOW=self.fake.now,
@@ -575,6 +575,48 @@ class CalamariCliTest(unittest.TestCase):
         self.assertEqual((code, out["stamped"]), (0, False))
         self.assertNotIn("clockOut", [n for n, _ in self.fake.tool_calls])
 
+    # Prüfbefehl für das Overlap-Verhalten
+
+    def test_check_overlap_confirms_that_a_running_shift_reaches_now(self):
+        self.login()
+        self.store_api_key()
+        self.fake.now = "2026-09-22T14:00:30"
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+
+        code, out = self.run_helper("check-overlap")
+
+        self.assertEqual((code, out), (0, {"ok": True, "shift": "running", "overlapsNow": True, "unchanged": True}))
+
+    def test_check_overlap_notices_when_calamari_changed_the_behaviour(self):
+        self.login()
+        self.store_api_key()
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+        self.fake.running_reaches_now = False
+
+        self.assert_error(self.run_helper("check-overlap"), "OVERLAP_CHANGED")
+        self.assertIn("check-overlap failed: OVERLAP_CHANGED", self.log_text())
+
+    def test_check_overlap_without_running_shift_cannot_tell(self):
+        self.login()
+        self.store_api_key()
+        self.fake.shifts = [("2026-09-22", "08:00:00", "12:00:00")]
+
+        code, out = self.run_helper("check-overlap")
+
+        self.assertEqual((code, out), (0, {"ok": True, "shift": "stopped", "overlapsNow": False, "unchanged": None}))
+
+    def test_check_overlap_only_reads(self):
+        self.login()
+        self.store_api_key()
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+
+        self.run_helper("check-overlap")
+
+        # getMyProfile names the own person for REST.
+        self.assertEqual([n for n, _ in self.fake.tool_calls if n != "getMyProfile"], ["checkTimesheetOverlap"])
+        self.assertEqual([p for p, _ in self.fake.rest_calls], ["/clockin/shift/status/v1/get-current"])
+        self.assertEqual(self.fake.shifts, [("2026-09-22", "09:40:30", None)])
+
     def test_stamping_when_rate_limited_is_reported_and_nothing_is_stamped(self):
         self.login()
         self.fake.mcp_status = 429
@@ -712,6 +754,16 @@ class CalamariCliTest(unittest.TestCase):
 
     def test_api_key_must_not_be_empty(self):
         self.assert_error(self.run_helper("api-key", input="\n"), "USAGE")
+
+    def test_rest_without_api_url_asks_for_one(self):
+        # The REST API lives under the company's own address; there is no default.
+        self.login()
+        self.store_api_key()
+
+        for command in ("status", "clock-in", "lookup"):
+            with self.subTest(command):
+                self.assert_error(self.run_helper(command, api_url=""), "API_URL_REQUIRED")
+        self.assertEqual(self.fake.rest_calls, [])
 
     def test_lookup_without_api_key_asks_for_one(self):
         self.login()

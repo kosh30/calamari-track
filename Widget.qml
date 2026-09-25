@@ -122,7 +122,7 @@ BarWidget {
             : root.view.kind === "idle" ? Color.muted : root.barForeground
         dimmed: root.view.kind === "unknown"
         tooltipText: root.opened ? "" : root.view.kind === "auth" ? "Calamari: Anmeldung nötig"
-            : root.view.kind === "error" ? "Calamari: Fehler"
+            : root.view.kind === "error" ? root.service.errorTooltip
             : root.view.kind === "running" ? "Calamari: Schicht läuft"
             : root.view.kind === "reminder" ? "Calamari: noch nicht eingestempelt"
             : root.view.kind === "break" ? "Calamari: Pause"

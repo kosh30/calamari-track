@@ -300,6 +300,7 @@ const STAMP_CAUSES = {
   API_SCOPE_MISSING: "keine Berechtigung für den API-Key",
   API_KEY_REQUIRED: "kein API-Key, bitte bin/calamari api-key ausführen",
   API_KEY_REJECTED: "Calamari lehnt den API-Key ab",
+  API_URL_REQUIRED: "keine REST-API-URL, bitte in den Einstellungen setzen",
 }
 
 function stampErrorText(action, error) {
