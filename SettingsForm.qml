@@ -200,7 +200,8 @@ Column {
         // only happened to land inside it. It does draw outside its parent:
         // nothing in the chain clips today, and if that ever changes the bar
         // goes quietly, which neither qmllint nor the tests can see — the lint
-        // snapshot of KeyboardPanel carries no padding at all.
+        // snapshot of KeyboardPanel carries no padding at all. That nothing
+        // clips is a decision now, not an accident: docs/adr/0005.
         Rectangle {
             readonly property var place: ScrollIndicator.thumb(fields.visibleArea.yPosition, fields.visibleArea.heightRatio, parent.height, Style.space(12))
             visible: place.visible
