@@ -31,6 +31,11 @@ DERIVED_FILES = (
     ".qmllint.ini",
 )
 
+# The same, for the shell we run inside. These are not snapshots under `lint/`
+# but our own files modelled on one of its components, which is the case the
+# notice calls a derivative.
+OMARCHY_DERIVED_FILES = ("ActionButton.qml",)
+
 
 def sections(text):
     """The notice split on its `## ` headings, as {heading: body}."""
@@ -121,6 +126,19 @@ class DerivedFileHeaderTest(unittest.TestCase):
     def test_the_notice_lists_every_file_that_carries_such_a_header(self):
         text = NOTICE.read_text()
         for rel in DERIVED_FILES:
+            self.assertIn(rel, text, rel)
+
+
+class OmarchyDerivedFileHeaderTest(unittest.TestCase):
+    def test_every_derived_file_names_its_origin_in_its_own_header(self):
+        for rel in OMARCHY_DERIVED_FILES:
+            head = "".join((ROOT / rel).read_text().splitlines(keepends=True)[:6])
+            self.assertIn("basecamp/omarchy", head, rel)
+            self.assertIn(BORROWED["basecamp/omarchy"], head, rel)
+
+    def test_the_notice_lists_every_file_that_carries_such_a_header(self):
+        text = NOTICE.read_text()
+        for rel in OMARCHY_DERIVED_FILES:
             self.assertIn(rel, text, rel)
 
 

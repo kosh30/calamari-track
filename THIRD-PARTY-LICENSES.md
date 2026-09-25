@@ -82,7 +82,9 @@ SOFTWARE.
 ## basecamp/omarchy
 
 - **Covers:** all of `lint/qs/Commons/` and `lint/qs/Ui/`, except
-  `Ui/KeyboardPanel.qml` and `Ui/qmldir`, which belong to the section above
+  `Ui/KeyboardPanel.qml` and `Ui/qmldir`, which belong to the section above,
+  plus `ActionButton.qml` at the root, which is not a snapshot but a
+  derivative
 - **Source:** <https://github.com/basecamp/omarchy>
 - **Version:** snapshot of the installed omarchy-shell, `/usr/share/omarchy/version`
   reporting `4.0.0.alpha` (package `omarchy` 4.0.4-1)
@@ -91,6 +93,12 @@ SOFTWARE.
 Verbatim snapshots of the shell this plugin runs inside, taken by
 `lint/refresh.sh` from the locally installed omarchy — all seventeen files are
 byte-identical to it, `Commons/qmldir` included.
+
+`ActionButton.qml` is the exception: it is our own button, not a snapshot. It
+had to leave `Ui/Button.qml` behind because that one has no `letterSpacing` to
+set, but it keeps that file's state cascade and its trick of reserving the
+widest border any state can paint, so it carries the notice in its own header
+rather than being filed as ours.
 
 The installed package ships no licence file, so the text below was taken from
 the project's repository.
@@ -140,7 +148,8 @@ as soon as a tracked top-level entry appears that is not classified here.
 | `tools/`, `.github/` | Ours. The release and format scripts, the CI workflow and the rulesets, written for this project. |
 | `.git-blame-ignore-revs`, `.prettierignore`, `.prettierrc.json`, `ruff.toml` | Ours. Formatter settings and the list of formatting commits. |
 | `renovate.json` | Written by the Renovate bot as its onboarding config. It names Renovate's `config:recommended` preset and its schema by URL instead of copying either, so it carries no third-party code. |
-| `ActionButton.qml`, `Panel.qml`, `Service.qml`, `SettingsForm.qml`, `Widget.qml`, `manifest.json` | Ours. They call the shell's API, which is not the same as copying it. |
+| `Panel.qml`, `Service.qml`, `SettingsForm.qml`, `Widget.qml`, `manifest.json` | Ours. They call the shell's API, which is not the same as copying it. |
+| `ActionButton.qml` | Ours, but modelled on omarchy's `Ui/Button.qml` — see the second section. |
 | `README.md`, `CLAUDE.md`, `CONTEXT.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `LICENSE`, `THIRD-PARTY-LICENSES.md` | Ours, except that `LICENSE` is the MIT text itself. |
 
 How it was checked: every file under `lint/`, and every dotfile at the root, was
