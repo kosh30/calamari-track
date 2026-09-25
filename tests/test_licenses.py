@@ -94,7 +94,9 @@ class ThirdPartyNoticeTest(unittest.TestCase):
         # the working tree would fail the suite over one.
         listed = subprocess.run(
             ["git", "-C", str(ROOT), "ls-files", "-z"],
-            capture_output=True, text=True, check=True,
+            capture_output=True,
+            text=True,
+            check=True,
         ).stdout.split("\0")
         entries = set()
         for path in filter(None, listed):
@@ -134,9 +136,7 @@ class LintStubNoteTest(unittest.TestCase):
         # lint/qs/ is a copy of omarchy-shell. This bullet used to present it as
         # a mere convenience, which is how its licence went unrecorded; asserting
         # against the whole file would pass on the closing paragraph alone.
-        (bullet,) = [
-            line for line in self.text.splitlines() if "verbatim snapshots" in line
-        ]
+        (bullet,) = [line for line in self.text.splitlines() if "verbatim snapshots" in line]
         self.assertIn("basecamp/omarchy", bullet)
 
 
