@@ -4,7 +4,7 @@
 
 **Blocked by:** 03, 04
 
-**Status:** ready-for-agent
+**Status:** umgezogen nach [#8](https://github.com/kosh30/calamari-track/issues/8) (2026-09-25); der aktuelle Stand steht dort, diese Datei ist Archiv.
 
 - [ ] Das Schema trägt die Gruppe je Feld; ein Feld ohne Gruppe landet sichtbar in einer Sammelgruppe, statt zu verschwinden
 - [ ] Die sieben Kernzeiten stehen als eine Karte mit einer gemeinsamen Erklärung

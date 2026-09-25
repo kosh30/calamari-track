@@ -8,7 +8,7 @@ Kennt der gespeicherte Zustand beim Aufwachen oder Start des Rechners noch eine 
 
 **Blocked by:** 08
 
-**Status:** ready-for-agent
+**Status:** umgezogen nach [#5](https://github.com/kosh30/calamari-track/issues/5) (2026-09-25); der aktuelle Stand steht dort, diese Datei ist Archiv.
 
 - [x] Letzte Aktivität und Heartbeat werden im lokalen Zustand gespeichert
 - [x] Eine Heartbeat-Lücke über 5 Min wird als Suspend erkannt, die letzte Aktivität ist der Heartbeat davor

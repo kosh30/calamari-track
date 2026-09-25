@@ -6,7 +6,7 @@ Dieses Ticket steht bewusst am Ende und ist als einziges in Frage gestellt. Der 
 
 **Blocked by:** 02, 06
 
-**Status:** ready-for-agent
+**Status:** umgezogen nach [#9](https://github.com/kosh30/calamari-track/issues/9) (2026-09-25); der aktuelle Stand steht dort, diese Datei ist Archiv.
 
 - [ ] Zuerst entschieden und im Ticket begründet, ob der Gewinn den Aufwand trägt; ein begründetes Nein schließt das Ticket als `wontfix` und ist ein vollwertiges Ergebnis
 - [ ] Der Wechsel ist animiert, und die Richtung entspricht der Navigation

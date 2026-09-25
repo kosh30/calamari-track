@@ -4,7 +4,7 @@
 
 **Blocked by:** 01
 
-**Status:** ready-for-agent
+**Status:** umgezogen nach [#3](https://github.com/kosh30/calamari-track/issues/3) (2026-09-25); der aktuelle Stand steht dort, diese Datei ist Archiv.
 
 - [ ] Der Balken erscheint nur bei Überlauf und folgt der Scrollposition
 - [ ] Er verschiebt oder verschmälert die Felder nicht

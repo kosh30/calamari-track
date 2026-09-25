@@ -4,7 +4,7 @@
 
 **Blocked by:** 06, 07, 09
 
-**Status:** ready-for-agent
+**Status:** umgezogen nach [#10](https://github.com/kosh30/calamari-track/issues/10) (2026-09-25); der aktuelle Stand steht dort, diese Datei ist Archiv.
 
 - [x] Backoff bei `NETWORK` und `RATE_LIMITED`, nach Erfolg zurück zum normalen Intervall
 - [x] Der Prüfbefehl für das Overlap-Verhalten existiert und ist in der README beschrieben

@@ -4,7 +4,7 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** umgezogen nach [#6](https://github.com/kosh30/calamari-track/issues/6) (2026-09-25); der aktuelle Stand steht dort, diese Datei ist Archiv.
 
 - [x] Vor der Umsetzung, mit ausdrücklichem Okay des Benutzers: einmal an einem echten Eintrag prüfen, wie Calamari ein `clock-out` mit offener Pause und einer Uhrzeit in der Vergangenheit behandelt (bleibt die Pause, braucht es vorher `break-stop`, wie weit zurück darf die Uhrzeit liegen). Ergebnis unter `## Comments` festhalten
 - [x] „Feierabend statt Pause“ stempelt auf den Pausenbeginn aus; danach ist Feierabend

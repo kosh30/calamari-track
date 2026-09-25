@@ -4,7 +4,7 @@
 
 **Blocked by:** 02
 
-**Status:** ready-for-agent
+**Status:** umgezogen nach [#7](https://github.com/kosh30/calamari-track/issues/7) (2026-09-25); der aktuelle Stand steht dort, diese Datei ist Archiv.
 
 - [ ] Eine Zeile über die Kernzeit mit Schichten, ausgesparten Pausen und Jetzt-Markierung
 - [ ] Keine Hintergrundspur hinter den gefüllten Teilen — eine schwach gefüllte volle Zeile wirkt wie ein Ladebalken statt wie ein Messwert

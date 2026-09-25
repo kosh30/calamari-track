@@ -19,7 +19,7 @@ Dieses Repo liegt auf **GitHub** (`kosh30/calamari-track`), ausdrücklich abweic
 
 ### Issue tracker
 
-Issues und Specs liegen als lokale Markdown-Dateien unter `.scratch/`. See `docs/agents/issue-tracker.md`.
+Issues und Specs sind GitHub Issues in `kosh30/calamari-track` (`gh`). Erledigte Tickets von früher liegen als Archiv unter `.scratch/`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

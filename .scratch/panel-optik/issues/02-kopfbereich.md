@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-human
+**Status:** umgezogen nach [#2](https://github.com/kosh30/calamari-track/issues/2) (2026-09-25); der aktuelle Stand steht dort, diese Datei ist Archiv.
 
 - [x] Vorab geprüft, welche Teile dieser Gestaltung der Baukasten `qs.Ui` bereits mitbringt; nur der Rest wird selbst gezeichnet, das Ergebnis der Durchsicht ist notiert
 - [x] Schichtdauer als größte Zahl, Einordnung darunter kleiner und gedunkelt

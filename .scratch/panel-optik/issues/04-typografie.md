@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** umgezogen nach [#4](https://github.com/kosh30/calamari-track/issues/4) (2026-09-25); der aktuelle Stand steht dort, diese Datei ist Archiv.
 
 - [ ] Haupt- und Zweitaktion sind auf einen Blick unterscheidbar, ohne die Beschriftung zu lesen
 - [ ] Die drei Zustände Ruhe, Zeiger darüber und deaktiviert sind definiert und weich überblendet
