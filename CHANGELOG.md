@@ -13,7 +13,7 @@ All notable changes to this plugin are documented here. The format follows
 
 ### Changed
 
-- The panel's buttons show their rank: what the page is for keeps its frame, everything beside it steps back into small capitals, and a button that cannot be pressed right now looks the part.
+- The panel's buttons show their rank: what the page is for keeps its frame, everything beside it steps back into spaced capitals, and a button that cannot be pressed right now looks the part.
 
 ### Fixed
 

@@ -10,10 +10,15 @@ import "js/contrast.mjs" as Contrast
 
 // A panel button that says its rank before its label is read.
 //
-// The page's main action (`primary`) keeps the frame, the body size and the
-// full foreground. Every other action steps back: no frame, one size down,
-// and spaced capitals at a lowered foreground that only comes up to full
-// under the pointer. Disabled dims either rank.
+// The page's main action (`primary`) keeps the frame and the full
+// foreground. Every other action steps back: no frame, and spaced capitals at
+// a lowered foreground that only comes up to full under the pointer. Disabled
+// dims either rank.
+//
+// Every rank reads at the body size. A step down used to stand in for the
+// letter spacing while the kit's Button had none to set; the spacing arrived
+// with the rebuild and the step stayed on beside it, which is one signal more
+// than the rank needs and a size less than the label deserves.
 //
 // This sits on BorderSurface rather than on the kit's Button because the
 // spaced capitals are the point and Button has no letterSpacing to set.
@@ -163,7 +168,7 @@ BorderSurface {
             text: root.primary ? root.label : root.label.toUpperCase()
             color: root._labelColor
             font.family: Style.font.family
-            font.pixelSize: root.primary ? Style.font.body : Style.font.bodySmall
+            font.pixelSize: Style.font.body
             font.letterSpacing: root.primary ? 0 : root._spacing
             font.bold: root.selected
 
