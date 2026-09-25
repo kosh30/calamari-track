@@ -23,8 +23,8 @@ import qs.Ui
 //
 // The colours are the theme's foreground at three strengths rather than
 // Qt.darker: darkening the dark foreground of a light theme would make a
-// secondary action louder than the main one, while lowering the contrast
-// against the background reads the same either way.
+// secondary action louder than the main one. How far back the quiet strength
+// steps is not the same on both, though — see _quietAlpha.
 //
 // Set `label`, not `text`: the capitals are put on here.
 BorderSurface {
@@ -46,11 +46,22 @@ BorderSurface {
     // "Heute frei" would carry nothing but its fill.
     readonly property bool _framed: root.primary || root.selected
 
+    // How far a quiet label steps back. A light theme has far less room
+    // between foreground and background than a dark one — measured on the
+    // running shell, Catppuccin Latte offers 6.5:1 where Solitude offers 11:1
+    // — so the alpha that reads as quiet on dark spends all of it and lands at
+    // 2.8:1, under the 4.5:1 a label of this size needs. The step is therefore
+    // smaller on a light theme. The rank survives that: the frame, the size and
+    // the capitals carry it, the colour only seconds them.
+    readonly property bool _onLight: Color.background.hslLightness > 0.5
+    readonly property real _quietAlpha: root._onLight ? 0.85 : 0.62
+    readonly property real _disabledAlpha: root._onLight ? 0.5 : 0.35
+
     // Full strength for the main action and for whatever the pointer is on.
     // Switched on beats both, so the theme's own selected colour still shows;
     // disabled beats everything, so a button that cannot be pressed never
     // renders at full strength.
-    readonly property color _labelColor: !root.enabled ? Util.alpha(Color.foreground, 0.35) : root.selected ? Style.selectedStateColor(Color.foreground, Color.accent) : root.primary || root._hot ? Color.foreground : Util.alpha(Color.foreground, 0.62)
+    readonly property color _labelColor: !root.enabled ? Util.alpha(Color.foreground, root._disabledAlpha) : root.selected ? Style.selectedStateColor(Color.foreground, Color.accent) : root.primary || root._hot ? Color.foreground : Util.alpha(Color.foreground, root._quietAlpha)
 
     readonly property var _hoverBorder: Border.controlSpec("hover-cursor", Color.foreground, Color.accent)
     readonly property var _normalBorder: Border.controlSpec("normal", Color.foreground, Color.accent)

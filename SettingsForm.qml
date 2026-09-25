@@ -132,7 +132,12 @@ Column {
             width: Style.space(3)
             height: place.height
             radius: width / 2
-            color: Util.alpha(Color.foreground, 0.55)
+            // Stepped back like a secondary label, and for the same reason
+            // split by the theme's polarity (see ActionButton.qml): a light
+            // theme has less room to spend, and at the dark alpha the bar
+            // measured 2.5:1 there, under the 3:1 a control needs to be made
+            // out at all.
+            color: Util.alpha(Color.foreground, Color.background.hslLightness > 0.5 ? 0.7 : 0.55)
         }
     }
 
