@@ -89,7 +89,7 @@ SOFTWARE.
 - **Licence:** MIT
 
 Verbatim snapshots of the shell this plugin runs inside, taken by
-`lint/refresh.sh` from the locally installed omarchy — all sixteen files are
+`lint/refresh.sh` from the locally installed omarchy — all seventeen files are
 byte-identical to it, `Commons/qmldir` included.
 
 The installed package ships no licence file, so the text below was taken from

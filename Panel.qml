@@ -4,6 +4,7 @@ import qs.Ui
 import "js/shiftclock.mjs" as ShiftClock
 import "js/reminders.mjs" as Reminders
 import "js/panelheader.mjs" as PanelHeader
+import "js/daytimeline.mjs" as DayTimeline
 
 // Popup panel toggled from the bar icon: login state, shift status and
 // clocking in/out (page "main"); on right-click a small menu (page "menu")
@@ -27,8 +28,9 @@ Panel {
     readonly property string countdown: service ? Reminders.countdownText(service.decision, service.now) : ""
 
     // The header block (js/panelheader.mjs): the duration as the page's
-    // largest number, the line placing it, and the core-time progress. Null
-    // while no login stands, when the shift says nothing worth a header.
+    // largest number, the line placing it, the core-time progress and the day
+    // line. Null while no login stands, when the shift says nothing worth a
+    // header.
     readonly property var headerModel: authState === "ok" && service !== null && view !== null ? PanelHeader.headerView({
         view: view,
         state: service.shiftState,
@@ -37,6 +39,7 @@ Panel {
         config: service.config
     }) : null
     readonly property var progress: headerModel ? headerModel.progress : null
+    readonly property var timeline: headerModel ? headerModel.timeline : null
 
     // A button's text, with "…" while its own action runs.
     // During the countdown clocking out is "Jetzt ausstempeln".
@@ -125,10 +128,10 @@ Panel {
                     spacing: Style.space(8)
 
                     // The page's anchor: the running duration as the largest
-                    // number, the line placing it, and the progress through
-                    // today's core time. The "Calamari Tracker" title used to
-                    // sit here; the number is the better anchor, and dropping
-                    // the title pays for the remaining-time line.
+                    // number, the line placing it, the progress through today's
+                    // core time, and the day as one line. The "Calamari Tracker"
+                    // title used to sit here; the number is the better anchor,
+                    // and dropping the title pays for the remaining-time line.
                     Column {
                         visible: root.headerModel !== null
                         width: parent.width
@@ -188,6 +191,93 @@ Panel {
                             font.family: Style.font.family
                             font.pixelSize: Style.font.caption
                             text: root.progress ? root.progress.text : ""
+                        }
+
+                        // The day as one lying line (js/daytimeline.mjs): the
+                        // shifts filled, the running Pause left out, a mark for
+                        // "now", the span's ends written underneath. Deliberately
+                        // without a background track behind the filled parts — a
+                        // faintly filled full line reads as a loading bar instead
+                        // of a measurement.
+                        Column {
+                            visible: root.timeline !== null
+                            width: parent.width
+                            spacing: Style.space(2)
+
+                            Item {
+                                width: parent.width
+                                height: Style.space(10)
+
+                                Repeater {
+                                    model: root.timeline ? root.timeline.segments : []
+
+                                    Rectangle {
+                                        required property var modelData
+                                        readonly property var place: DayTimeline.placeSegment(modelData, parent.width, Style.space(2))
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        x: place.x
+                                        width: place.width
+                                        height: Style.space(6)
+                                        radius: Style.space(2)
+                                        color: modelData.running ? Color.accent : Qt.darker(Color.foreground, 1.2)
+                                    }
+                                }
+
+                                // "Now": taller than the segments, so its ends show
+                                // even where it crosses one. Gone once it would sit
+                                // outside the line, rather than lying at its edge.
+                                Rectangle {
+                                    readonly property var place: DayTimeline.placeMark(root.timeline && root.timeline.nowFraction !== null ? root.timeline.nowFraction : 0, parent.width, Style.space(1))
+                                    visible: root.timeline !== null && root.timeline.nowFraction !== null
+                                    x: place.x
+                                    width: place.width
+                                    height: parent.height
+                                    color: Color.foreground
+
+                                    Behavior on x {
+                                        NumberAnimation {
+                                            duration: 320
+                                            easing.type: Easing.OutCubic
+                                        }
+                                    }
+                                }
+
+                                // The exact times on hover; clicks go through to the
+                                // page underneath.
+                                MouseArea {
+                                    id: dayLineHover
+                                    anchors.fill: parent
+                                    acceptedButtons: Qt.NoButton
+                                    hoverEnabled: true
+
+                                    PanelToolTip {
+                                        visible: dayLineHover.containsMouse
+                                        text: root.timeline ? root.timeline.tooltip : ""
+                                    }
+                                }
+                            }
+
+                            Item {
+                                width: parent.width
+                                height: spanStart.implicitHeight
+
+                                Text {
+                                    id: spanStart
+                                    anchors.left: parent.left
+                                    color: Qt.darker(Color.foreground, 1.4)
+                                    font.family: Style.font.family
+                                    font.pixelSize: Style.font.caption
+                                    text: root.timeline ? root.timeline.startText : ""
+                                }
+
+                                Text {
+                                    anchors.right: parent.right
+                                    color: Qt.darker(Color.foreground, 1.4)
+                                    font.family: Style.font.family
+                                    font.pixelSize: Style.font.caption
+                                    text: root.timeline ? root.timeline.endText : ""
+                                }
+                            }
                         }
                     }
 

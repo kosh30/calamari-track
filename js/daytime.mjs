@@ -22,6 +22,12 @@ export function toHhmm(minutes) {
   return `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`
 }
 
+// "H:MM" for a span of minutes; unlike a moment of the day its hours are
+// not padded, the way the bar and the panel spell a duration.
+export function toSpan(minutes) {
+  return `${Math.floor(minutes / 60)}:${pad(minutes % 60)}`
+}
+
 // "YYYY-MM-DDTHH:MM", for moments that may lie on another day.
 export function momentOf(d) {
   return `${ymd(d)}T${toHhmm(minuteOfDay(d))}`

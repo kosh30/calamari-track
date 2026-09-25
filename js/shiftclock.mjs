@@ -40,7 +40,7 @@
 // suspend) leaves the cached start of the earlier shift.
 
 import { awayCovers, lastActivity } from "./activity.mjs"
-import { minuteOfDay, pad, toHhmm, toMinutes, ymd } from "./daytime.mjs"
+import { minuteOfDay, toHhmm, toMinutes, toSpan, ymd } from "./daytime.mjs"
 
 export function emptyState() {
   return {
@@ -145,7 +145,7 @@ function addShift(state, start, end) {
 // The panel's line for the observed total of today ("" before any).
 export function workedText(state, now) {
   const minutes = workedMinutes(state, now)
-  return minutes > 0 ? `Heute gearbeitet (beobachtet): ${Math.floor(minutes / 60)}:${pad(minutes % 60)}` : ""
+  return minutes > 0 ? `Heute gearbeitet (beobachtet): ${toSpan(minutes)}` : ""
 }
 
 // Minutes worked today as far as the plugin saw: its ended shifts plus
@@ -294,8 +294,7 @@ export function inPause(state) {
 }
 
 function duration(since, now) {
-  const minutes = Math.max(minuteOfDay(now) - toMinutes(since), 0)
-  return `${Math.floor(minutes / 60)}:${pad(minutes % 60)}`
+  return toSpan(Math.max(minuteOfDay(now) - toMinutes(since), 0))
 }
 
 const STAMP_ACTIONS = {

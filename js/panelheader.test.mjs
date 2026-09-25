@@ -178,3 +178,20 @@ test("die Einstellung „frei“ nimmt den Balken weg", () => {
   const h = header(running("08:00"), at("11:00"), { config: { coreTuesday: "frei" } })
   assert.equal(h.progress, null)
 })
+
+test("der Kopfbereich gibt die Tageszeile mit weiter", () => {
+  const h = header(running("08:14"), at("11:56"))
+  assert.equal(h.timeline.startText, "08:14")
+  assert.equal(h.timeline.endText, "16:45")
+  assert.equal(h.timeline.segments.length, 1)
+})
+
+test("die Einstellung „frei“ nimmt auch die Tageszeile weg", () => {
+  assert.equal(header(running("08:00"), at("11:00"), { config: { coreTuesday: "frei" } }).timeline, null)
+})
+
+test("ein „Heute frei“ von gestern nimmt auch die Tageszeile nicht weg", () => {
+  // Dieselbe Filterung wie beim Balken: die Kernzeit wird einmal bestimmt.
+  const yesterday = setDayOff(emptyState(), true, at("11:00", "2026-09-21"))
+  assert.notEqual(header(yesterday, at("11:00")).timeline, null)
+})

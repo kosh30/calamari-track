@@ -6,6 +6,10 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- See the shape of the day in the panel: one line over the core time with today's shifts filled in, a mark for now, and the exact times on hover.
+
 ## [0.2.0] - 2026-09-25
 
 ### Added
