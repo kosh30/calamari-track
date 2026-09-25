@@ -1,0 +1,9 @@
+# Formatting-only commits, hidden from git blame. GitHub honours this file;
+# locally: git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# Format JS with Prettier
+83cbe72db6ddacb71b7107a09acdad0e2750fd8c
+# Format Python with Ruff
+63a027175686f772a987e4a319a93d61bbee30f6
+# Format QML with qmlformat
+ea4ea9d5c893a2848e5ed7698a83531067b01ea3

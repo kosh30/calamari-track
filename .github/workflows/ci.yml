@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  js:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      # A shell glob: Node 22 and 24 read "js/" as a module path.
+      - run: node --test js/*.test.mjs
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Arch's version, which runs the helper for users.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+      - run: python3 -m unittest
+
+  qml:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Pinned to Arch's qt6-declarative: another Qt warns differently, and
+      # Ubuntu's own Qt is far too old. tools/release warns when this
+      # differs from the local qmllint.
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.11.2"
+          archives: "qtbase qtdeclarative icu"
+          cache: true
+      - run: qmllint -I lint *.qml
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - uses: astral-sh/setup-uv@v10
+      # qmlformat comes with Qt, same pin as in the qml job.
+      - uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.11.2"
+          archives: "qtbase qtdeclarative icu"
+          cache: true
+      - run: tools/format --check
