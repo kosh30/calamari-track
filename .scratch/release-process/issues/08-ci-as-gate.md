@@ -31,7 +31,7 @@ The release commit touches only `manifest.json` and `CHANGELOG.md`, so the paren
 |---|---|---|
 | `stable` | branch `stable` | block force pushes (`non_fast_forward`), restrict deletions |
 | `main` | branch `main` | block force pushes, restrict deletions |
-| `tags` | tags `v*` | block force pushes, restrict deletions |
+| `tags` | tags `v*` | block force pushes, restrict deletions, restrict updates |
 
 - `stable`: GitHub cannot express "only `tools/release` may move it". Only the owner has write access, and the rules make every move a fast-forward, which is as much as can be enforced. Adding *Restrict updates* with an admin bypass was rejected, because a bypass lifts every rule, including the ban on force pushes.
 - `main`: there are no required status checks. The owner pushes directly, and a required check would need an admin bypass, which would only add a notice to every push. Contributor PRs run CI through the `pull_request` trigger, and the owner checks that CI passed before merging. The release-time CI check above is the substantive gate.
@@ -46,3 +46,7 @@ The release commit touches only `manifest.json` and `CHANGELOG.md`, so the paren
 - Required checks on `main`.
 - Setting the rulesets by hand in the GitHub UI.
 - A `--setup` mode in `tools/release`.
+
+## Comments
+
+2026-09-25, after `v0.1.0`: the `tags` ruleset also got *Restrict updates*. Blocking force pushes alone would still let a tag move forward to a descendant commit, and "a published `vX.Y.Z` is never moved" means not at all. Creating new tags stays allowed.

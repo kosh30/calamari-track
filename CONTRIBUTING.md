@@ -107,4 +107,6 @@ gh api --method PUT repos/kosh30/calamari-track/private-vulnerability-reporting
 ```
 
 The rulesets block force pushes and deletion of `stable`, `main` and `v*`
-tags, with no bypass, so they bind the owner too.
+tags, with no bypass, so they bind the owner too. A published `v*` tag
+cannot be moved at all, not even forward, because the changelog's compare
+links depend on it; new tags can still be created.
