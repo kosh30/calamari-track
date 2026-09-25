@@ -14,8 +14,7 @@ Column {
     property var service: null
     signal done
 
-    readonly property var schema: root.service && root.service.manifest && root.service.manifest.barWidget
-        ? root.service.manifest.barWidget.schema || [] : []
+    readonly property var schema: root.service && root.service.manifest && root.service.manifest.barWidget ? root.service.manifest.barWidget.schema || [] : []
     readonly property string version: root.service && root.service.manifest ? root.service.manifest.version || "" : ""
     // Filled when the page opens, then edited in place; errors after "Speichern".
     property var fields: []

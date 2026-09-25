@@ -13,7 +13,10 @@ BarWidget {
     property var panelItem: null
     readonly property var service: bar && bar.shell ? bar.shell.serviceFor(moduleName) : null
     // kind: auth | error | unknown | running | break | reminder | idle (js/shiftclock.mjs barView)
-    readonly property var view: service && service.barView ? service.barView : ({ kind: "unknown", text: "" })
+    readonly property var view: service && service.barView ? service.barView : ({
+            kind: "unknown",
+            text: ""
+        })
     readonly property bool alerting: view.kind === "auth" || view.kind === "error"
     readonly property color barForeground: bar ? bar.barForeground : Color.foreground
 

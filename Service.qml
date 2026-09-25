@@ -33,7 +33,10 @@ Item {
     property bool statusFailed: false
     property date now: new Date()
     readonly property var barView: ShiftClock.barView({
-        state: root.shiftState, now: root.now, authState: root.authState, failed: root.statusFailed,
+        state: root.shiftState,
+        now: root.now,
+        authState: root.authState,
+        failed: root.statusFailed,
         reminding: root.decision.barState === "reminder"
     })
 
@@ -61,8 +64,9 @@ Item {
     // What js/reminders.mjs decides for this moment. Re-evaluated whenever
     // time or state move; its actions are sent and recorded right away, so
     // the next evaluation no longer yields them.
-    readonly property var decision: Reminders.decide(root.now, root.dayInfo,
-        Object.assign({ failed: root.statusFailed || root.statusStale }, root.shiftState), root.config)
+    readonly property var decision: Reminders.decide(root.now, root.dayInfo, Object.assign({
+        failed: root.statusFailed || root.statusStale
+    }, root.shiftState), root.config)
 
     // After a suspend the last status is old news (a shift may have been
     // stamped on the phone meanwhile): no reminder until a fresh answer.
@@ -93,7 +97,9 @@ Item {
     // Added to the shell's environment for every helper call: the REST API
     // of the setting apiUrl (docs/adr/0003); without one the REST commands
     // fail with API_URL_REQUIRED.
-    readonly property var helperEnv: ({ CALAMARI_API_URL: root.setting("apiUrl", "") || null })
+    readonly property var helperEnv: ({
+            CALAMARI_API_URL: root.setting("apiUrl", "") || null
+        })
     readonly property string stateDir: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/calamari-tracker"
 
     function refreshIdentity() {
@@ -167,8 +173,7 @@ Item {
 
     // The user's activity (js/activity.mjs): a heartbeat each tick, and the
     // idle monitor with the lock timeout of the shell's idle config.
-    readonly property int lockTimeoutSeconds: root.shell && root.shell.idleConfig && root.shell.idleConfig.lock > 0
-        ? root.shell.idleConfig.lock : 300
+    readonly property int lockTimeoutSeconds: root.shell && root.shell.idleConfig && root.shell.idleConfig.lock > 0 ? root.shell.idleConfig.lock : 300
 
     function recordActivity(next) {
         if (root.stateLoaded && next !== root.shiftState)
@@ -188,9 +193,14 @@ Item {
     function notify(action) {
         var text = Reminders.notification(action, root.dayInfo, root.shiftState, root.config)
         var webUrl = root.setting("webUrl", "")
-        var click = text.click === "panel" ? ["omarchy-shell", "shell", "summon", "kosh.calamari-tracker"]
-            : webUrl ? ["xdg-open", webUrl] : []
-        root.noticeQueue = root.noticeQueue.concat([{ type: action.type, text: text, click: click }])
+        var click = text.click === "panel" ? ["omarchy-shell", "shell", "summon", "kosh.calamari-tracker"] : webUrl ? ["xdg-open", webUrl] : []
+        root.noticeQueue = root.noticeQueue.concat([
+            {
+                type: action.type,
+                text: text,
+                click: click
+            }
+        ])
         root.sendNextNotice()
     }
 
@@ -220,7 +230,13 @@ Item {
         try {
             return JSON.parse(text)
         } catch (e) {
-            return { ok: false, error: { code: "INTERNAL", message: "helper printed no JSON" } }
+            return {
+                ok: false,
+                error: {
+                    code: "INTERNAL",
+                    message: "helper printed no JSON"
+                }
+            }
         }
     }
 
@@ -258,8 +274,10 @@ Item {
         if (root.authState !== "ok")
             root.refreshIdentity()
         root.fetchDayInfo()
-        var result = ShiftClock.applyStatus(root.shiftState, out.shift, root.now,
-            { startedAt: out.startedAt || null, breakSince: out.breakSince || null })
+        var result = ShiftClock.applyStatus(root.shiftState, out.shift, root.now, {
+            startedAt: out.startedAt || null,
+            breakSince: out.breakSince || null
+        })
         root.setShiftState(result.state)
         if (result.startTimeQuery) {
             var after = result.startTimeQuery.after
@@ -318,7 +336,9 @@ Item {
         // A close that found no shift stamped nothing, and one at the start
         // of the Pause ended right: either way there is nothing to correct.
         if (out.ok && out.stamped !== false && !result.endTimeKnown && stampProc.notice)
-            root.notify(Object.assign({ at: Qt.formatTime(root.now, "HH:mm") }, stampProc.notice))
+            root.notify(Object.assign({
+                at: Qt.formatTime(root.now, "HH:mm")
+            }, stampProc.notice))
     }
 
     function setShiftState(next) {
@@ -378,7 +398,8 @@ Item {
         }
         // The status of today is asked once the day before is settled, and
         // after a failure too (blocked then skips the question).
-        onRunningChanged: if (!running) root.poll()
+        onRunningChanged: if (!running)
+            root.poll()
     }
 
     Process {
@@ -401,7 +422,8 @@ Item {
         stdout: StdioCollector {
             onStreamFinished: root.applyStamp(stampProc.action, root.parse(text))
         }
-        onRunningChanged: if (!running && pollWhenDone) root.poll()
+        onRunningChanged: if (!running && pollWhenDone)
+            root.poll()
     }
 
     Process {
@@ -421,7 +443,8 @@ Item {
     Process {
         id: notifyProc
         property string type: ""
-        onRunningChanged: if (!running) Qt.callLater(root.sendNextNotice)
+        onRunningChanged: if (!running)
+            Qt.callLater(root.sendNextNotice)
         stdout: StdioCollector {
             onStreamFinished: {
                 var id = parseInt(text, 10)
@@ -454,7 +477,8 @@ Item {
     Process {
         id: mkdirProc
         command: ["mkdir", "-p", root.stateDir]
-        onRunningChanged: if (!running) stateFile.reload()
+        onRunningChanged: if (!running)
+            stateFile.reload()
     }
 
     FileView {
