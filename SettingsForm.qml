@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "js/scrollindicator.mjs" as ScrollIndicator
 import "js/settingsform.mjs" as SettingsFormLogic
 
 // The settings page of the panel: one text field per entry of the
@@ -56,58 +57,78 @@ Column {
 
     // The fields scroll (wheel or drag) so that title and buttons stay on
     // screen, however many settings the schema has.
-    Flickable {
+    Item {
         width: parent.width
         height: Math.min(fieldColumn.implicitHeight, root.maxFieldsHeight)
-        contentHeight: fieldColumn.implicitHeight
-        clip: true
-        boundsBehavior: Flickable.StopAtBounds
 
-        Column {
-            id: fieldColumn
-            width: parent.width
-            spacing: Style.space(6)
+        Flickable {
+            id: fields
+            anchors.fill: parent
+            contentHeight: fieldColumn.implicitHeight
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
 
-            Repeater {
-                model: root.fields
+            Column {
+                id: fieldColumn
+                width: parent.width
+                spacing: Style.space(6)
 
-                Column {
-                    id: row
-                    required property var modelData
-                    width: fieldColumn.width
-                    spacing: Style.space(2)
+                Repeater {
+                    model: root.fields
 
-                    Text {
-                        width: parent.width
-                        wrapMode: Text.Wrap
-                        color: Color.foreground
-                        font.family: Style.font.family
-                        font.pixelSize: Style.font.body
-                        text: row.modelData.label
-                    }
+                    Column {
+                        id: row
+                        required property var modelData
+                        width: fieldColumn.width
+                        spacing: Style.space(2)
 
-                    TextField {
-                        width: parent.width
-                        text: row.modelData.text
-                        onTextEdited: {
-                            var texts = Object.assign({}, root.texts)
-                            texts[row.modelData.key] = text
-                            root.texts = texts
+                        Text {
+                            width: parent.width
+                            wrapMode: Text.Wrap
+                            color: Color.foreground
+                            font.family: Style.font.family
+                            font.pixelSize: Style.font.body
+                            text: row.modelData.label
                         }
-                        onAccepted: root.save()
-                    }
 
-                    Text {
-                        width: parent.width
-                        visible: root.errors[row.modelData.key] !== undefined
-                        wrapMode: Text.Wrap
-                        color: Color.urgent
-                        font.family: Style.font.family
-                        font.pixelSize: Style.font.body
-                        text: root.errors[row.modelData.key] || ""
+                        TextField {
+                            width: parent.width
+                            text: row.modelData.text
+                            onTextEdited: {
+                                var texts = Object.assign({}, root.texts)
+                                texts[row.modelData.key] = text
+                                root.texts = texts
+                            }
+                            onAccepted: root.save()
+                        }
+
+                        Text {
+                            width: parent.width
+                            visible: root.errors[row.modelData.key] !== undefined
+                            wrapMode: Text.Wrap
+                            color: Color.urgent
+                            font.family: Style.font.family
+                            font.pixelSize: Style.font.body
+                            text: root.errors[row.modelData.key] || ""
+                        }
                     }
                 }
             }
+        }
+
+        // Where in the fields the window stands, while there is more than
+        // fits (js/scrollindicator.mjs). It lies over the right edge instead
+        // of beside it, so the fields keep their full width, and it is gone
+        // altogether while everything fits.
+        Rectangle {
+            readonly property var place: ScrollIndicator.thumb(fields.visibleArea.yPosition, fields.visibleArea.heightRatio, parent.height, Style.space(12))
+            visible: place.visible
+            anchors.right: parent.right
+            y: place.y
+            width: Style.space(2)
+            height: place.height
+            radius: width / 2
+            color: Util.alpha(Color.foreground, 0.35)
         }
     }
 

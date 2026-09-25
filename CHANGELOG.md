@@ -10,6 +10,10 @@ All notable changes to this plugin are documented here. The format follows
 
 - See the shape of the day in the panel: one line over the core time with today's shifts filled in, a mark for now, and the exact times on hover.
 
+### Changed
+
+- The settings show a thin bar at their right edge while fields stand below the window, so it is no longer a guess whether there is more to scroll to.
+
 ## [0.2.0] - 2026-09-25
 
 ### Added
