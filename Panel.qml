@@ -33,6 +33,36 @@ Panel {
         return label + (busy ? " …" : "")
     }
 
+    function loginText() {
+        if (root.loggingIn)
+            return "Anmeldung im Browser läuft …"
+        if (root.authState === "ok")
+            return root.service.userName ? "Angemeldet als " + root.service.userName : "Angemeldet"
+        if (root.authState === "required")
+            return "Anmeldung nötig"
+        if (root.authState === "error")
+            return "Calamari nicht erreichbar"
+        return "Verbinde …"
+    }
+
+    function shiftText() {
+        var view = root.view
+        var shift = root.service ? root.service.shiftState : null
+        if (!view || view.kind === "unknown")
+            return "Schichtstatus wird abgefragt …"
+        if (view.kind === "error")
+            return "Schichtstatus unbekannt"
+        if (view.kind === "reminder")
+            return "Noch nicht eingestempelt, die Kernzeit läuft"
+        if (view.kind === "break")
+            return "Pause seit " + ShiftClock.breakSinceText(shift) + " (" + view.text + ")"
+        if (view.kind === "idle")
+            return shift.clockedOutAt ? "Feierabend seit " + shift.clockedOutAt : "Keine laufende Schicht"
+        if (shift.startedAt)
+            return "Schicht läuft seit " + shift.startedAt + " (" + view.text + ")"
+        return "Schicht läuft"
+    }
+
     property string page: "main"
 
     function showPage(name) {
@@ -113,11 +143,7 @@ Panel {
                         color: Color.foreground
                         font.family: Style.font.family
                         font.pixelSize: Style.font.body
-                        text: root.loggingIn ? "Anmeldung im Browser läuft …"
-                            : root.authState === "ok" ? (root.service.userName ? "Angemeldet als " + root.service.userName : "Angemeldet")
-                            : root.authState === "required" ? "Anmeldung nötig"
-                            : root.authState === "error" ? "Calamari nicht erreichbar"
-                            : "Verbinde …"
+                        text: root.loginText()
                     }
 
                     Text {
@@ -127,15 +153,7 @@ Panel {
                         color: Color.foreground
                         font.family: Style.font.family
                         font.pixelSize: Style.font.body
-                        readonly property var shift: root.service ? root.service.shiftState : null
-                        readonly property var view: root.view
-                        text: !view || view.kind === "unknown" ? "Schichtstatus wird abgefragt …"
-                            : view.kind === "error" ? "Schichtstatus unbekannt"
-                            : view.kind === "reminder" ? "Noch nicht eingestempelt, die Kernzeit läuft"
-                            : view.kind === "break" ? "Pause seit " + ShiftClock.breakSinceText(shift) + " (" + view.text + ")"
-                            : view.kind === "idle" ? (shift.clockedOutAt ? "Feierabend seit " + shift.clockedOutAt : "Keine laufende Schicht")
-                            : shift.startedAt ? "Schicht läuft seit " + shift.startedAt + " (" + view.text + ")"
-                            : "Schicht läuft"
+                        text: root.shiftText()
                     }
 
                     Text {
