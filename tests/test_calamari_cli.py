@@ -1,6 +1,5 @@
 """Seam B: the command-line interface of bin/calamari against a fake gateway."""
 
-import datetime
 import json
 import os
 import re
