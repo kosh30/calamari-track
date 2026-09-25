@@ -22,19 +22,17 @@ BORROWED = {
 }
 AX1G_COMMIT = "2c7b75abde55b23ee6d6e1356797c8f50f60b8a1"
 
-# Files we took from ax1g and edited. Each has to say so in its own header, the
-# rule the notice states; the notice is not the only place a reader looks.
-DERIVED_FILES = (
-    "lint/Quickshell/Io/FileView.qml",
-    "lint/Quickshell/Io/StdioCollector.qml",
-    "lint/qs/Ui/KeyboardPanel.qml",
-    ".qmllint.ini",
-)
-
-# The same, for the shell we run inside. These are not snapshots under `lint/`
-# but our own files modelled on one of its components, which is the case the
-# notice calls a derivative.
-OMARCHY_DERIVED_FILES = ("ActionButton.qml",)
+# Files we took from an upstream and edited, or wrote along one of its files,
+# against the section of the notice each one belongs to. Every one has to say
+# so in its own header, the rule the notice states; the notice is not the only
+# place a reader looks.
+DERIVED_FILES = {
+    "lint/Quickshell/Io/FileView.qml": "ax1g/quickshell-screentime-plugin",
+    "lint/Quickshell/Io/StdioCollector.qml": "ax1g/quickshell-screentime-plugin",
+    "lint/qs/Ui/KeyboardPanel.qml": "ax1g/quickshell-screentime-plugin",
+    ".qmllint.ini": "ax1g/quickshell-screentime-plugin",
+    "ActionButton.qml": "basecamp/omarchy",
+}
 
 
 def sections(text):
@@ -117,28 +115,19 @@ class ThirdPartyNoticeTest(unittest.TestCase):
 
 class DerivedFileHeaderTest(unittest.TestCase):
     def test_every_derived_file_names_its_origin_in_its_own_header(self):
-        for rel in DERIVED_FILES:
+        for rel, upstream in DERIVED_FILES.items():
             head = "".join((ROOT / rel).read_text().splitlines(keepends=True)[:6])
-            self.assertIn("ax1g/quickshell-screentime-plugin", head, rel)
-            self.assertIn(AX1G_COMMIT[:7], head, rel)
-            self.assertIn("Copyright (c) 2026 agx", head, rel)
+            self.assertIn(upstream, head, rel)
+            self.assertIn(BORROWED[upstream], head, rel)
+            # Only the ax1g copies pin a commit: they are snapshots of files
+            # that move, where ours is written along a component we then track
+            # by the shell version the notice records.
+            if upstream.startswith("ax1g/"):
+                self.assertIn(AX1G_COMMIT[:7], head, rel)
 
     def test_the_notice_lists_every_file_that_carries_such_a_header(self):
         text = NOTICE.read_text()
         for rel in DERIVED_FILES:
-            self.assertIn(rel, text, rel)
-
-
-class OmarchyDerivedFileHeaderTest(unittest.TestCase):
-    def test_every_derived_file_names_its_origin_in_its_own_header(self):
-        for rel in OMARCHY_DERIVED_FILES:
-            head = "".join((ROOT / rel).read_text().splitlines(keepends=True)[:6])
-            self.assertIn("basecamp/omarchy", head, rel)
-            self.assertIn(BORROWED["basecamp/omarchy"], head, rel)
-
-    def test_the_notice_lists_every_file_that_carries_such_a_header(self):
-        text = NOTICE.read_text()
-        for rel in OMARCHY_DERIVED_FILES:
             self.assertIn(rel, text, rel)
 
 

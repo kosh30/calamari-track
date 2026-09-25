@@ -19,6 +19,10 @@
 
 // WCAG's floors, so the panel can ask for a meaning instead of a number: 4.5:1
 // for text at the sizes we use, 3:1 for something you only have to make out.
+// A label you cannot click takes the lower one: WCAG exempts a disabled
+// control from the text floor, and holding it to 4.5:1 would leave it as loud
+// as a live one, which is the whole thing it must not look like. 3:1 keeps it
+// from disappearing.
 export const TEXT = 4.5
 export const CONTROL = 3
 
@@ -48,11 +52,12 @@ const INERT = 0.35
 // floor is a floor and not a target: on a theme with room to spare the chosen
 // strength stands, and only where the theme is tight does it give way.
 export function strengths(foreground, background) {
-  const raised = (wanted, minimum) => Math.max(wanted, alphaFor(foreground, background, minimum))
+  const text = alphaFor(foreground, background, TEXT)
+  const control = alphaFor(foreground, background, CONTROL)
   return {
-    quiet: raised(QUIET, TEXT),
-    mark: raised(MARK, CONTROL),
-    inert: raised(INERT, CONTROL),
+    quiet: Math.max(QUIET, text),
+    mark: Math.max(MARK, control),
+    inert: Math.max(INERT, control),
   }
 }
 

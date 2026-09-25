@@ -91,8 +91,8 @@ SOFTWARE.
 - **Licence:** MIT
 
 Verbatim snapshots of the shell this plugin runs inside, taken by
-`lint/refresh.sh` from the locally installed omarchy — all seventeen files are
-byte-identical to it, `Commons/qmldir` included.
+`lint/refresh.sh` from the locally installed omarchy — all seventeen files
+under `lint/` are byte-identical to it, `Commons/qmldir` included.
 
 `ActionButton.qml` is the exception: it is our own button, not a snapshot. It
 had to leave `Ui/Button.qml` behind because that one has no `letterSpacing` to
@@ -149,7 +149,7 @@ as soon as a tracked top-level entry appears that is not classified here.
 | `.git-blame-ignore-revs`, `.prettierignore`, `.prettierrc.json`, `ruff.toml` | Ours. Formatter settings and the list of formatting commits. |
 | `renovate.json` | Written by the Renovate bot as its onboarding config. It names Renovate's `config:recommended` preset and its schema by URL instead of copying either, so it carries no third-party code. |
 | `Panel.qml`, `Service.qml`, `SettingsForm.qml`, `Widget.qml`, `manifest.json` | Ours. They call the shell's API, which is not the same as copying it. |
-| `ActionButton.qml` | Ours, but modelled on omarchy's `Ui/Button.qml` — see the second section. |
+| `ActionButton.qml` | Derived from omarchy — see the second section. |
 | `README.md`, `CLAUDE.md`, `CONTEXT.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `LICENSE`, `THIRD-PARTY-LICENSES.md` | Ours, except that `LICENSE` is the MIT text itself. |
 
 How it was checked: every file under `lint/`, and every dotfile at the root, was

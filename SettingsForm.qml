@@ -25,8 +25,10 @@ Column {
     property string saveError: ""
     property real maxFieldsHeight: Style.space(440)
 
-    // How far the quiet things on this page may step back (js/contrast.mjs).
-    readonly property var strength: Contrast.strengths(Color.foreground, Color.background)
+    // How far the quiet things on this page may step back (js/contrast.mjs),
+    // measured against the panel's own card rather than the desktop behind it
+    // — see ActionButton.qml.
+    readonly property var strength: Contrast.strengths(Color.foreground, Color.popups.background)
 
     function load() {
         root.fields = SettingsFormLogic.formFields(root.schema, root.service ? root.service.settings : null)
@@ -125,13 +127,19 @@ Column {
         // margin, beside the fields rather than on them: laid over their right
         // edge it came out the same width and colour as a text field's border
         // and read as one. Nothing is taken from the fields for it, and it is
-        // gone altogether while everything fits. Bar and margin are both
-        // Style.space, so they keep their proportion at any spacing scale.
+        // gone altogether while everything fits.
+        //
+        // That margin is Ui/KeyboardPanel.qml's padding, so the bar is centred
+        // in exactly that token rather than at a measured-off distance that
+        // only happened to land inside it. It does draw outside its parent:
+        // nothing in the chain clips today, and if that ever changes the bar
+        // goes quietly, which neither qmllint nor the tests can see — the lint
+        // snapshot of KeyboardPanel carries no padding at all.
         Rectangle {
             readonly property var place: ScrollIndicator.thumb(fields.visibleArea.yPosition, fields.visibleArea.heightRatio, parent.height, Style.space(12))
             visible: place.visible
             anchors.right: parent.right
-            anchors.rightMargin: -Style.space(6)
+            anchors.rightMargin: -(Style.spacing.popupPadding + width) / 2
             y: place.y
             width: Style.space(3)
             height: place.height

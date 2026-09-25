@@ -16,11 +16,21 @@ import "js/contrast.mjs" as Contrast
 // under the pointer. Disabled dims either rank.
 //
 // This sits on BorderSurface rather than on the kit's Button because the
-// spaced capitals are the point and Button has no letterSpacing to set. What
-// is left out against Button, because no button of ours uses it: the focus
-// ring and Tab handling, the keyboard-cursor model, right-clicks, left
-// alignment, the spinning icon and the `active` state. Should the panel ever
-// want one of those, take it back from the kit rather than growing this.
+// spaced capitals are the point and Button has no letterSpacing to set.
+// Against Button it leaves out, among other things no button of ours uses:
+// the focus ring and Tab handling, the keyboard-cursor model and its
+// `hovered` signal, right-clicks, left alignment, the spinning icon, the
+// `active` state, per-instance colour overrides — and the dedicated selected
+// border token, so a theme that sets selected-border-width gets our normal
+// frame instead of its own. Should the panel want one of those, take it back
+// from the kit rather than growing this.
+//
+// Three channels, each with its own precedence, which is why they are read
+// apart below rather than from one state:
+//
+//   label   disabled ▸ selected ▸ primary or pointer ▸ quiet
+//   frame   pointer ▸ primary or selected ▸ none
+//   fill    pressed ▸ pointer ▸ selected ▸ none
 //
 // The colours are the theme's foreground at three strengths rather than
 // Qt.darker: darkening the dark foreground of a light theme would make a
@@ -28,7 +38,8 @@ import "js/contrast.mjs" as Contrast
 // is the theme's business rather than a constant — js/contrast.mjs works it
 // out from what the theme leaves between its foreground and its background.
 //
-// Set `label`, not `text`: the capitals are put on here.
+// The label goes in `label`, not `text`: what is painted is the capitalised
+// form, so the plain one has to arrive under its own name.
 BorderSurface {
     id: root
 
@@ -42,16 +53,23 @@ BorderSurface {
 
     // 1.2 px is what the shell spaces its own capitals by (Ui/PanelHero.qml).
     readonly property real _spacing: 1.2
+    // The kit's Button fades its fill over 120 ms; label and surface travel
+    // together only if ours agree with it.
+    readonly property int _fade: 120
 
     readonly property bool _hot: mouse.containsMouse && root.enabled
     // A switched-on secondary keeps the frame: without it the ON state of
     // "Heute frei" would carry nothing but its fill.
     readonly property bool _framed: root.primary || root.selected
 
-    // How far the quiet strengths may step back on this theme. The rank
-    // survives a theme that leaves them little room: the frame, the size and
-    // the capitals carry it, the colour only seconds them.
-    readonly property var _strength: Contrast.strengths(Color.foreground, Color.background)
+    // How far the quiet strengths may step back on this theme. Measured
+    // against the panel's own card (Ui/KeyboardPanel.qml paints it in
+    // Color.popups.background), not against the desktop background: a theme
+    // is free to give popups a surface of their own, and a floor held against
+    // a surface the text never sits on is no floor. The rank survives a theme
+    // that leaves little room — the frame, the size and the capitals carry
+    // it, the colour only seconds them.
+    readonly property var _strength: Contrast.strengths(Color.foreground, Color.popups.background)
 
     // Full strength for the main action and for whatever the pointer is on.
     // Switched on beats both, so the theme's own selected colour still shows;
@@ -81,7 +99,7 @@ BorderSurface {
 
     Behavior on color {
         ColorAnimation {
-            duration: 120
+            duration: root._fade
         }
     }
 
@@ -107,13 +125,14 @@ BorderSurface {
 
             Behavior on color {
                 ColorAnimation {
-                    duration: 120
+                    duration: root._fade
                 }
             }
         }
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
+            visible: root.label !== ""
             textFormat: Text.PlainText
             text: root.primary ? root.label : root.label.toUpperCase()
             color: root._labelColor
@@ -124,7 +143,7 @@ BorderSurface {
 
             Behavior on color {
                 ColorAnimation {
-                    duration: 120
+                    duration: root._fade
                 }
             }
         }
