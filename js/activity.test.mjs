@@ -4,7 +4,7 @@ import { awayCovers, heartbeat, lastActivity, setIdle } from "./activity.mjs"
 import { applyStatus, emptyState, restoreState } from "./shiftclock.mjs"
 
 const at = (hhmm, date = "2026-09-22") => new Date(`${date}T${hhmm}:00`)
-const running = now => applyStatus(emptyState(), "running", at(now)).state
+const running = (now) => applyStatus(emptyState(), "running", at(now)).state
 
 test("nach einer Heartbeat-Lücke über 5 Minuten gilt der Heartbeat davor als letzte Aktivität", () => {
   let state = heartbeat(heartbeat(running("17:00"), at("17:58")), at("17:59"))

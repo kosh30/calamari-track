@@ -38,7 +38,9 @@ export function heartbeat(state, now) {
 // press may beat the first tick after waking) keeps the idle start.
 export function setIdle(state, idle, now, timeoutSeconds) {
   if (!idle)
-    return state.idle ? Object.assign({}, state, { idle: false, lastSeen: momentOf(now), awayUntil: momentOf(now) }) : state
+    return state.idle
+      ? Object.assign({}, state, { idle: false, lastSeen: momentOf(now), awayUntil: momentOf(now) })
+      : state
   const since = new Date(now.getTime() - timeoutSeconds * 1000)
   return Object.assign({}, state, { idle: true, awaySince: momentOf(since), awayUntil: null })
 }

@@ -9,8 +9,15 @@ const HALF_DAY = 12 * 60
 // The widget settings coreMonday .. coreSunday override the work plan:
 // "HH:MM-HH:MM" is the core time, "frei" makes the weekday non-working,
 // anything else (empty, unreadable) keeps the plan from Calamari.
-const OVERRIDE_KEYS = ["coreSunday", "coreMonday", "coreTuesday", "coreWednesday",
-  "coreThursday", "coreFriday", "coreSaturday"]
+const OVERRIDE_KEYS = [
+  "coreSunday",
+  "coreMonday",
+  "coreTuesday",
+  "coreWednesday",
+  "coreThursday",
+  "coreFriday",
+  "coreSaturday",
+]
 const OVERRIDE = /^\s*(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\s*$/
 
 // Minutes of the day for "H:MM" / "HH:MM", or null if it is no time of day.

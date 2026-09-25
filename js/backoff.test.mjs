@@ -46,16 +46,14 @@ test("andere Fehler zeigen die Bar wie bisher", () => {
 })
 
 test("Fehler, die auf den Benutzer warten, nennen die Abhilfe statt eines nächsten Versuchs", () => {
-  assert.equal(errorTooltip("API_URL_REQUIRED", 3),
-    "Calamari: REST-API-URL fehlt, bitte in den Einstellungen setzen")
-  assert.equal(errorTooltip("API_KEY_REQUIRED", 3),
-    "Calamari: API-Key fehlt, bitte bin/calamari api-key ausführen")
-  assert.equal(errorTooltip("API_KEY_REJECTED", 3),
-    "Calamari lehnt den API-Key ab, bitte bin/calamari api-key erneut ausführen")
-  assert.equal(errorTooltip("API_TERMINAL_MISSING", 3),
-    "Calamari: API Terminal fehlt in Clockin")
-  assert.equal(errorTooltip("API_SCOPE_MISSING", 3),
-    "Calamari: dem API-Key fehlt eine Berechtigung")
+  assert.equal(errorTooltip("API_URL_REQUIRED", 3), "Calamari: REST-API-URL fehlt, bitte in den Einstellungen setzen")
+  assert.equal(errorTooltip("API_KEY_REQUIRED", 3), "Calamari: API-Key fehlt, bitte bin/calamari api-key ausführen")
+  assert.equal(
+    errorTooltip("API_KEY_REJECTED", 3),
+    "Calamari lehnt den API-Key ab, bitte bin/calamari api-key erneut ausführen",
+  )
+  assert.equal(errorTooltip("API_TERMINAL_MISSING", 3), "Calamari: API Terminal fehlt in Clockin")
+  assert.equal(errorTooltip("API_SCOPE_MISSING", 3), "Calamari: dem API-Key fehlt eine Berechtigung")
 })
 
 test("kein Warten hilft, also steht in diesen Hinweisen keine Wartezeit", () => {

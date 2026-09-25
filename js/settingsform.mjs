@@ -5,9 +5,11 @@
 // One field per schema entry: { key, label, type, text }, text being the
 // current value (or the default) as the form shows it.
 export function formFields(schema, settings) {
-  return schema.map(field => {
-    const value = settings && settings[field.key] !== undefined && settings[field.key] !== null
-      ? settings[field.key] : field.defaultValue
+  return schema.map((field) => {
+    const value =
+      settings && settings[field.key] !== undefined && settings[field.key] !== null
+        ? settings[field.key]
+        : field.defaultValue
     return { key: field.key, label: field.label, type: field.type, text: String(value) }
   })
 }
@@ -20,8 +22,8 @@ function clockMinutes(text) {
 // Readers per field kind: return the value, or undefined if the text does
 // not fit (the message says what would).
 const READERS = {
-  integer: field => ({
-    read: text => {
+  integer: (field) => ({
+    read: (text) => {
       const n = /^\d+$/.test(text) ? Number(text) : NaN
       const min = field.min === undefined ? 0 : field.min
       const max = field.max === undefined ? Infinity : field.max
@@ -30,22 +32,22 @@ const READERS = {
     message: `Eine ganze Zahl von ${field.min === undefined ? 0 : field.min} bis ${field.max}`,
   }),
   time: () => ({
-    read: text => clockMinutes(text) !== null ? text : undefined,
+    read: (text) => (clockMinutes(text) !== null ? text : undefined),
     message: "Eine Uhrzeit wie 19:00",
   }),
   coreTime: () => ({
-    read: text => {
+    read: (text) => {
       if (text === "" || text.toLowerCase() === "frei") return text.toLowerCase()
-      const [start, end] = text.split("-").map(t => clockMinutes(t.trim()))
+      const [start, end] = text.split("-").map((t) => clockMinutes(t.trim()))
       return start !== null && end !== null && start < end ? text : undefined
     },
     message: "Leer, „frei“ oder eine Kernzeit wie 09:00-16:45",
   }),
   url: () => ({
-    read: text => text === "" || /^https?:\/\/\S+$/.test(text) ? text : undefined,
+    read: (text) => (text === "" || /^https?:\/\/\S+$/.test(text) ? text : undefined),
     message: "Leer oder eine Adresse wie https://firma.calamari.io",
   }),
-  string: () => ({ read: text => text, message: "" }),
+  string: () => ({ read: (text) => text, message: "" }),
 }
 
 function readerFor(field) {

@@ -28,8 +28,14 @@ function atMinute(now, minute) {
 
 // The config values decide() falls back to, as in manifest.json.
 export const DEFAULTS = {
-  stampReminderMinutes: 5, breakLimitMinutes: 30, breakReminderMinutes: 5, softHintMinutes: 30,
-  finalWarningTime: "19:00", autoCloseMinutes: 15, extendMinutes: 60, hardLimitTime: "23:00",
+  stampReminderMinutes: 5,
+  breakLimitMinutes: 30,
+  breakReminderMinutes: 5,
+  softHintMinutes: 30,
+  finalWarningTime: "19:00",
+  autoCloseMinutes: 15,
+  extendMinutes: 60,
+  hardLimitTime: "23:00",
 }
 
 function withDefaults(config) {
@@ -52,7 +58,9 @@ function earlier(a, b) {
 // Minutes of the day for an "H:MM" / "HH:MM" setting, else of the fallback.
 function clockSetting(text, fallback) {
   const match = /^(\d{1,2}):(\d{2})$/.exec(String(text || "").trim())
-  return match && Number(match[1]) < 24 && Number(match[2]) < 60 ? Number(match[1]) * 60 + Number(match[2]) : toMinutes(fallback)
+  return match && Number(match[1]) < 24 && Number(match[2]) < 60
+    ? Number(match[1]) * 60 + Number(match[2])
+    : toMinutes(fallback)
 }
 
 export function decide(now, day, state, settings) {
@@ -120,16 +128,22 @@ function decideEvening(now, state, config) {
     const closeMinute = Math.min(minute + wait, limit)
     const closeAt = atMinute(now, closeMinute)
     const warning = { type: "final-warning", autoCloseAt: toHhmm(closeMinute) }
-    return Object.assign(r, { actions: [warning], autoCloseAt: closeAt, nextCheckAt: closeAt, canExtend: closeMinute < limit })
+    return Object.assign(r, {
+      actions: [warning],
+      autoCloseAt: closeAt,
+      nextCheckAt: closeAt,
+      canExtend: closeMinute < limit,
+    })
   }
   const closeMinute = Math.min(warnedAt + wait, limit)
   r.autoCloseAt = atMinute(now, closeMinute)
-  if (minute < closeMinute)
-    return Object.assign(r, { nextCheckAt: r.autoCloseAt, canExtend: closeMinute < limit })
+  if (minute < closeMinute) return Object.assign(r, { nextCheckAt: r.autoCloseAt, canExtend: closeMinute < limit })
   // Due until the shift is gone; a failed clock-out is retried now and then.
   // Someone idle at the auto-close gets told when they were last active.
   const close = { type: "auto-close", lastActivity: state.idle ? lastActivity(state) : null }
-  return Object.assign(repeating(now, state, close, AUTO_CLOSE_RETRY, closeMinute, null), { autoCloseAt: r.autoCloseAt })
+  return Object.assign(repeating(now, state, close, AUTO_CLOSE_RETRY, closeMinute, null), {
+    autoCloseAt: r.autoCloseAt,
+  })
 }
 
 // "+1 h weiterarbeiten": the next final warning comes extendMinutes from
@@ -146,7 +160,7 @@ export function postpone(state, settings, now) {
 function decidePause(now, state, config) {
   const pause = decideBreak(now, state, config)
   const r = decideEvening(now, state, config)
-  const evening = r.actions.map(a => (a.type === "auto-close" ? Object.assign({}, a, { inPause: true }) : a))
+  const evening = r.actions.map((a) => (a.type === "auto-close" ? Object.assign({}, a, { inPause: true }) : a))
   r.actions = pause.actions.concat(evening)
   r.nextCheckAt = earlier(r.nextCheckAt, pause.nextCheckAt)
   return r
@@ -208,11 +222,12 @@ export function markSent(state, type, now) {
 // hint about a day Calamari itself ended (js/shiftclock.mjs applyDayEnd).
 export function notification(action, day, state, settings) {
   const panel = (headline, body) => ({ headline, body, click: "panel" })
-  if (action.type === "soft-hint")
-    return panel("Schicht läuft noch", `Die Kernzeit endete um ${action.coreEnd}.`)
+  if (action.type === "soft-hint") return panel("Schicht läuft noch", `Die Kernzeit endete um ${action.coreEnd}.`)
   if (action.type === "final-warning")
-    return panel("Letzte Warnung",
-      `Auto-Abschluss um ${action.autoCloseAt}. Im Panel: ${extendLabel(settings)} oder ${inPause(state) ? "Feierabend" : "jetzt ausstempeln"}.`)
+    return panel(
+      "Letzte Warnung",
+      `Auto-Abschluss um ${action.autoCloseAt}. Im Panel: ${extendLabel(settings)} oder ${inPause(state) ? "Feierabend" : "jetzt ausstempeln"}.`,
+    )
   if (action.type === "auto-closed") {
     const body = action.lastActivity
       ? `Um ${action.at} ausgestempelt, letzte Aktivität ${clockOf(action.lastActivity)}. Bitte die Endzeit in Calamari darauf korrigieren.`
@@ -258,7 +273,9 @@ export function extendLabel(settings) {
 // correction hint to send once it went through; null for plain reminders.
 export function closeFor(action) {
   if (action.type === "auto-close")
-    return { stamp: action.inPause ? "break-clock-out" : "clock-out",
-      notice: { type: "auto-closed", lastActivity: action.lastActivity } }
+    return {
+      stamp: action.inPause ? "break-clock-out" : "clock-out",
+      notice: { type: "auto-closed", lastActivity: action.lastActivity },
+    }
   return null
 }

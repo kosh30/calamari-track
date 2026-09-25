@@ -43,8 +43,28 @@ import { awayCovers, lastActivity } from "./activity.mjs"
 import { minuteOfDay, pad, toHhmm, toMinutes, ymd } from "./daytime.mjs"
 
 export function emptyState() {
-  return { date: "", running: null, onBreak: false, startedAt: null, searchAfter: null, clockedOutAt: null, breakSince: null, breakStartUnknown: false, breakMinutes: 0, unclosed: null, stampedToday: false, dayOff: false, postponedTo: null, sent: {}, shifts: [], pendingEnd: null,
-    lastSeen: null, idle: false, awaySince: null, awayUntil: null }
+  return {
+    date: "",
+    running: null,
+    onBreak: false,
+    startedAt: null,
+    searchAfter: null,
+    clockedOutAt: null,
+    breakSince: null,
+    breakStartUnknown: false,
+    breakMinutes: 0,
+    unclosed: null,
+    stampedToday: false,
+    dayOff: false,
+    postponedTo: null,
+    sent: {},
+    shifts: [],
+    pendingEnd: null,
+    lastSeen: null,
+    idle: false,
+    awaySince: null,
+    awayUntil: null,
+  }
 }
 
 function forToday(state, now) {
@@ -55,8 +75,7 @@ function forToday(state, now) {
   // is unknown again. A day left with a running shift is noted for
   // pendingDayEnd; when the user was last active still holds.
   const carried = emptyState()
-  for (const key of ["lastSeen", "idle", "awaySince", "awayUntil"])
-    if (state && key in state) carried[key] = state[key]
+  for (const key of ["lastSeen", "idle", "awaySince", "awayUntil"]) if (state && key in state) carried[key] = state[key]
   if (state && state.running === true && state.date) carried.unclosed = state.date
   else if (state && state.unclosed) carried.unclosed = state.unclosed
   return Object.assign(carried, { date: today })
@@ -137,8 +156,7 @@ export function workedMinutes(state, now) {
   for (const shift of state.shifts) total += toMinutes(shift.end) - toMinutes(shift.start)
   // The time of a Pause is no work.
   const until = state.onBreak && state.breakSince ? toMinutes(state.breakSince) : minuteOfDay(now)
-  if (state.running && state.startedAt)
-    total += Math.max(until - toMinutes(state.startedAt), 0)
+  if (state.running && state.startedAt) total += Math.max(until - toMinutes(state.startedAt), 0)
   return Math.max(total - (state.breakMinutes || 0), 0)
 }
 
@@ -179,8 +197,7 @@ export function restoreState(text) {
     const saved = JSON.parse(text)
     if (saved && typeof saved === "object" && !Array.isArray(saved)) {
       const state = emptyState()
-      for (const key of Object.keys(state))
-        if (key in saved) state[key] = saved[key]
+      for (const key of Object.keys(state)) if (key in saved) state[key] = saved[key]
       return state
     }
   } catch (e) {
@@ -193,8 +210,15 @@ export function restoreState(text) {
 // and a Feierabend earlier today is over.
 function applyClockIn(state, now) {
   const next = forToday(state, now)
-  return Object.assign(next, { running: true, onBreak: false, startedAt: toHhmm(minuteOfDay(now)), clockedOutAt: null,
-    breakSince: null, breakStartUnknown: false, stampedToday: true })
+  return Object.assign(next, {
+    running: true,
+    onBreak: false,
+    startedAt: toHhmm(minuteOfDay(now)),
+    clockedOutAt: null,
+    breakSince: null,
+    breakStartUnknown: false,
+    stampedToday: true,
+  })
 }
 
 // The own clock-out succeeded: no shift runs since minute (default now).
@@ -205,7 +229,10 @@ function stopShift(state, now, minute = minuteOfDay(now)) {
   endPause(next, minute)
   // The ended shift reaches into the minute of the clock-out.
   return Object.assign(next, {
-    running: false, startedAt: null, clockedOutAt: null, searchAfter: toHhmm(Math.min(minute + 1, 24 * 60 - 1)),
+    running: false,
+    startedAt: null,
+    clockedOutAt: null,
+    searchAfter: toHhmm(Math.min(minute + 1, 24 * 60 - 1)),
   })
 }
 
@@ -216,8 +243,14 @@ function applyClockOut(state, now, minute = minuteOfDay(now)) {
 
 // Pause beginnen: the shift goes on, in a Pause from now.
 function applyBreakStart(state, now) {
-  return Object.assign(forToday(state, now), { running: true, onBreak: true, breakSince: toHhmm(minuteOfDay(now)),
-    breakStartUnknown: false, clockedOutAt: null, stampedToday: true })
+  return Object.assign(forToday(state, now), {
+    running: true,
+    onBreak: true,
+    breakSince: toHhmm(minuteOfDay(now)),
+    breakStartUnknown: false,
+    clockedOutAt: null,
+    stampedToday: true,
+  })
 }
 
 // The panel switch "Heute frei". Like everything in the state it belongs
@@ -266,8 +299,10 @@ function duration(since, now) {
 }
 
 const STAMP_ACTIONS = {
-  "clock-in": "Einstempeln", "clock-out": "Ausstempeln",
-  "break-start": "Pause beginnen", "break-end": "Pause beenden",
+  "clock-in": "Einstempeln",
+  "clock-out": "Ausstempeln",
+  "break-start": "Pause beginnen",
+  "break-end": "Pause beenden",
   "break-clock-out": "Feierabend",
 }
 
@@ -304,9 +339,12 @@ const STAMP_CAUSES = {
 }
 
 function stampErrorText(action, error) {
-  const cause = error.code === "PROJECT_UNKNOWN" ? `Projekt „${error.project}“ gibt es in Calamari nicht`
-    : error.code === "BREAK_TYPE_UNKNOWN" ? `Pausentyp „${error.breakType}“ gibt es in Calamari nicht`
-    : STAMP_CAUSES[error.code] || error.message || error.code
+  const cause =
+    error.code === "PROJECT_UNKNOWN"
+      ? `Projekt „${error.project}“ gibt es in Calamari nicht`
+      : error.code === "BREAK_TYPE_UNKNOWN"
+        ? `Pausentyp „${error.breakType}“ gibt es in Calamari nicht`
+        : STAMP_CAUSES[error.code] || error.message || error.code
   return `${STAMP_ACTIONS[action]} fehlgeschlagen: ${cause}. Es wird nichts nachgereicht.`
 }
 

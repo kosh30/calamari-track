@@ -1,15 +1,24 @@
 import { test } from "node:test"
 import { readFileSync } from "node:fs"
 import assert from "node:assert/strict"
-import { DEFAULTS, closeFor, countdownText, decide, extendLabel, markSent, notification, postpone } from "./reminders.mjs"
+import {
+  DEFAULTS,
+  closeFor,
+  countdownText,
+  decide,
+  extendLabel,
+  markSent,
+  notification,
+  postpone,
+} from "./reminders.mjs"
 import { applyDayEnd, applyStamp, applyStatus, emptyState, restoreState, setDayOff } from "./shiftclock.mjs"
 import { heartbeat, setIdle } from "./activity.mjs"
 
 const at = (hhmm, date = "2026-09-22") => new Date(`${date}T${hhmm}:00`)
 const workday = { date: "2026-09-22", workingDay: true, coreStart: "09:00", coreEnd: "16:45" }
 const config = { stampReminderMinutes: 5 }
-const noShift = now => applyStatus(emptyState(), "stopped", at(now)).state
-const types = r => r.actions.map(a => a.type)
+const noShift = (now) => applyStatus(emptyState(), "stopped", at(now)).state
+const types = (r) => r.actions.map((a) => a.type)
 const quietDay = { barState: null, actions: [], nextCheckAt: null, autoCloseAt: null, canExtend: false }
 
 test("in der Kernzeit ohne Schicht kommt sofort eine Stempel-Erinnerung", () => {
@@ -48,7 +57,8 @@ test("vor der Kernzeit wird zu ihrem Beginn wieder geprüft", () => {
 })
 
 const stamp = (state, action, now) =>
-  applyStamp(state, action, { ok: true, running: action === "clock-in", onBreak: action === "break-start" }, at(now)).state
+  applyStamp(state, action, { ok: true, running: action === "clock-in", onBreak: action === "break-start" }, at(now))
+    .state
 
 test("nach einem Feierabend vor Ende der Kernzeit kommt keine Stempel-Erinnerung mehr", () => {
   const state = stamp(stamp(noShift("08:55"), "clock-in", "09:00"), "clock-out", "15:30")
@@ -79,7 +89,12 @@ test("wer mitten in der Kernzeit startet, wird sofort erinnert", () => {
 
 test("am Wochenende gibt es keine Stempel-Erinnerung", () => {
   const saturday = { date: "2026-09-26", workingDay: false, coreStart: null, coreEnd: null }
-  const r = decide(at("10:00", "2026-09-26"), saturday, applyStatus(emptyState(), "stopped", at("10:00", "2026-09-26")).state, config)
+  const r = decide(
+    at("10:00", "2026-09-26"),
+    saturday,
+    applyStatus(emptyState(), "stopped", at("10:00", "2026-09-26")).state,
+    config,
+  )
   assert.deepEqual(r, quietDay)
 })
 
@@ -96,8 +111,11 @@ test("der Arbeitsplan von gestern gilt heute nicht", () => {
 })
 
 test("die Stempel-Erinnerung nennt den Beginn der Kernzeit", () => {
-  assert.deepEqual(notification({ type: "stamp-reminder" }, workday),
-    { headline: "Noch nicht eingestempelt", body: "Die Kernzeit läuft seit 09:00.", click: "panel" })
+  assert.deepEqual(notification({ type: "stamp-reminder" }, workday), {
+    headline: "Noch nicht eingestempelt",
+    body: "Die Kernzeit läuft seit 09:00.",
+    click: "panel",
+  })
 })
 
 test("ein Zustand von gestern löst heute keine Stempel-Erinnerung aus", () => {
@@ -113,7 +131,7 @@ test("ein Arbeitstag ohne Kernzeit im Arbeitsplan löst keine Erinnerung aus", (
 
 // Freie Tage
 
-const withDay = extra => Object.assign({}, workday, { holiday: null, absence: null }, extra)
+const withDay = (extra) => Object.assign({}, workday, { holiday: null, absence: null }, extra)
 
 test("an einem Feiertag gibt es keine Stempel-Erinnerung", () => {
   const day = withDay({ holiday: { name: "Tag der Deutschen Einheit", halfDay: false, halfdayPeriod: null } })
@@ -161,7 +179,11 @@ test("„Heute frei“ lässt sich zurücknehmen", () => {
 })
 
 test("„Heute frei“ gilt am nächsten Tag nicht mehr", () => {
-  const monday = setDayOff(applyStatus(emptyState(), "stopped", at("08:00", "2026-09-21")).state, true, at("08:00", "2026-09-21"))
+  const monday = setDayOff(
+    applyStatus(emptyState(), "stopped", at("08:00", "2026-09-21")).state,
+    true,
+    at("08:00", "2026-09-21"),
+  )
   const tuesday = applyStatus(monday, "stopped", at("10:00")).state
   assert.deepEqual(types(decide(at("10:00"), withDay({}), tuesday, config)), ["stamp-reminder"])
 })
@@ -176,7 +198,14 @@ test("eine Arbeitsplan-Überschreibung gilt für ihren Wochentag", () => {
 })
 
 test("eine Arbeitsplan-Überschreibung macht einen arbeitsfreien Wochentag zum Arbeitstag", () => {
-  const saturday = { date: "2026-09-26", workingDay: false, coreStart: null, coreEnd: null, holiday: null, absence: null }
+  const saturday = {
+    date: "2026-09-26",
+    workingDay: false,
+    coreStart: null,
+    coreEnd: null,
+    holiday: null,
+    absence: null,
+  }
   const state = applyStatus(emptyState(), "stopped", at("10:00", "2026-09-26")).state
   const own = Object.assign({}, config, { coreSaturday: "09:00-12:00" })
   assert.deepEqual(types(decide(at("10:00", "2026-09-26"), saturday, state, own)), ["stamp-reminder"])
@@ -236,7 +265,14 @@ test("die Pausen-Erinnerung einer früheren Pause zählt bei der nächsten nicht
 })
 
 test("auch am Wochenende erinnert eine lange Pause", () => {
-  const saturday = { date: "2026-09-26", workingDay: false, coreStart: null, coreEnd: null, holiday: null, absence: null }
+  const saturday = {
+    date: "2026-09-26",
+    workingDay: false,
+    coreStart: null,
+    coreEnd: null,
+    holiday: null,
+    absence: null,
+  }
   let state = applyStatus(emptyState(), "stopped", at("09:55", "2026-09-26")).state
   state = applyStamp(state, "clock-in", { ok: true, running: true }, at("10:00", "2026-09-26")).state
   state = applyStamp(state, "break-start", { ok: true, onBreak: true }, at("11:00", "2026-09-26")).state
@@ -249,14 +285,21 @@ test("nach dem Pausenende kommt keine Pausen-Erinnerung mehr", () => {
 })
 
 test("die Pausen-Erinnerung nennt den Beginn der Pause", () => {
-  assert.deepEqual(notification({ type: "break-reminder" }, workday, onBreak("12:00")),
-    { headline: "Pause läuft noch", body: "Die Pause läuft seit 12:00.", click: "panel" })
+  assert.deepEqual(notification({ type: "break-reminder" }, workday, onBreak("12:00")), {
+    headline: "Pause läuft noch",
+    body: "Die Pause läuft seit 12:00.",
+    click: "panel",
+  })
 })
 
 // Sanfter Hinweis, letzte Warnung, Auto-Abschluss
 
 const eveningConfig = Object.assign({}, breakConfig, {
-  softHintMinutes: 30, finalWarningTime: "19:00", autoCloseMinutes: 15, extendMinutes: 60, hardLimitTime: "23:00",
+  softHintMinutes: 30,
+  finalWarningTime: "19:00",
+  autoCloseMinutes: 15,
+  extendMinutes: 60,
+  hardLimitTime: "23:00",
 })
 const working = (begun = "09:00") => stamp(noShift("08:55"), "clock-in", begun)
 
@@ -343,7 +386,14 @@ test("eine erst abends begonnene Schicht bekommt keinen sanften Hinweis", () => 
 })
 
 test("am Wochenende mit laufender Schicht kommen letzte Warnung und Auto-Abschluss, aber kein sanfter Hinweis", () => {
-  const saturday = { date: "2026-09-26", workingDay: false, coreStart: null, coreEnd: null, holiday: null, absence: null }
+  const saturday = {
+    date: "2026-09-26",
+    workingDay: false,
+    coreStart: null,
+    coreEnd: null,
+    holiday: null,
+    absence: null,
+  }
   let state = applyStatus(emptyState(), "stopped", at("09:55", "2026-09-26")).state
   state = applyStamp(state, "clock-in", { ok: true, running: true }, at("10:00", "2026-09-26")).state
   assert.deepEqual(types(decide(at("18:00", "2026-09-26"), saturday, state, eveningConfig)), [])
@@ -383,19 +433,27 @@ test("ein fehlgeschlagener Auto-Abschluss wird nach 5 Minuten wiederholt, nicht 
 
 test("die Standardwerte der Logik sind die des Manifests", () => {
   const manifest = JSON.parse(readFileSync(new URL("../manifest.json", import.meta.url)))
-  for (const [key, value] of Object.entries(DEFAULTS))
-    assert.equal(manifest.barWidget.defaults[key], value, key)
+  for (const [key, value] of Object.entries(DEFAULTS)) assert.equal(manifest.barWidget.defaults[key], value, key)
 })
 
 test("sanfter Hinweis, letzte Warnung und Korrektur-Hinweis nennen ihre Uhrzeiten", () => {
   const hint = decide(at("17:15"), workday, working(), eveningConfig).actions[0]
-  assert.deepEqual(notification(hint, workday, working()),
-    { headline: "Schicht läuft noch", body: "Die Kernzeit endete um 16:45.", click: "panel" })
+  assert.deepEqual(notification(hint, workday, working()), {
+    headline: "Schicht läuft noch",
+    body: "Die Kernzeit endete um 16:45.",
+    click: "panel",
+  })
   const warning = decide(at("19:00"), workday, hinted(), eveningConfig).actions[0]
-  assert.deepEqual(notification(warning, workday, hinted()),
-    { headline: "Letzte Warnung", body: "Auto-Abschluss um 19:15. Im Panel: +1 h weiterarbeiten oder jetzt ausstempeln.", click: "panel" })
-  assert.deepEqual(notification({ type: "auto-closed", at: "19:15", lastActivity: null }, workday, hinted()),
-    { headline: "Schicht automatisch beendet", body: "Um 19:15 ausgestempelt. Bitte die Endzeit in Calamari korrigieren.", click: "calamari" })
+  assert.deepEqual(notification(warning, workday, hinted()), {
+    headline: "Letzte Warnung",
+    body: "Auto-Abschluss um 19:15. Im Panel: +1 h weiterarbeiten oder jetzt ausstempeln.",
+    click: "panel",
+  })
+  assert.deepEqual(notification({ type: "auto-closed", at: "19:15", lastActivity: null }, workday, hinted()), {
+    headline: "Schicht automatisch beendet",
+    body: "Um 19:15 ausgestempelt. Bitte die Endzeit in Calamari korrigieren.",
+    click: "calamari",
+  })
 })
 
 test("nach der letzten Warnung zeigt das Panel einen Countdown bis zum Auto-Abschluss", () => {
@@ -413,12 +471,22 @@ test("der Button zum Verschieben nennt die eingestellte Dauer", () => {
 test("die letzte Warnung nennt die eingestellte Verschiebung", () => {
   const own = Object.assign({}, eveningConfig, { extendMinutes: 90 })
   const warning = decide(at("19:00"), workday, hinted(), own).actions[0]
-  assert.match(notification(warning, workday, hinted(), own).body, /Im Panel: \+90 Min weiterarbeiten oder jetzt ausstempeln\.$/)
+  assert.match(
+    notification(warning, workday, hinted(), own).body,
+    /Im Panel: \+90 Min weiterarbeiten oder jetzt ausstempeln\.$/,
+  )
 })
 
 // Letzte Aktivität und Tagesende-Abschluss
 
-const wednesday = { date: "2026-09-23", workingDay: true, coreStart: "09:00", coreEnd: "16:45", holiday: null, absence: null }
+const wednesday = {
+  date: "2026-09-23",
+  workingDay: true,
+  coreStart: "09:00",
+  coreEnd: "16:45",
+  holiday: null,
+  absence: null,
+}
 // Shift since 09:00 on Tuesday, lid closed at 17:59, opened Wednesday 07:30.
 // Calamari ended the shift at 23:59 itself, so nothing runs this morning.
 const morningAfter = () => {
@@ -436,17 +504,29 @@ test("nach dem Korrektur-Hinweis für den Vortag beginnt der neue Tag normal", (
 })
 
 test("der Hinweis zum Tagesende-Abschluss nennt die letzte Aktivität von jenem Tag", () => {
-  assert.deepEqual(notification({ type: "day-end-closed", date: "2026-09-22", lastActivity: "2026-09-22T17:59" }, wednesday, morningAfter()),
-    { headline: "Schicht vom Vortag beendet",
+  assert.deepEqual(
+    notification(
+      { type: "day-end-closed", date: "2026-09-22", lastActivity: "2026-09-22T17:59" },
+      wednesday,
+      morningAfter(),
+    ),
+    {
+      headline: "Schicht vom Vortag beendet",
       body: "Die Schicht vom 22.09. lief bis zum Tagesende, Calamari hat sie um 23:59 beendet. Bitte die Endzeit dort auf 17:59 korrigieren (letzte Aktivität).",
-      click: "calamari" })
+      click: "calamari",
+    },
+  )
 })
 
 test("ohne bekannte letzte Aktivität bittet der Hinweis nur um die Korrektur", () => {
-  assert.deepEqual(notification({ type: "day-end-closed", date: "2026-09-22", lastActivity: null }, wednesday, morningAfter()),
-    { headline: "Schicht vom Vortag beendet",
+  assert.deepEqual(
+    notification({ type: "day-end-closed", date: "2026-09-22", lastActivity: null }, wednesday, morningAfter()),
+    {
+      headline: "Schicht vom Vortag beendet",
       body: "Die Schicht vom 22.09. lief bis zum Tagesende, Calamari hat sie um 23:59 beendet. Bitte die Endzeit dort korrigieren.",
-      click: "calamari" })
+      click: "calamari",
+    },
+  )
 })
 
 test("der Korrektur-Hinweis nach dem Auto-Abschluss nennt die letzte Aktivität", () => {
@@ -454,18 +534,24 @@ test("der Korrektur-Hinweis nach dem Auto-Abschluss nennt die letzte Aktivität"
   state = setIdle(state, true, at("18:45"), 300)
   const close = decide(at("19:15"), workday, state, eveningConfig).actions[0]
   assert.deepEqual(close, { type: "auto-close", lastActivity: "2026-09-22T18:40" })
-  assert.deepEqual(notification({ type: "auto-closed", at: "19:15", lastActivity: close.lastActivity }, workday, state).body,
-    "Um 19:15 ausgestempelt, letzte Aktivität 18:40. Bitte die Endzeit in Calamari darauf korrigieren.")
+  assert.deepEqual(
+    notification({ type: "auto-closed", at: "19:15", lastActivity: close.lastActivity }, workday, state).body,
+    "Um 19:15 ausgestempelt, letzte Aktivität 18:40. Bitte die Endzeit in Calamari darauf korrigieren.",
+  )
 })
 
 test("wer beim Auto-Abschluss aktiv ist, bekommt keine letzte Aktivität genannt", () => {
   const state = markSent(hinted(), "final-warning", at("19:00"))
-  assert.deepEqual(decide(at("19:15"), workday, state, eveningConfig).actions, [{ type: "auto-close", lastActivity: null }])
+  assert.deepEqual(decide(at("19:15"), workday, state, eveningConfig).actions, [
+    { type: "auto-close", lastActivity: null },
+  ])
 })
 
 test("der Auto-Abschluss stempelt aus und kündigt seinen Korrektur-Hinweis an", () => {
-  assert.deepEqual(closeFor({ type: "auto-close", lastActivity: "2026-09-22T18:40" }),
-    { stamp: "clock-out", notice: { type: "auto-closed", lastActivity: "2026-09-22T18:40" } })
+  assert.deepEqual(closeFor({ type: "auto-close", lastActivity: "2026-09-22T18:40" }), {
+    stamp: "clock-out",
+    notice: { type: "auto-closed", lastActivity: "2026-09-22T18:40" },
+  })
   assert.equal(closeFor({ type: "stamp-reminder" }), null)
 })
 
@@ -481,7 +567,11 @@ test("nach einem Auto-Abschluss bekommt eine neue Schicht ihre eigene letzte War
 })
 
 test("solange der Beginn einer im Web begonnenen Schicht unbekannt ist, wird nicht ausgestempelt", () => {
-  let state = markSent(postpone(markSent(hinted(), "final-warning", at("19:00")), eveningConfig, at("19:00")), "final-warning", at("20:00"))
+  let state = markSent(
+    postpone(markSent(hinted(), "final-warning", at("19:00")), eveningConfig, at("19:00")),
+    "final-warning",
+    at("20:00"),
+  )
   state = stamp(markSent(state, "auto-close", at("20:15")), "clock-out", "20:15")
   // Clocked in on the phone; the poll sees it, start-time has not answered yet.
   state = applyStatus(state, "running", at("20:40")).state
@@ -505,8 +595,11 @@ test("die Pausen-Erinnerung einer fremden Pause zählt ab dem ersten Sehen", () 
 })
 
 test("die Pausen-Erinnerung einer fremden Pause sagt, dass ihr Beginn nicht bekannt ist", () => {
-  assert.deepEqual(notification({ type: "break-reminder" }, workday, seenBreak("12:10")),
-    { headline: "Pause läuft noch", body: "Die Pause läuft seit spätestens 12:10.", click: "panel" })
+  assert.deepEqual(notification({ type: "break-reminder" }, workday, seenBreak("12:10")), {
+    headline: "Pause läuft noch",
+    body: "Die Pause läuft seit spätestens 12:10.",
+    click: "panel",
+  })
 })
 
 test("nach einer fremden Pause läuft die Schicht mit ihren Erinnerungen weiter", () => {
@@ -525,8 +618,9 @@ test("in einer Pause am Abend kommen letzte Warnung und Auto-Abschluss wie in de
   assert.deepEqual(warning.autoCloseAt, at("19:15"))
   state = markSent(state, "final-warning", at("19:00"))
   state = markSent(state, "break-reminder", at("19:15"))
-  assert.deepEqual(decide(at("19:15"), workday, state, eveningConfig).actions,
-    [{ type: "auto-close", lastActivity: null, inPause: true }])
+  assert.deepEqual(decide(at("19:15"), workday, state, eveningConfig).actions, [
+    { type: "auto-close", lastActivity: null, inPause: true },
+  ])
 })
 
 test("die Pausen-Erinnerung läuft am Abend neben der letzten Warnung weiter", () => {
@@ -540,8 +634,9 @@ test("„+1 h“ verschiebt auch in einer Pause letzte Warnung und Auto-Abschlus
   const r = decide(at("19:15"), workday, state, eveningConfig)
   assert.deepEqual(types(r), [])
   assert.equal(r.canExtend, false)
-  assert.deepEqual(types(decide(at("20:05"), workday, markSent(state, "break-reminder", at("20:05")), eveningConfig)),
-    ["final-warning"])
+  assert.deepEqual(types(decide(at("20:05"), workday, markSent(state, "break-reminder", at("20:05")), eveningConfig)), [
+    "final-warning",
+  ])
 })
 
 test("in einer Pause kommt weiterhin kein sanfter Hinweis", () => {
@@ -549,13 +644,18 @@ test("in einer Pause kommt weiterhin kein sanfter Hinweis", () => {
 })
 
 test("der Auto-Abschluss aus einer Pause stempelt auf den Pausenbeginn aus", () => {
-  assert.deepEqual(closeFor({ type: "auto-close", lastActivity: null, inPause: true }),
-    { stamp: "break-clock-out", notice: { type: "auto-closed", lastActivity: null } })
+  assert.deepEqual(closeFor({ type: "auto-close", lastActivity: null, inPause: true }), {
+    stamp: "break-clock-out",
+    notice: { type: "auto-closed", lastActivity: null },
+  })
 })
 
 test("die letzte Warnung in einer Pause bietet den Feierabend an", () => {
   const state = pausedAt("18:30")
-  const warning = decide(at("19:00"), workday, state, eveningConfig).actions.find(a => a.type === "final-warning")
-  assert.deepEqual(notification(warning, workday, state),
-    { headline: "Letzte Warnung", body: "Auto-Abschluss um 19:15. Im Panel: +1 h weiterarbeiten oder Feierabend.", click: "panel" })
+  const warning = decide(at("19:00"), workday, state, eveningConfig).actions.find((a) => a.type === "final-warning")
+  assert.deepEqual(notification(warning, workday, state), {
+    headline: "Letzte Warnung",
+    body: "Auto-Abschluss um 19:15. Im Panel: +1 h weiterarbeiten oder Feierabend.",
+    click: "panel",
+  })
 })
