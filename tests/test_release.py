@@ -147,6 +147,15 @@ class QtPinTest(unittest.TestCase):
     def test_the_pin_is_read_from_the_install_qt_step(self):
         self.assertEqual(release.qt_pin((ROOT / ".github" / "workflows" / "ci.yml").read_text()), "6.11.2")
 
+    def test_jobs_that_pin_different_qt_versions_are_refused(self):
+        ci = "".join(
+            '      - uses: jurplel/install-qt-action@v4\n        with:\n          version: "%s"\n' % v
+            for v in ("6.11.2", "6.12.0")
+        )
+
+        with self.assertRaisesRegex(release.Abort, "6.11.2.*6.12.0"):
+            release.qt_pin(ci)
+
     def test_the_local_qmllint_version_is_its_last_word(self):
         self.assertEqual(release.qmllint_version("qmllint 6.11.2\n"), "6.11.2")
 

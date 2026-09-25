@@ -95,10 +95,15 @@ def bump_manifest(text, version):
 
 
 def qt_pin(ci_yml):
-    match = re.search(r"install-qt-action@.*?\n\s+with:\s*\n(?:\s+.*\n)*?\s+version:\s*[\"']?([\d.]+)", ci_yml)
-    if not match:
+    """The Qt version of every install-qt-action step; the jobs must agree."""
+    pins = sorted(
+        set(re.findall(r"install-qt-action@.*?\n\s+with:\s*\n(?:\s+.*\n)*?\s+version:\s*[\"']?([\d.]+)", ci_yml))
+    )
+    if not pins:
         raise Abort("no Qt version pinned in .github/workflows/%s" % WORKFLOW)
-    return match.group(1)
+    if len(pins) > 1:
+        raise Abort("the jobs in .github/workflows/%s pin different Qt versions: %s" % (WORKFLOW, ", ".join(pins)))
+    return pins[0]
 
 
 def qmllint_version(output):
@@ -167,7 +172,13 @@ def run_checks():
 def check_ci(sha, dry_run):
     out = run("gh", "run", "list", "--workflow", WORKFLOW, "--commit", sha, "--json", "databaseId,status,conclusion")
     runs = json.loads(out or "[]")
-    verdict = ci_verdict(runs)
+    try:
+        verdict = ci_verdict(runs)
+    except Abort as e:
+        if not dry_run:
+            raise
+        print("CI: %s; a real release would abort here" % e)
+        return
     print("CI: run %s of %s is %s" % (runs[0]["databaseId"], sha[:12], verdict))
     if verdict == "running" and not dry_run:
         print("waiting for it …")
@@ -212,7 +223,7 @@ def release(version, dry_run):
         print("Planned commands:")
         for argv in [
             ["git", "commit", "-m", "Release " + tag, "manifest.json", "CHANGELOG.md"],
-            ["git", "tag", "-a", tag, "-m", tag],
+            ["git", "tag", "-a", "--no-sign", tag, "-m", tag],
             *steps,
         ]:
             print("  " + shlex.join(argv))
@@ -222,8 +233,15 @@ def release(version, dry_run):
         f.write(new_manifest)
     with open("CHANGELOG.md", "w") as f:
         f.write(new_changelog)
-    run("git", "commit", "--quiet", "-m", "Release " + tag, "manifest.json", "CHANGELOG.md")
-    run("git", "tag", "-a", tag, "-m", tag)
+    try:
+        run("git", "commit", "--quiet", "-m", "Release " + tag, "manifest.json", "CHANGELOG.md")
+    except Abort:
+        with open("manifest.json", "w") as f:
+            f.write(manifest_text)
+        with open("CHANGELOG.md", "w") as f:
+            f.write(changelog_text)
+        raise
+    run("git", "tag", "-a", "--no-sign", tag, "-m", tag)
     for i, argv in enumerate(steps):
         print(shlex.join(argv))
         proc = subprocess.run(argv, text=True, input=notes if argv[0] == "gh" else None)
