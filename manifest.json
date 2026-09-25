@@ -50,6 +50,10 @@
         "title": "Pause"
       },
       {
+        "key": "closing",
+        "title": "Feierabend"
+      },
+      {
         "key": "core",
         "title": "Kernzeiten",
         "description": "Je Wochentag HH:MM-HH:MM, „frei“ für einen freien Tag, oder leer für den Arbeitsplan aus Calamari."
@@ -107,7 +111,7 @@
         "min": 0,
         "max": 240,
         "defaultValue": 30,
-        "group": "polling"
+        "group": "closing"
       },
       {
         "key": "finalWarningTime",
@@ -115,7 +119,7 @@
         "label": "Uhrzeit der letzten Warnung (HH:MM)",
         "format": "time",
         "defaultValue": "19:00",
-        "group": "polling"
+        "group": "closing"
       },
       {
         "key": "autoCloseMinutes",
@@ -124,7 +128,7 @@
         "min": 1,
         "max": 120,
         "defaultValue": 15,
-        "group": "polling"
+        "group": "closing"
       },
       {
         "key": "extendMinutes",
@@ -133,7 +137,7 @@
         "min": 5,
         "max": 240,
         "defaultValue": 60,
-        "group": "polling"
+        "group": "closing"
       },
       {
         "key": "hardLimitTime",
@@ -141,7 +145,7 @@
         "label": "Obergrenze für den Auto-Abschluss (HH:MM)",
         "format": "time",
         "defaultValue": "23:00",
-        "group": "polling"
+        "group": "closing"
       },
       {
         "key": "webUrl",
