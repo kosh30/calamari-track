@@ -6,6 +6,8 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-09-25
+
 ### Added
 
 - Clock in and out from the bar: the bar shows whether a shift runs and for how long, the panel stamps with one click.
@@ -17,4 +19,5 @@ All notable changes to this plugin are documented here. The format follows
 - Log in with your company's Calamari login, e.g. Microsoft SSO; login and API key stay in the system keyring.
 - Change the settings in the panel under “Einstellungen”, which also shows the plugin's version.
 
-[Unreleased]: https://github.com/kosh30/calamari-track/commits/main
+[Unreleased]: https://github.com/kosh30/calamari-track/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/kosh30/calamari-track/releases/tag/v0.1.0
