@@ -145,15 +145,14 @@ Column {
     Row {
         spacing: Style.space(8)
 
-        Button {
-            text: "Abbrechen"
-            bordered: true
+        ActionButton {
+            label: "Abbrechen"
             onClicked: root.done()
         }
 
-        Button {
-            text: "Speichern"
-            bordered: true
+        ActionButton {
+            label: "Speichern"
+            primary: true
             onClicked: root.save()
         }
     }

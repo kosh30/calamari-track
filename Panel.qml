@@ -105,11 +105,11 @@ Panel {
                 id: content
                 width: parent.width
 
-                Button {
+                ActionButton {
                     visible: root.page === "menu"
-                    text: "Einstellungen"
+                    label: "Einstellungen"
                     iconText: "󰒓"
-                    bordered: true
+                    primary: true
                     onClicked: root.showPage("settings")
                 }
 
@@ -301,10 +301,9 @@ Panel {
                         text: root.countdown
                     }
 
-                    Button {
+                    ActionButton {
                         visible: root.service !== null && root.service.decision.canExtend === true
-                        text: Reminders.extendLabel(root.service ? root.service.config : null)
-                        bordered: true
+                        label: Reminders.extendLabel(root.service ? root.service.config : null)
                         onClicked: root.service.postpone()
                     }
 
@@ -318,38 +317,35 @@ Panel {
                         text: root.service ? ShiftClock.workedText(root.service.shiftState, root.service.now) : ""
                     }
 
-                    Button {
+                    ActionButton {
                         visible: root.stampAction !== null
                         enabled: root.service !== null && !root.service.busy
-                        text: root.actionText(root.stampAction)
-                        bordered: true
+                        label: root.actionText(root.stampAction)
+                        primary: true
                         onClicked: root.service.stamp(root.stampAction)
                     }
 
-                    Button {
+                    ActionButton {
                         visible: root.breakAction !== null
                         enabled: root.service !== null && !root.service.busy
-                        text: root.actionText(root.breakAction)
-                        bordered: true
+                        label: root.actionText(root.breakAction)
                         onClicked: root.service.stamp(root.breakAction)
                     }
 
-                    Button {
+                    ActionButton {
                         visible: root.feierabendAction !== null
                         enabled: root.service !== null && !root.service.busy
-                        text: root.actionText(root.feierabendAction)
+                        label: root.actionText(root.feierabendAction)
                         tooltipText: "Die Schicht endet beim Beginn der Pause (ist er Calamari nicht bekannt: jetzt)"
-                        bordered: true
                         onClicked: root.service.stamp(root.feierabendAction)
                     }
 
-                    Button {
+                    ActionButton {
                         visible: root.service !== null && root.authState === "ok"
                         readonly property bool dayOff: root.service !== null && root.service.dayOff
-                        text: dayOff ? "Heute frei (zurücknehmen)" : "Heute frei"
+                        label: dayOff ? "Heute frei (zurücknehmen)" : "Heute frei"
                         tooltipText: "Keine Stempel-Erinnerungen bis morgen"
                         selected: dayOff
-                        bordered: true
                         onClicked: root.service.setDayOff(!dayOff)
                     }
 
@@ -373,10 +369,10 @@ Panel {
                         text: root.service ? root.service.errorMessage : ""
                     }
 
-                    Button {
+                    ActionButton {
                         visible: root.service !== null && root.authState !== "ok" && !root.loggingIn
-                        text: "Neu anmelden"
-                        bordered: true
+                        label: "Neu anmelden"
+                        primary: true
                         onClicked: root.service.login()
                     }
                 }

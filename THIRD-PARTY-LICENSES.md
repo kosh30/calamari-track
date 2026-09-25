@@ -140,7 +140,7 @@ as soon as a tracked top-level entry appears that is not classified here.
 | `tools/`, `.github/` | Ours. The release and format scripts, the CI workflow and the rulesets, written for this project. |
 | `.git-blame-ignore-revs`, `.prettierignore`, `.prettierrc.json`, `ruff.toml` | Ours. Formatter settings and the list of formatting commits. |
 | `renovate.json` | Written by the Renovate bot as its onboarding config. It names Renovate's `config:recommended` preset and its schema by URL instead of copying either, so it carries no third-party code. |
-| `Panel.qml`, `Service.qml`, `SettingsForm.qml`, `Widget.qml`, `manifest.json` | Ours. They call the shell's API, which is not the same as copying it. |
+| `ActionButton.qml`, `Panel.qml`, `Service.qml`, `SettingsForm.qml`, `Widget.qml`, `manifest.json` | Ours. They call the shell's API, which is not the same as copying it. |
 | `README.md`, `CLAUDE.md`, `CONTEXT.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `LICENSE`, `THIRD-PARTY-LICENSES.md` | Ours, except that `LICENSE` is the MIT text itself. |
 
 How it was checked: every file under `lint/`, and every dotfile at the root, was
