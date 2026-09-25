@@ -76,3 +76,13 @@ _Avoid_: Tag abschließen, Tagesabschluss
 
 **Letzte Aktivität**:
 Der letzte Zeitpunkt, an dem der Benutzer am Rechner aktiv war, bevor er in den Leerlauf oder Suspend ging.
+
+### Auslieferung
+
+**Release**:
+Ein Stand, der mit einem Tag `vX.Y.Z`, einem Abschnitt im Changelog und einem GitHub-Release versehen und auf den Auslieferungs-Branch gesetzt wird. Erst dann bekommen Nutzer ihn per `omarchy plugin update`.
+_Avoid_: Version (das ist nur die Nummer), Deploy
+
+**Auslieferungs-Branch** (`stable`):
+Der Default-Branch auf GitHub, dem installierte Plugins folgen. Bewegt sich nur beim Release, per Fast-Forward auf den getaggten Commit. Entwickelt wird auf `main`. Siehe [ADR 0004](docs/adr/0004-auslieferungs-branch-stable.md).
+_Avoid_: Release-Branch, Default-Branch (wenn `main` gemeint ist)
