@@ -15,6 +15,16 @@ Dieses Repo liegt auf **GitHub** (`kosh30/calamari-track`), ausdrücklich abweic
 - Lint: `/usr/lib/qt6/bin/qmllint -I lint *.qml` (Snapshots auffrischen: `lint/refresh.sh`)
 - Installiert per Symlink `~/.config/omarchy/plugins/kosh.calamari-tracker`. Widget und Panel laden beim Speichern neu. `Service.qml` ist `keepLoaded` und braucht `omarchy-restart-shell`.
 
+## Manuelle Tests
+
+Zum Testen der Oberfläche sind Eingabe-Automatisierung und Bildschirmaufnahmen ausdrücklich erlaubt:
+
+- `ydotool` (Tasten, Klicks, Maus) — braucht laufenden `ydotoold`
+- `grim` für Screenshots, `slurp` für den Ausschnitt
+- `wf-recorder -g "$(slurp)" -f <datei>.mp4` für Bildschirmaufnahmen (Stop per SIGINT)
+- Screenshots und Aufnahmen dürfen zur Analyse gelesen werden
+- Artefakte gehören ins Scratchpad, nicht ins Repo
+
 ## Agent skills
 
 ### Issue tracker
