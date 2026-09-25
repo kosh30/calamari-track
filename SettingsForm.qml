@@ -117,18 +117,22 @@ Column {
         }
 
         // Where in the fields the window stands, while there is more than
-        // fits (js/scrollindicator.mjs). It lies over the right edge instead
-        // of beside it, so the fields keep their full width, and it is gone
-        // altogether while everything fits.
+        // fits (js/scrollindicator.mjs). It hangs in the panel's own right
+        // margin, beside the fields rather than on them: laid over their right
+        // edge it came out the same width and colour as a text field's border
+        // and read as one. Nothing is taken from the fields for it, and it is
+        // gone altogether while everything fits. Bar and margin are both
+        // Style.space, so they keep their proportion at any spacing scale.
         Rectangle {
             readonly property var place: ScrollIndicator.thumb(fields.visibleArea.yPosition, fields.visibleArea.heightRatio, parent.height, Style.space(12))
             visible: place.visible
             anchors.right: parent.right
+            anchors.rightMargin: -Style.space(6)
             y: place.y
-            width: Style.space(2)
+            width: Style.space(3)
             height: place.height
             radius: width / 2
-            color: Util.alpha(Color.foreground, 0.35)
+            color: Util.alpha(Color.foreground, 0.55)
         }
     }
 
