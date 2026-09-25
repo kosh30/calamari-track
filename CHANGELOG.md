@@ -6,6 +6,14 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- See how far the day's core time has run, as a thin bar in the panel with the time left (“noch 2:15 bis Ende der Kernzeit”). Days without a core time and days off leave it out.
+
+### Changed
+
+- The panel leads with the running shift's duration as its largest number and places it in a smaller line below, instead of a list of equally loud lines.
+
 ## [0.1.0] - 2026-09-25
 
 ### Added
