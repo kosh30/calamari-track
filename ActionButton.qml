@@ -32,6 +32,14 @@ import "js/contrast.mjs" as Contrast
 //   frame   pointer ▸ primary or selected ▸ none
 //   fill    pressed ▸ pointer ▸ selected ▸ none
 //
+// All three fade. The frame is the awkward one: a spec carries a colour, a
+// set of widths and an optional gradient, and only a colour can be animated.
+// So the theme's own spec is kept for its widths and its gradient and only
+// its colour is swapped for one that fades — to transparent where no frame
+// should show, which leaves the widths standing and the geometry still. A
+// gradient border cannot be faded that way, because the overlay draws the
+// gradient and never looks at the colour; those keep the hard switch.
+//
 // The colours are the theme's foreground at three strengths rather than
 // Qt.darker: darkening the dark foreground of a light theme would make a
 // secondary action louder than the main one. How far back the quiet ones step
@@ -80,6 +88,20 @@ BorderSurface {
     readonly property var _hoverBorder: Border.controlSpec("hover-cursor", Color.foreground, Color.accent)
     readonly property var _normalBorder: Border.controlSpec("normal", Color.foreground, Color.accent)
 
+    // The spec whose widths and gradient are in force. A frame on its way out
+    // keeps the shape it is fading from, which is the pointer's.
+    readonly property var _frameShape: root._framed && !root._hot ? root._normalBorder : root._hoverBorder
+    readonly property bool _frameFades: !root._frameShape.gradient || !root._frameShape.gradient.enabled
+    readonly property var _frameHard: root._hot ? root._hoverBorder : root._framed ? root._normalBorder : Border.none()
+
+    property color _frameColor: root._hot ? Border.color(root._hoverBorder) : root._framed ? Border.color(root._normalBorder) : "transparent"
+
+    Behavior on _frameColor {
+        ColorAnimation {
+            duration: root._fade
+        }
+    }
+
     // Reserve the widest border any state can paint, so coming under the
     // pointer never nudges the buttons below.
     readonly property real _reservedX: Math.max(Border.left(root._hoverBorder), Border.left(root._normalBorder)) + Math.max(Border.right(root._hoverBorder), Border.right(root._normalBorder))
@@ -94,7 +116,11 @@ BorderSurface {
     implicitHeight: content.implicitHeight + root.topPadding + root.bottomPadding + root._reservedY
     radius: Style.cornerRadius
 
-    borderSpec: root._hot ? root._hoverBorder : root._framed ? root._normalBorder : Border.none()
+    borderSpec: root._frameFades ? {
+        color: root._frameColor,
+        widths: root._frameShape.widths,
+        gradient: root._frameShape.gradient
+    } : root._frameHard
     color: mouse.pressed ? Style.pressedFillFor(Color.foreground, Color.accent) : root._hot ? Style.hoverFillFor(Color.foreground, Color.accent) : root.selected ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
 
     Behavior on color {
