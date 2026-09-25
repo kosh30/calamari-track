@@ -40,6 +40,29 @@
       "coreSaturday": "",
       "coreSunday": ""
     },
+    "groups": [
+      {
+        "key": "polling",
+        "title": "Abfrage und Erinnerungen"
+      },
+      {
+        "key": "break",
+        "title": "Pause"
+      },
+      {
+        "key": "core",
+        "title": "Kernzeiten",
+        "description": "Je Wochentag HH:MM-HH:MM, „frei“ für einen freien Tag, oder leer für den Arbeitsplan aus Calamari."
+      },
+      {
+        "key": "connection",
+        "title": "Verbindung"
+      },
+      {
+        "key": "naming",
+        "title": "Projekt und Pausentyp"
+      }
+    ],
     "schema": [
       {
         "key": "pollIntervalMinutes",
@@ -47,7 +70,8 @@
         "label": "Abfrage-Intervall (Minuten)",
         "min": 1,
         "max": 60,
-        "defaultValue": 3
+        "defaultValue": 3,
+        "group": "polling"
       },
       {
         "key": "stampReminderMinutes",
@@ -55,7 +79,8 @@
         "label": "Stempel-Erinnerung wiederholen alle (Minuten)",
         "min": 1,
         "max": 60,
-        "defaultValue": 5
+        "defaultValue": 5,
+        "group": "polling"
       },
       {
         "key": "breakLimitMinutes",
@@ -63,7 +88,8 @@
         "label": "Pausen-Erinnerung nach (Minuten)",
         "min": 1,
         "max": 240,
-        "defaultValue": 30
+        "defaultValue": 30,
+        "group": "break"
       },
       {
         "key": "breakReminderMinutes",
@@ -71,7 +97,8 @@
         "label": "Pausen-Erinnerung wiederholen alle (Minuten)",
         "min": 1,
         "max": 60,
-        "defaultValue": 5
+        "defaultValue": 5,
+        "group": "break"
       },
       {
         "key": "softHintMinutes",
@@ -79,14 +106,16 @@
         "label": "Sanfter Hinweis nach Ende der Kernzeit (Minuten)",
         "min": 0,
         "max": 240,
-        "defaultValue": 30
+        "defaultValue": 30,
+        "group": "polling"
       },
       {
         "key": "finalWarningTime",
         "type": "string",
         "label": "Uhrzeit der letzten Warnung (HH:MM)",
         "format": "time",
-        "defaultValue": "19:00"
+        "defaultValue": "19:00",
+        "group": "polling"
       },
       {
         "key": "autoCloseMinutes",
@@ -94,7 +123,8 @@
         "label": "Auto-Abschluss nach der letzten Warnung (Minuten)",
         "min": 1,
         "max": 120,
-        "defaultValue": 15
+        "defaultValue": 15,
+        "group": "polling"
       },
       {
         "key": "extendMinutes",
@@ -102,89 +132,102 @@
         "label": "Verschiebung durch „+1 h“ (Minuten)",
         "min": 5,
         "max": 240,
-        "defaultValue": 60
+        "defaultValue": 60,
+        "group": "polling"
       },
       {
         "key": "hardLimitTime",
         "type": "string",
         "label": "Obergrenze für den Auto-Abschluss (HH:MM)",
         "format": "time",
-        "defaultValue": "23:00"
+        "defaultValue": "23:00",
+        "group": "polling"
       },
       {
         "key": "webUrl",
         "type": "string",
         "label": "Calamari im Browser (z.B. https://firma.calamari.io)",
         "format": "url",
-        "defaultValue": ""
+        "defaultValue": "",
+        "group": "connection"
       },
       {
         "key": "apiUrl",
         "type": "string",
         "label": "Calamari-REST-API, z.B. https://firma.calamari.io/api (Key per bin/calamari api-key)",
         "format": "url",
-        "defaultValue": ""
+        "defaultValue": "",
+        "group": "connection"
       },
       {
         "key": "defaultProject",
         "type": "string",
         "label": "Standard-Projekt beim Einstempeln (Name in Calamari, leer = Check-in)",
-        "defaultValue": "Check-in"
+        "defaultValue": "Check-in",
+        "group": "naming"
       },
       {
         "key": "breakType",
         "type": "string",
         "label": "Pausentyp (Name in Calamari, leer = Break)",
-        "defaultValue": "Break"
+        "defaultValue": "Break",
+        "group": "naming"
       },
       {
         "key": "coreMonday",
         "type": "string",
-        "label": "Kernzeit Montag (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "label": "Montag",
         "format": "coreTime",
-        "defaultValue": ""
+        "defaultValue": "",
+        "group": "core"
       },
       {
         "key": "coreTuesday",
         "type": "string",
-        "label": "Kernzeit Dienstag (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "label": "Dienstag",
         "format": "coreTime",
-        "defaultValue": ""
+        "defaultValue": "",
+        "group": "core"
       },
       {
         "key": "coreWednesday",
         "type": "string",
-        "label": "Kernzeit Mittwoch (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "label": "Mittwoch",
         "format": "coreTime",
-        "defaultValue": ""
+        "defaultValue": "",
+        "group": "core"
       },
       {
         "key": "coreThursday",
         "type": "string",
-        "label": "Kernzeit Donnerstag (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "label": "Donnerstag",
         "format": "coreTime",
-        "defaultValue": ""
+        "defaultValue": "",
+        "group": "core"
       },
       {
         "key": "coreFriday",
         "type": "string",
-        "label": "Kernzeit Freitag (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "label": "Freitag",
         "format": "coreTime",
-        "defaultValue": ""
+        "defaultValue": "",
+        "group": "core"
       },
       {
         "key": "coreSaturday",
         "type": "string",
-        "label": "Kernzeit Samstag (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "label": "Samstag",
         "format": "coreTime",
-        "defaultValue": ""
+        "defaultValue": "",
+        "group": "core"
       },
       {
         "key": "coreSunday",
         "type": "string",
-        "label": "Kernzeit Sonntag (HH:MM-HH:MM, frei, leer = Arbeitsplan aus Calamari)",
+        "label": "Sonntag",
         "format": "coreTime",
-        "defaultValue": ""
+        "defaultValue": "",
+        "group": "core"
       }
     ]
   }

@@ -20,6 +20,23 @@ class ManifestTest(unittest.TestCase):
         self.assertIn("breakLimitMinutes", schema)
         self.assertIn("breakReminderMinutes", schema)
 
+    def test_every_group_is_named_once_and_carries_a_title(self):
+        # A duplicated key would render the same fields in two cards; a group
+        # without a title would head a card with nothing.
+        groups = json.loads((ROOT / "manifest.json").read_text())["barWidget"]["groups"]
+        keys = [group["key"] for group in groups]
+        self.assertEqual(sorted(keys), sorted(set(keys)), keys)
+        for group in groups:
+            self.assertTrue(group["title"].strip(), group["key"])
+
+    def test_every_setting_names_a_group_the_manifest_declares(self):
+        # A field whose group does not exist is still shown, in a catch-all
+        # card, but it is a mistake and belongs caught here.
+        widget = json.loads((ROOT / "manifest.json").read_text())["barWidget"]
+        declared = {group["key"] for group in widget["groups"]}
+        for field in widget["schema"]:
+            self.assertIn(field.get("group"), declared, field["key"])
+
     def test_the_rest_api_url_names_no_company(self):
         widget = json.loads((ROOT / "manifest.json").read_text())["barWidget"]
         (field,) = [f for f in widget["schema"] if f["key"] == "apiUrl"]

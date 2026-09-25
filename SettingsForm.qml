@@ -8,18 +8,24 @@ import "js/scrollindicator.mjs" as ScrollIndicator
 import "js/settingsform.mjs" as SettingsFormLogic
 
 // The settings page of the panel: one text field per entry of the
-// manifest's barWidget.schema, checked by js/settingsform.mjs and saved
-// through the service into the bar entry of shell.json.
+// manifest's barWidget.schema, grouped into cards by that schema's own
+// barWidget.groups, checked by js/settingsform.mjs and saved through the
+// service into the bar entry of shell.json.
+//
+// Checking and saving stay flat and schema-wide — a card is a way of showing
+// the fields, not a unit anything is read or written by.
 Column {
     id: root
 
     property var service: null
     signal done
 
-    readonly property var schema: root.service && root.service.manifest && root.service.manifest.barWidget ? root.service.manifest.barWidget.schema || [] : []
+    readonly property var widget: root.service && root.service.manifest ? root.service.manifest.barWidget || null : null
+    readonly property var schema: root.widget ? root.widget.schema || [] : []
+    readonly property var groups: root.widget ? root.widget.groups || [] : []
     readonly property string version: root.service && root.service.manifest ? root.service.manifest.version || "" : ""
     // Filled when the page opens, then edited in place; errors after "Speichern".
-    property var fields: []
+    property var cards: []
     property var texts: ({})
     property var errors: ({})
     property string saveError: ""
@@ -31,11 +37,9 @@ Column {
     readonly property var strength: Contrast.strengths(Color.foreground, Color.popups.background)
 
     function load() {
-        root.fields = SettingsFormLogic.formFields(root.schema, root.service ? root.service.settings : null)
-        var texts = {}
-        for (var i = 0; i < root.fields.length; i++)
-            texts[root.fields[i].key] = root.fields[i].text
-        root.texts = texts
+        var settings = root.service ? root.service.settings : null
+        root.cards = SettingsFormLogic.formCards(root.schema, root.groups, settings)
+        root.texts = SettingsFormLogic.formTexts(root.schema, settings)
         root.errors = {}
         root.saveError = ""
     }
@@ -80,42 +84,104 @@ Column {
                 spacing: Style.space(6)
 
                 Repeater {
-                    model: root.fields
+                    model: root.cards
 
-                    Column {
-                        id: row
+                    // One tinted card per group, headed in the spaced
+                    // capitals a secondary action speaks in — a caption here
+                    // against a body size there, but the same voice.
+                    //
+                    // The tint is the kit's own normal fill. The hairline is
+                    // not: Style.normalBorderColor is a control's border at
+                    // 40 %, which around a card full of bordered fields would
+                    // shout. Without any line at all a 4 % tint vanishes on a
+                    // light theme, where foreground and background are close.
+                    Rectangle {
+                        id: card
+
                         required property var modelData
+                        readonly property real inset: Style.space(8)
+
                         width: fieldColumn.width
-                        spacing: Style.space(2)
+                        implicitHeight: cardColumn.implicitHeight + card.inset * 2
+                        radius: Style.cornerRadius
+                        color: Style.normalFill
+                        border.width: Style.spacing.hairline
+                        border.color: Util.alpha(Color.foreground, 0.1)
 
-                        Text {
-                            width: parent.width
-                            wrapMode: Text.Wrap
-                            color: Color.foreground
-                            font.family: Style.font.family
-                            font.pixelSize: Style.font.body
-                            text: row.modelData.label
-                        }
+                        Column {
+                            id: cardColumn
 
-                        TextField {
-                            width: parent.width
-                            text: row.modelData.text
-                            onTextEdited: {
-                                var texts = Object.assign({}, root.texts)
-                                texts[row.modelData.key] = text
-                                root.texts = texts
+                            x: card.inset
+                            y: card.inset
+                            width: card.width - card.inset * 2
+                            spacing: Style.space(6)
+
+                            Text {
+                                width: parent.width
+                                wrapMode: Text.Wrap
+                                color: Util.alpha(Color.foreground, root.strength.quiet)
+                                font.family: Style.font.family
+                                font.pixelSize: Style.font.caption
+                                // The shell's own spacing for capitals
+                                // (Ui/PanelHero.qml), as in ActionButton.qml.
+                                font.letterSpacing: 1.2
+                                font.bold: true
+                                text: card.modelData.title.toUpperCase()
                             }
-                            onAccepted: root.save()
-                        }
 
-                        Text {
-                            width: parent.width
-                            visible: root.errors[row.modelData.key] !== undefined
-                            wrapMode: Text.Wrap
-                            color: Color.urgent
-                            font.family: Style.font.family
-                            font.pixelSize: Style.font.body
-                            text: root.errors[row.modelData.key] || ""
+                            // Said once for the whole card, which is what
+                            // spares the seven core times their own sentence.
+                            Text {
+                                width: parent.width
+                                visible: text !== ""
+                                wrapMode: Text.Wrap
+                                color: Util.alpha(Color.foreground, root.strength.quiet)
+                                font.family: Style.font.family
+                                font.pixelSize: Style.font.bodySmall
+                                text: card.modelData.description
+                            }
+
+                            Repeater {
+                                model: card.modelData.fields
+
+                                Column {
+                                    id: row
+
+                                    required property var modelData
+                                    width: cardColumn.width
+                                    spacing: Style.space(2)
+
+                                    Text {
+                                        width: parent.width
+                                        wrapMode: Text.Wrap
+                                        color: Color.foreground
+                                        font.family: Style.font.family
+                                        font.pixelSize: Style.font.body
+                                        text: row.modelData.label
+                                    }
+
+                                    TextField {
+                                        width: parent.width
+                                        text: row.modelData.text
+                                        onTextEdited: {
+                                            var texts = Object.assign({}, root.texts)
+                                            texts[row.modelData.key] = text
+                                            root.texts = texts
+                                        }
+                                        onAccepted: root.save()
+                                    }
+
+                                    Text {
+                                        width: parent.width
+                                        visible: root.errors[row.modelData.key] !== undefined
+                                        wrapMode: Text.Wrap
+                                        color: Color.urgent
+                                        font.family: Style.font.family
+                                        font.pixelSize: Style.font.body
+                                        text: root.errors[row.modelData.key] || ""
+                                    }
+                                }
+                            }
                         }
                     }
                 }

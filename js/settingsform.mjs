@@ -14,6 +14,43 @@ export function formFields(schema, settings) {
   })
 }
 
+// The form's texts, flat by key, which is how they are edited and read back:
+// a card is a way of showing the fields, never a unit anything is saved by.
+export function formTexts(schema, settings) {
+  return Object.fromEntries(formFields(schema, settings).map((field) => [field.key, field.text]))
+}
+
+// Where a field goes whose group the manifest does not name, or names and
+// does not declare. It is a card like any other rather than a silent drop:
+// a setting added without a group has to be visible, or nobody notices it is
+// homeless.
+const STRAY = { key: "other", title: "Weitere" }
+
+// The fields of `schema` as cards: one per entry of `groups`, in that order,
+// each { key, title, description, fields }. Empty groups fall away, and
+// whatever is left over lands in one card at the end.
+export function formCards(schema, groups, settings) {
+  const declared = groups || []
+  const known = new Set(declared.map((group) => group.key))
+  const fields = formFields(schema, settings)
+  // By position rather than by the field objects: formFields promises one
+  // field per schema entry in order, and nothing more than that.
+  const where = (key) => fields.filter((_, i) => schema[i].group === key)
+
+  const cards = declared
+    .map((group) => ({
+      key: group.key,
+      title: group.title || "",
+      description: group.description || "",
+      fields: where(group.key),
+    }))
+    .filter((card) => card.fields.length > 0)
+
+  const stray = fields.filter((_, i) => !known.has(schema[i].group))
+  if (stray.length) cards.push({ key: STRAY.key, title: STRAY.title, description: "", fields: stray })
+  return cards
+}
+
 function clockMinutes(text) {
   const match = /^(\d{1,2}):(\d{2})$/.exec(text)
   return match && Number(match[1]) < 24 && Number(match[2]) < 60 ? Number(match[1]) * 60 + Number(match[2]) : null
