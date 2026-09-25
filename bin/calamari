@@ -114,8 +114,9 @@ def well_known(url, name):
 class SecretToolKeyring:
     def get(self, key):
         try:
-            proc = subprocess.run(["secret-tool", "lookup", "service", KEYRING_SERVICE, "key", key],
-                                  capture_output=True, text=True)
+            proc = subprocess.run(
+                ["secret-tool", "lookup", "service", KEYRING_SERVICE, "key", key], capture_output=True, text=True
+            )
         except FileNotFoundError:
             raise HelperError("KEYRING", "secret-tool is not installed")
         if proc.returncode != 0 and proc.stderr.strip():
@@ -125,9 +126,21 @@ class SecretToolKeyring:
 
     def set(self, key, value):
         try:
-            proc = subprocess.run(["secret-tool", "store", "--label", "Calamari Tracker (%s)" % key,
-                                   "service", KEYRING_SERVICE, "key", key],
-                                  input=json.dumps(value), capture_output=True, text=True)
+            proc = subprocess.run(
+                [
+                    "secret-tool",
+                    "store",
+                    "--label",
+                    "Calamari Tracker (%s)" % key,
+                    "service",
+                    KEYRING_SERVICE,
+                    "key",
+                    key,
+                ],
+                input=json.dumps(value),
+                capture_output=True,
+                text=True,
+            )
         except FileNotFoundError:
             raise HelperError("KEYRING", "secret-tool is not installed")
         if proc.returncode != 0:
@@ -278,9 +291,14 @@ class _CallbackHandler(BaseHTTPRequestHandler):
             return
         self.server.result = result
         ok = "code" in result
-        body = ("<!doctype html><meta charset=utf-8><title>Calamari Tracker</title><p>%s</p>"
-                % ("Anmeldung abgeschlossen. Dieses Fenster kann geschlossen werden." if ok
-                   else "Anmeldung fehlgeschlagen.")).encode()
+        body = (
+            "<!doctype html><meta charset=utf-8><title>Calamari Tracker</title><p>%s</p>"
+            % (
+                "Anmeldung abgeschlossen. Dieses Fenster kann geschlossen werden."
+                if ok
+                else "Anmeldung fehlgeschlagen."
+            )
+        ).encode()
         self.send_response(200 if ok else 400)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -292,8 +310,13 @@ def open_browser(url):
     command = shlex.split(os.environ.get("BROWSER") or "xdg-open")
     command = [a.replace("%s", url) for a in command] if any("%s" in a for a in command) else command + [url]
     try:
-        subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL, start_new_session=True)
+        subprocess.Popen(
+            command,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
     except OSError:
         pass  # the URL is on stderr as a fallback
 
@@ -310,17 +333,25 @@ def login(args):
     redirect_uri = "http://127.0.0.1:%d/callback" % server.server_port
     try:
         # A fresh registration per login: the redirect URI carries this run's port.
-        status, _, body = http(meta["registration_endpoint"], json.dumps({
-            "client_name": CLIENT_NAME,
-            "redirect_uris": [redirect_uri],
-            "grant_types": ["authorization_code", "refresh_token"],
-            "response_types": ["code"],
-            "scope": SCOPE,
-            "token_endpoint_auth_method": "client_secret_basic",
-        }).encode(), {"Content-Type": "application/json", "Accept": "application/json"})
+        status, _, body = http(
+            meta["registration_endpoint"],
+            json.dumps(
+                {
+                    "client_name": CLIENT_NAME,
+                    "redirect_uris": [redirect_uri],
+                    "grant_types": ["authorization_code", "refresh_token"],
+                    "response_types": ["code"],
+                    "scope": SCOPE,
+                    "token_endpoint_auth_method": "client_secret_basic",
+                }
+            ).encode(),
+            {"Content-Type": "application/json", "Accept": "application/json"},
+        )
         if status not in (200, 201):
-            raise HelperError("LOGIN_FAILED", "client registration refused: HTTP %d %s"
-                              % (status, body[:300].decode(errors="replace")))
+            raise HelperError(
+                "LOGIN_FAILED",
+                "client registration refused: HTTP %d %s" % (status, body[:300].decode(errors="replace")),
+            )
         registered = json.loads(body)
         client = {
             "client_id": registered["client_id"],
@@ -331,16 +362,22 @@ def login(args):
         }
 
         verifier, challenge = pkce_pair()
-        authorize_url = meta["authorization_endpoint"] + "?" + urlencode({
-            "response_type": "code",
-            "client_id": client["client_id"],
-            "redirect_uri": redirect_uri,
-            "scope": SCOPE,
-            "state": state,
-            "code_challenge": challenge,
-            "code_challenge_method": "S256",
-            "resource": client["resource"],
-        })
+        authorize_url = (
+            meta["authorization_endpoint"]
+            + "?"
+            + urlencode(
+                {
+                    "response_type": "code",
+                    "client_id": client["client_id"],
+                    "redirect_uri": redirect_uri,
+                    "scope": SCOPE,
+                    "state": state,
+                    "code_challenge": challenge,
+                    "code_challenge_method": "S256",
+                    "resource": client["resource"],
+                }
+            )
+        )
         print("Öffne im Browser: " + authorize_url, file=sys.stderr)
         open_browser(authorize_url)
 
@@ -354,15 +391,19 @@ def login(args):
     if result is None:
         raise HelperError("LOGIN_FAILED", "no answer from the browser within %d s" % LOGIN_TIMEOUT)
     if "code" not in result:
-        raise HelperError("LOGIN_FAILED", "login refused: %s %s"
-                          % (result.get("error", "?"), result.get("error_description", "")))
+        raise HelperError(
+            "LOGIN_FAILED", "login refused: %s %s" % (result.get("error", "?"), result.get("error_description", ""))
+        )
 
-    status, payload = token_request(client, {
-        "grant_type": "authorization_code",
-        "code": result["code"],
-        "redirect_uri": redirect_uri,
-        "code_verifier": verifier,
-    })
+    status, payload = token_request(
+        client,
+        {
+            "grant_type": "authorization_code",
+            "code": result["code"],
+            "redirect_uri": redirect_uri,
+            "code_verifier": verifier,
+        },
+    )
     if status != 200 or "access_token" not in payload:
         raise HelperError("LOGIN_FAILED", "token exchange failed: HTTP %d %s" % (status, payload.get("error", "")))
 
@@ -402,13 +443,18 @@ class Session:
                 return
             if not self.tokens.get("refresh_token"):
                 raise HelperError("AUTH_REQUIRED", "no refresh token, run `calamari login`")
-            status, payload = token_request(self.client, {
-                "grant_type": "refresh_token",
-                "refresh_token": self.tokens["refresh_token"],
-            })
+            status, payload = token_request(
+                self.client,
+                {
+                    "grant_type": "refresh_token",
+                    "refresh_token": self.tokens["refresh_token"],
+                },
+            )
             if status in (400, 401):  # invalid_grant / invalid_client: the login is gone
-                raise HelperError("AUTH_REQUIRED", "token refresh refused (%s), run `calamari login`"
-                                  % (payload.get("error") or "HTTP %d" % status))
+                raise HelperError(
+                    "AUTH_REQUIRED",
+                    "token refresh refused (%s), run `calamari login`" % (payload.get("error") or "HTTP %d" % status),
+                )
             check_status(status, json.dumps(payload).encode(), "token refresh")
             if "access_token" not in payload:
                 raise HelperError("MCP_ERROR", "token refresh: no access token in the answer")
@@ -466,11 +512,14 @@ class McpClient:
         return self.post(message)
 
     def open(self):
-        result, headers = self.request("initialize", {
-            "protocolVersion": MCP_PROTOCOL_VERSION,
-            "capabilities": {},
-            "clientInfo": {"name": "calamari-tracker", "version": VERSION},
-        })
+        result, headers = self.request(
+            "initialize",
+            {
+                "protocolVersion": MCP_PROTOCOL_VERSION,
+                "capabilities": {},
+                "clientInfo": {"name": "calamari-tracker", "version": VERSION},
+            },
+        )
         self.session_id = headers.get("Mcp-Session-Id")
         self.protocol_version = result.get("protocolVersion") or self.protocol_version
         self.post({"jsonrpc": "2.0", "method": "notifications/initialized"})
@@ -525,10 +574,13 @@ def parse_hhmm(text):
 
 
 def overlaps(client, date, start, end):
-    dates = client.call_tool("checkTimesheetOverlap", {
-        "entries": [{"date": date, "fromTime": hhmm(start), "toTime": hhmm(end)}],
-        "skipNotEligibleDays": False,
-    })
+    dates = client.call_tool(
+        "checkTimesheetOverlap",
+        {
+            "entries": [{"date": date, "fromTime": hhmm(start), "toTime": hhmm(end)}],
+            "skipNotEligibleDays": False,
+        },
+    )
     if not isinstance(dates, list):
         raise HelperError("MCP_ERROR", "checkTimesheetOverlap: unexpected answer %r" % (dates,))
     return date in dates
@@ -590,6 +642,7 @@ def clock_out(args):
     does not. stamped tells whether clockOut was sent. There is no check
     afterwards: the shift just ended still overlaps every window up to now
     (docs/adr/0001)."""
+
     def work(client):
         running = overlaps_now(client)
         if running:
@@ -610,8 +663,11 @@ def check_overlap(args):
     shift = current_shift(RestClient())
     overlapping = with_mcp(overlaps_now)
     if shift == "running" and not overlapping:
-        raise HelperError("OVERLAP_CHANGED", "checkTimesheetOverlap no longer counts the running shift up to now; "
-                          "start-time, end-time, day-end and clock-out are unreliable (docs/adr/0001)")
+        raise HelperError(
+            "OVERLAP_CHANGED",
+            "checkTimesheetOverlap no longer counts the running shift up to now; "
+            "start-time, end-time, day-end and clock-out are unreliable (docs/adr/0001)",
+        )
     return {"shift": shift, "overlapsNow": overlapping, "unchanged": True if shift == "running" else None}
 
 
@@ -667,8 +723,11 @@ def day_info(args):
 
     plan, holidays, absences = with_mcp(fetch_day)
     weekday = WEEKDAYS[date.weekday()]
-    entry = next((d for d in plan.get("days", []) if d.get("dayOfWeek") == weekday), None) \
-        if isinstance(plan, dict) else None
+    entry = (
+        next((d for d in plan.get("days", []) if d.get("dayOfWeek") == weekday), None)
+        if isinstance(plan, dict)
+        else None
+    )
     if entry is None:
         raise HelperError("MCP_ERROR", "getWorkPlan: no entry for %s in %r" % (weekday, plan))
     working = entry.get("workingDay") is True
@@ -680,13 +739,19 @@ def day_info(args):
     own = [a for a in absences.get("absences", []) if a.get("start", "")[:10] <= day <= a.get("end", "")[:10]]
     own.sort(key=lambda a: (a.get("category") != "TIMEOFF", a.get("fullDayRequest") is not True))
     absence = own[0] if own else None
-    return {"date": day, "workingDay": working,
-            "coreStart": entry.get("startTime") if working else None,
-            "coreEnd": entry.get("finishTime") if working else None,
-            "holiday": holiday and {"name": (holiday.get("name") or "").strip(), "halfDay": holiday.get("halfDay") is True,
-                                    "halfdayPeriod": holiday.get("halfdayPeriod")},
-            "absence": absence and {"category": absence.get("category"),
-                                    "fullDay": absence.get("fullDayRequest") is True}}
+    return {
+        "date": day,
+        "workingDay": working,
+        "coreStart": entry.get("startTime") if working else None,
+        "coreEnd": entry.get("finishTime") if working else None,
+        "holiday": holiday
+        and {
+            "name": (holiday.get("name") or "").strip(),
+            "halfDay": holiday.get("halfDay") is True,
+            "halfdayPeriod": holiday.get("halfdayPeriod"),
+        },
+        "absence": absence and {"category": absence.get("category"), "fullDay": absence.get("fullDayRequest") is True},
+    }
 
 
 def end_time(args):
@@ -743,8 +808,11 @@ class RestClient:
         headers = {"Content-Type": "application/json", "Accept": "application/json", "Authorization": self.auth}
         status, _, raw = http(self.url + path, json.dumps(payload).encode(), headers)
         if not 200 <= status < 300:
-            log("err", "REST %s sent %s, got HTTP %d %s"
-                % (path, json.dumps(payload), status, raw[:500].decode(errors="replace")))
+            log(
+                "err",
+                "REST %s sent %s, got HTTP %d %s"
+                % (path, json.dumps(payload), status, raw[:500].decode(errors="replace")),
+            )
             raise rest_error(path, status, raw)
         return json.loads(raw) if raw else None
 
@@ -758,7 +826,9 @@ def rest_error(path, status, raw):
         body = None
     body = body if isinstance(body, dict) else {}
     code = body.get("code")
-    detail = "%s: %s" % (code, body.get("message")) if code else "HTTP %d %s" % (status, raw[:200].decode(errors="replace"))
+    detail = (
+        "%s: %s" % (code, body.get("message")) if code else "HTTP %d %s" % (status, raw[:200].decode(errors="replace"))
+    )
     if status == 401:
         return HelperError("API_KEY_REJECTED", "Calamari rejects the API key (%s), run `calamari api-key`" % detail)
     if status == 403:
@@ -848,8 +918,9 @@ def stamp_break(args, which):
     client = RestClient()
     body = {
         "time": terminal_time(),
-        "breakType": id_by_name(break_types(client), args.break_type, "BREAK_TYPE_UNKNOWN", "breakType", "break type",
-                                client.person),
+        "breakType": id_by_name(
+            break_types(client), args.break_type, "BREAK_TYPE_UNKNOWN", "breakType", "break type", client.person
+        ),
     }
     path = "/clockin/terminal/v1/break-" + which
     answer = client.call(path, body)
@@ -902,8 +973,9 @@ def open_entry(client):
     (datetimes, or None)."""
     today = now().date().isoformat()
     # Without employees the answer holds the whole company.
-    entries = client.call("/clockin/timesheetentries/v1/find",
-                          {"from": today, "to": today, "employees": [client.person]})
+    entries = client.call(
+        "/clockin/timesheetentries/v1/find", {"from": today, "to": today, "employees": [client.person]}
+    )
     if not isinstance(entries, list):
         raise HelperError("API_ERROR", "timesheetentries/find: unexpected answer %r" % (entries,))
     entry = next((e for e in entries if isinstance(e, dict) and e.get("started") and not e.get("finished")), None)
@@ -983,11 +1055,24 @@ def parse_args(argv):
     return parser.parse_args(argv)
 
 
-COMMANDS = {"login": login, "whoami": whoami, "tools": tools, "status": status, "start-time": start_time,
-            "end-time": end_time, "clock-in": clock_in, "clock-out": clock_out, "day-info": day_info,
-            "day-end": day_end, "api-key": api_key, "lookup": lookup,
-            "break-start": break_start, "break-stop": break_stop, "clock-out-break": clock_out_break,
-            "check-overlap": check_overlap}
+COMMANDS = {
+    "login": login,
+    "whoami": whoami,
+    "tools": tools,
+    "status": status,
+    "start-time": start_time,
+    "end-time": end_time,
+    "clock-in": clock_in,
+    "clock-out": clock_out,
+    "day-info": day_info,
+    "day-end": day_end,
+    "api-key": api_key,
+    "lookup": lookup,
+    "break-start": break_start,
+    "break-stop": break_stop,
+    "clock-out-break": clock_out_break,
+    "check-overlap": check_overlap,
+}
 
 
 def main(argv):
@@ -1006,8 +1091,11 @@ def main(argv):
         out, code = {"ok": False, "error": {"code": "INTERNAL", "message": "%s: %s" % (type(e).__name__, e)}}, 1
     if code:
         try:
-            log("err", "%s failed: %s %s" % (argv[0] if argv else "(no command)", out["error"]["code"],
-                                             out["error"]["message"]))
+            log(
+                "err",
+                "%s failed: %s %s"
+                % (argv[0] if argv else "(no command)", out["error"]["code"], out["error"]["message"]),
+            )
         except OSError:
             pass  # a broken log must not cost the answer
     print(json.dumps(out, ensure_ascii=False))

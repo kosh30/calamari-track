@@ -29,15 +29,23 @@ class CalamariCliTest(unittest.TestCase):
         self.log = Path(tmp.name) / "journal.log"
 
     def start_helper(self, *args, base_url=None, api_url=None, helper=HELPER):
-        env = dict(os.environ,
-                   CALAMARI_BASE_URL=base_url or self.fake.base_url,
-                   CALAMARI_API_URL=self.fake.api_url if api_url is None else api_url,
-                   CALAMARI_KEYRING_FILE=str(self.keyring),
-                   CALAMARI_LOG_FILE=str(self.log),
-                   CALAMARI_NOW=self.fake.now,
-                   BROWSER="%s %s %%s" % (sys.executable, FAKE_BROWSER))
-        return subprocess.Popen([sys.executable, str(helper), *args], env=env, stdin=subprocess.PIPE,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        env = dict(
+            os.environ,
+            CALAMARI_BASE_URL=base_url or self.fake.base_url,
+            CALAMARI_API_URL=self.fake.api_url if api_url is None else api_url,
+            CALAMARI_KEYRING_FILE=str(self.keyring),
+            CALAMARI_LOG_FILE=str(self.log),
+            CALAMARI_NOW=self.fake.now,
+            BROWSER="%s %s %%s" % (sys.executable, FAKE_BROWSER),
+        )
+        return subprocess.Popen(
+            [sys.executable, str(helper), *args],
+            env=env,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
 
     def finish_helper(self, proc, input=None):
         stdout, stderr = proc.communicate(input, timeout=30)
@@ -297,8 +305,7 @@ class CalamariCliTest(unittest.TestCase):
 
     def test_start_time_after_a_break_finds_the_later_shift(self):
         self.login()
-        self.fake.shifts = [("2026-09-22", "08:00:10", "12:00:00"),
-                            ("2026-09-22", "12:45:20", None)]
+        self.fake.shifts = [("2026-09-22", "08:00:10", "12:00:00"), ("2026-09-22", "12:45:20", None)]
 
         code, out = self.run_helper("start-time", "--after", "12:30")
 
@@ -402,8 +409,11 @@ class CalamariCliTest(unittest.TestCase):
     def test_failed_rest_clock_in_does_not_fall_back_to_mcp(self):
         self.login()
         self.store_api_key()
-        for status, error, expected in ((400, "API_TERMINAL_NOT_AVAILABLE", "API_TERMINAL_MISSING"),
-                                        (403, None, "API_SCOPE_MISSING"), (429, "QUOTA_EXCEEDED", "RATE_LIMITED")):
+        for status, error, expected in (
+            (400, "API_TERMINAL_NOT_AVAILABLE", "API_TERMINAL_MISSING"),
+            (403, None, "API_SCOPE_MISSING"),
+            (429, "QUOTA_EXCEEDED", "RATE_LIMITED"),
+        ):
             with self.subTest(expected):
                 self.fake.rest_failure = (status, error)
                 self.assert_error(self.run_helper("clock-in"), expected)
@@ -502,8 +512,9 @@ class CalamariCliTest(unittest.TestCase):
 
         code, out = self.run_helper("clock-out-break")
 
-        self.assertEqual((code, out), (0, {"ok": True, "running": False, "stamped": True, "endedAt": "17:32",
-                                           "atBreakStart": True}))
+        self.assertEqual(
+            (code, out), (0, {"ok": True, "running": False, "stamped": True, "endedAt": "17:32", "atBreakStart": True})
+        )
         (req,) = self.clock_outs()
         self.assertEqual(req, {"person": "erika@example.com", "time": "2026-09-22T17:32:17"})
         self.assertEqual(self.fake.shifts, [("2026-09-22", "09:40:30", "17:32:17")])
@@ -519,8 +530,9 @@ class CalamariCliTest(unittest.TestCase):
 
         code, out = self.run_helper("clock-out-break")
 
-        self.assertEqual((code, out), (0, {"ok": True, "running": False, "stamped": True, "endedAt": "17:35",
-                                           "atBreakStart": False}))
+        self.assertEqual(
+            (code, out), (0, {"ok": True, "running": False, "stamped": True, "endedAt": "17:35", "atBreakStart": False})
+        )
         self.assertEqual(self.clock_outs()[0]["time"], "2026-09-22T17:35:35")
         self.assertIn("API_SCOPE_MISSING", self.log_text())
 
@@ -531,8 +543,9 @@ class CalamariCliTest(unittest.TestCase):
 
         code, out = self.run_helper("clock-out-break")
 
-        self.assertEqual((code, out), (0, {"ok": True, "running": False, "stamped": False, "endedAt": None,
-                                           "atBreakStart": False}))
+        self.assertEqual(
+            (code, out), (0, {"ok": True, "running": False, "stamped": False, "endedAt": None, "atBreakStart": False})
+        )
         self.assertEqual(self.clock_outs(), [])
 
     def test_failed_clock_out_break_is_not_retried_another_way(self):
@@ -647,34 +660,60 @@ class CalamariCliTest(unittest.TestCase):
 
         code, out = self.run_helper("day-info", "--date", "2026-09-25")  # a Friday
 
-        self.assertEqual((code, out), (0, {"ok": True, "date": "2026-09-25", "workingDay": True,
-                                           "coreStart": "09:00", "coreEnd": "16:30",
-                                           "holiday": None, "absence": None}))
+        self.assertEqual(
+            (code, out),
+            (
+                0,
+                {
+                    "ok": True,
+                    "date": "2026-09-25",
+                    "workingDay": True,
+                    "coreStart": "09:00",
+                    "coreEnd": "16:30",
+                    "holiday": None,
+                    "absence": None,
+                },
+            ),
+        )
 
     def test_day_info_knows_the_weekend_is_no_working_day(self):
         self.login()
 
         code, out = self.run_helper("day-info", "--date", "2026-09-26")  # a Saturday
 
-        self.assertEqual((code, out), (0, {"ok": True, "date": "2026-09-26", "workingDay": False,
-                                           "coreStart": None, "coreEnd": None,
-                                           "holiday": None, "absence": None}))
+        self.assertEqual(
+            (code, out),
+            (
+                0,
+                {
+                    "ok": True,
+                    "date": "2026-09-26",
+                    "workingDay": False,
+                    "coreStart": None,
+                    "coreEnd": None,
+                    "holiday": None,
+                    "absence": None,
+                },
+            ),
+        )
 
     def test_day_info_names_a_public_holiday(self):
         self.login()
 
         code, out = self.run_helper("day-info", "--date", "2026-10-03")
 
-        self.assertEqual((code, out["holiday"]), (0, {"name": "Tag der Deutschen Einheit",
-                                                      "halfDay": False, "halfdayPeriod": None}))
+        self.assertEqual(
+            (code, out["holiday"]), (0, {"name": "Tag der Deutschen Einheit", "halfDay": False, "halfdayPeriod": None})
+        )
 
     def test_day_info_names_a_half_holiday_with_its_period(self):
         self.login()
 
         code, out = self.run_helper("day-info", "--date", "2026-12-24")
 
-        self.assertEqual((code, out["holiday"]), (0, {"name": "Heiligabend (PM)",
-                                                      "halfDay": True, "halfdayPeriod": "PM"}))
+        self.assertEqual(
+            (code, out["holiday"]), (0, {"name": "Heiligabend (PM)", "halfDay": True, "halfdayPeriod": "PM"})
+        )
         self.assertEqual(out["coreEnd"], "16:45")  # shortening the core time is decide's job
 
     def test_day_info_names_the_own_absence_on_its_last_day(self):
@@ -693,9 +732,19 @@ class CalamariCliTest(unittest.TestCase):
 
     def test_day_info_prefers_time_off_over_a_working_absence(self):
         self.login()
-        self.fake.absences.append((self.fake.profile["personUuid"], {
-            "userId": 1, "name": "Erika Mustermann", "category": "TIMEOFF", "fullDayRequest": True,
-            "start": "2026-11-02T00:00", "end": "2026-11-02T00:00"}))
+        self.fake.absences.append(
+            (
+                self.fake.profile["personUuid"],
+                {
+                    "userId": 1,
+                    "name": "Erika Mustermann",
+                    "category": "TIMEOFF",
+                    "fullDayRequest": True,
+                    "start": "2026-11-02T00:00",
+                    "end": "2026-11-02T00:00",
+                },
+            )
+        )
 
         code, out = self.run_helper("day-info", "--date", "2026-11-02")
 
@@ -704,10 +753,32 @@ class CalamariCliTest(unittest.TestCase):
     def test_day_info_prefers_time_off_for_the_whole_day_over_hourly_time_off(self):
         self.login()
         me = self.fake.profile["personUuid"]
-        self.fake.absences[:0] = [(me, {"userId": 1, "name": "Erika Mustermann", "category": "TIMEOFF",
-                                        "fullDayRequest": False, "start": "2026-11-02T08:00", "end": "2026-11-02T10:00"})]
-        self.fake.absences.append((me, {"userId": 1, "name": "Erika Mustermann", "category": "TIMEOFF",
-                                        "fullDayRequest": True, "start": "2026-11-02T00:00", "end": "2026-11-02T00:00"}))
+        self.fake.absences[:0] = [
+            (
+                me,
+                {
+                    "userId": 1,
+                    "name": "Erika Mustermann",
+                    "category": "TIMEOFF",
+                    "fullDayRequest": False,
+                    "start": "2026-11-02T08:00",
+                    "end": "2026-11-02T10:00",
+                },
+            )
+        ]
+        self.fake.absences.append(
+            (
+                me,
+                {
+                    "userId": 1,
+                    "name": "Erika Mustermann",
+                    "category": "TIMEOFF",
+                    "fullDayRequest": True,
+                    "start": "2026-11-02T00:00",
+                    "end": "2026-11-02T00:00",
+                },
+            )
+        )
 
         code, out = self.run_helper("day-info", "--date", "2026-11-02")
 
@@ -715,12 +786,16 @@ class CalamariCliTest(unittest.TestCase):
 
     def test_day_info_prefers_a_whole_holiday_over_a_half_one(self):
         self.login()
-        self.fake.holidays.insert(0, {"name": "Halber Tag", "start": "2026-10-03", "end": "2026-10-03",
-                                      "halfDay": True, "halfdayPeriod": "PM"})
+        self.fake.holidays.insert(
+            0,
+            {"name": "Halber Tag", "start": "2026-10-03", "end": "2026-10-03", "halfDay": True, "halfdayPeriod": "PM"},
+        )
 
         code, out = self.run_helper("day-info", "--date", "2026-10-03")
 
-        self.assertEqual((code, out["holiday"]["name"], out["holiday"]["halfDay"]), (0, "Tag der Deutschen Einheit", False))
+        self.assertEqual(
+            (code, out["holiday"]["name"], out["holiday"]["halfDay"]), (0, "Tag der Deutschen Einheit", False)
+        )
 
     def test_day_info_defaults_to_today(self):
         self.login()
@@ -740,8 +815,9 @@ class CalamariCliTest(unittest.TestCase):
         code, out = self.run_helper("tools")
 
         self.assertEqual(code, 0)
-        self.assertEqual([t["name"] for t in out["tools"]],
-                         ["checkTimesheetOverlap", "clockIn", "clockOut", "getMyProfile"])
+        self.assertEqual(
+            [t["name"] for t in out["tools"]], ["checkTimesheetOverlap", "clockIn", "clockOut", "getMyProfile"]
+        )
         self.assertEqual(out["tools"][1]["description"], "fake clockIn")
 
     # REST API (docs/adr/0003)
@@ -783,10 +859,13 @@ class CalamariCliTest(unittest.TestCase):
         self.assertEqual(out["person"], "erika@example.com")
         self.assertEqual(out["projects"], [{"id": 7, "name": "Check-in"}, {"id": 9, "name": "Kunde A"}])
         self.assertEqual(out["breakTypes"], [{"id": 1, "name": "Mittagspause"}, {"id": 3, "name": "Break"}])
-        self.assertEqual(self.fake.rest_calls, [
-            ("/clockin/projects/v1/get-projects-for-person", {"person": "erika@example.com"}),
-            ("/clockin/terminal/v1/get-break-types-for-person", {"person": "erika@example.com"}),
-        ])
+        self.assertEqual(
+            self.fake.rest_calls,
+            [
+                ("/clockin/projects/v1/get-projects-for-person", {"person": "erika@example.com"}),
+                ("/clockin/terminal/v1/get-break-types-for-person", {"person": "erika@example.com"}),
+            ],
+        )
 
     def test_the_own_person_is_asked_from_the_profile_only_once(self):
         self.login()
@@ -858,8 +937,9 @@ class CalamariCliTest(unittest.TestCase):
     def test_every_failure_is_logged_with_command_and_code(self):
         code, out = self.run_helper("whoami")
 
-        self.assertIn("err [%s] whoami failed: AUTH_REQUIRED %s" % (MANIFEST_VERSION, out["error"]["message"]),
-                      self.log_text())
+        self.assertIn(
+            "err [%s] whoami failed: AUTH_REQUIRED %s" % (MANIFEST_VERSION, out["error"]["message"]), self.log_text()
+        )
 
     def test_every_journal_line_starts_with_the_version_from_the_manifest(self):
         self.login()

@@ -64,29 +64,87 @@ class FakeCalamari:
         # Shape of the real getWorkPlan answer.
         week = [(d, "09:00", "16:45") for d in ("MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY")]
         week += [("FRIDAY", "09:00", "16:30"), ("SATURDAY", None, None), ("SUNDAY", None, None)]
-        self.work_plan = {"id": 3, "name": "Vollzeit", "days": [
-            {"dayOfWeek": d, "workingDay": start is not None, "startTime": start, "finishTime": end,
-             "durationSeconds": None if start is None else 27900} for d, start, end in week]}
+        self.work_plan = {
+            "id": 3,
+            "name": "Vollzeit",
+            "days": [
+                {
+                    "dayOfWeek": d,
+                    "workingDay": start is not None,
+                    "startTime": start,
+                    "finishTime": end,
+                    "durationSeconds": None if start is None else 27900,
+                }
+                for d, start, end in week
+            ],
+        }
         # Shapes of the real getPublicHolidays / search answers.
         self.holidays = [
-            {"name": "Tag der Deutschen Einheit", "start": "2026-10-03", "end": "2026-10-03", "halfDay": False, "halfdayPeriod": None},
-            {"name": "Heiligabend (PM)", "start": "2026-12-24", "end": "2026-12-24", "halfDay": True, "halfdayPeriod": "PM"},
+            {
+                "name": "Tag der Deutschen Einheit",
+                "start": "2026-10-03",
+                "end": "2026-10-03",
+                "halfDay": False,
+                "halfdayPeriod": None,
+            },
+            {
+                "name": "Heiligabend (PM)",
+                "start": "2026-12-24",
+                "end": "2026-12-24",
+                "halfDay": True,
+                "halfdayPeriod": "PM",
+            },
         ]
         me, other = "00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000003"
         self.absences = [
-            (me, {"userId": 1, "name": "Erika Mustermann", "category": "TIMEOFF", "fullDayRequest": True,
-                  "start": "2026-10-12T00:00", "end": "2026-10-16T00:00"}),
-            (me, {"userId": 1, "name": "Erika Mustermann", "category": "WORK", "fullDayRequest": True,
-                  "start": "2026-11-02T00:00", "end": "2026-11-02T00:00"}),
-            (other, {"userId": 3, "name": "Max Mustermann", "category": "TIMEOFF", "fullDayRequest": True,
-                     "start": "2026-10-19T00:00", "end": "2026-10-19T00:00"}),
+            (
+                me,
+                {
+                    "userId": 1,
+                    "name": "Erika Mustermann",
+                    "category": "TIMEOFF",
+                    "fullDayRequest": True,
+                    "start": "2026-10-12T00:00",
+                    "end": "2026-10-16T00:00",
+                },
+            ),
+            (
+                me,
+                {
+                    "userId": 1,
+                    "name": "Erika Mustermann",
+                    "category": "WORK",
+                    "fullDayRequest": True,
+                    "start": "2026-11-02T00:00",
+                    "end": "2026-11-02T00:00",
+                },
+            ),
+            (
+                other,
+                {
+                    "userId": 3,
+                    "name": "Max Mustermann",
+                    "category": "TIMEOFF",
+                    "fullDayRequest": True,
+                    "start": "2026-10-19T00:00",
+                    "end": "2026-10-19T00:00",
+                },
+            ),
         ]
         # Shape of the real getMyProfile answer (trimmed).
-        self.profile = {"personUuid": "00000000-0000-4000-8000-000000000001", "legacyId": 1,
-                        "name": "Erika Mustermann", "email": "erika@example.com",
-                        "directManager": {"personUuid": "00000000-0000-4000-8000-000000000002",
-                                          "name": "Max Mustermann", "email": "max@example.com"},
-                        "teams": [{"id": 1, "name": "IT-Team"}], "roles": []}
+        self.profile = {
+            "personUuid": "00000000-0000-4000-8000-000000000001",
+            "legacyId": 1,
+            "name": "Erika Mustermann",
+            "email": "erika@example.com",
+            "directManager": {
+                "personUuid": "00000000-0000-4000-8000-000000000002",
+                "name": "Max Mustermann",
+                "email": "max@example.com",
+            },
+            "teams": [{"id": 1, "name": "IT-Team"}],
+            "roles": [],
+        }
 
         # Observable state.
         self.clients = {}
@@ -117,9 +175,13 @@ class FakeCalamari:
         access, refresh = secrets.token_hex(8), secrets.token_hex(8)
         self.access_tokens.add(access)
         self.refresh_tokens.add(refresh)
-        return {"access_token": access, "refresh_token": refresh,
-                "token_type": "Bearer", "expires_in": self.access_token_ttl,
-                "scope": "mcp"}
+        return {
+            "access_token": access,
+            "refresh_token": refresh,
+            "token_type": "Bearer",
+            "expires_in": self.access_token_ttl,
+            "scope": "mcp",
+        }
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -148,19 +210,23 @@ class _Handler(BaseHTTPRequestHandler):
         url = urlsplit(self.path)
         base = self.fake.base_url
         if url.path == "/.well-known/oauth-protected-resource" + MCP_PATH:
-            return self._send(200, {"resource": self.fake.mcp_url,
-                                    "authorization_servers": [base + AS_PATH],
-                                    "scopes_supported": ["mcp"]})
+            return self._send(
+                200,
+                {"resource": self.fake.mcp_url, "authorization_servers": [base + AS_PATH], "scopes_supported": ["mcp"]},
+            )
         if url.path == "/.well-known/oauth-authorization-server" + AS_PATH:
-            return self._send(200, {
-                "issuer": base + AS_PATH,
-                "authorization_endpoint": base + AS_PATH + "/oauth2/authorize",
-                "token_endpoint": base + AS_PATH + "/oauth2/token",
-                "registration_endpoint": base + AS_PATH + "/oauth2/register",
-                "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
-                "code_challenge_methods_supported": ["S256"],
-                "scopes_supported": ["mcp"],
-            })
+            return self._send(
+                200,
+                {
+                    "issuer": base + AS_PATH,
+                    "authorization_endpoint": base + AS_PATH + "/oauth2/authorize",
+                    "token_endpoint": base + AS_PATH + "/oauth2/token",
+                    "registration_endpoint": base + AS_PATH + "/oauth2/register",
+                    "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
+                    "code_challenge_methods_supported": ["S256"],
+                    "scopes_supported": ["mcp"],
+                },
+            )
         if url.path == AS_PATH + "/oauth2/authorize":
             return self._authorize(parse_qs(url.query))
         self._send(404, {"error": "not_found"})
@@ -174,7 +240,7 @@ class _Handler(BaseHTTPRequestHandler):
         if path == MCP_PATH:
             return self._mcp(json.loads(self._body()))
         if path.startswith(API_PATH + "/"):
-            return self._rest(path[len(API_PATH):], self._body())
+            return self._rest(path[len(API_PATH) :], self._body())
         self._send(404, {"error": "not_found"})
 
     def _rest(self, path, body):
@@ -202,9 +268,13 @@ class _Handler(BaseHTTPRequestHandler):
             running = any(end is None for _, _, end in self.fake.shifts)
             on_break = any(end is None for _, _, end in self.fake.breaks)
             status = "BREAK" if running and on_break else "STARTED" if running else "STOPPED"
-            return self._send(200, {"person": {"firstName": "Erika", "lastName": "Mustermann",
-                                               "email": req.get("person")},
-                                    "status": self.fake.shift_status or status})
+            return self._send(
+                200,
+                {
+                    "person": {"firstName": "Erika", "lastName": "Mustermann", "email": req.get("person")},
+                    "status": self.fake.shift_status or status,
+                },
+            )
         self._send(404, {"message": "Not found", "code": "INVALID_METHOD_URL", "field": None})
 
     def _find(self, req):
@@ -227,11 +297,24 @@ class _Handler(BaseHTTPRequestHandler):
         for date, start, end in self.fake.shifts:
             if not req["from"] <= date <= req["to"]:
                 continue
-            breaks = [{"from": utc(d, s), "to": utc(d, e), "duration": None, "breakType": {"id": 1, "name": "Break"}}
-                      for d, s, e in self.fake.breaks if d == date and s >= start and (end is None or s < end)]
-            entries.append({"id": len(entries) + 1, "started": utc(date, start), "finished": utc(date, end),
-                            "startedTimeZone": "Europe/Vienna", "duration": 0, "breaks": breaks, "projects": [],
-                            "closed": end is not None, "description": ""})
+            breaks = [
+                {"from": utc(d, s), "to": utc(d, e), "duration": None, "breakType": {"id": 1, "name": "Break"}}
+                for d, s, e in self.fake.breaks
+                if d == date and s >= start and (end is None or s < end)
+            ]
+            entries.append(
+                {
+                    "id": len(entries) + 1,
+                    "started": utc(date, start),
+                    "finished": utc(date, end),
+                    "startedTimeZone": "Europe/Vienna",
+                    "duration": 0,
+                    "breaks": breaks,
+                    "projects": [],
+                    "closed": end is not None,
+                    "description": "",
+                }
+            )
         # Newest first, like the real answer.
         return self._send(200, list(reversed(entries)))
 
@@ -257,7 +340,9 @@ class _Handler(BaseHTTPRequestHandler):
         except ValueError:
             return self._send(400, {"message": "Incorrect value", "code": None, "field": "time"})
         if req.get("breakType") not in [t["id"] for t in self.fake.break_types]:
-            return self._send(400, {"message": "Invalid break type", "code": "INVALID_BREAK_TYPE", "field": "breakType"})
+            return self._send(
+                400, {"message": "Invalid break type", "code": "INVALID_BREAK_TYPE", "field": "breakType"}
+            )
         if not any(end is None for _, _, end in self.fake.shifts):
             return self._send(400, {"message": "No started shift", "code": "NO_STARTED_SHIFT", "field": None})
         today, now = self.fake.now.split("T")
@@ -267,8 +352,13 @@ class _Handler(BaseHTTPRequestHandler):
         if not start and open_breaks:
             date, begun, _ = self.fake.breaks[open_breaks[0]]
             self.fake.breaks[open_breaks[0]] = (date, begun, now)
-        return self._send(200, {"person": {"firstName": "Erika", "lastName": "Mustermann"},
-                                "breakStatus": "STARTED" if start else "FINISHED"})
+        return self._send(
+            200,
+            {
+                "person": {"firstName": "Erika", "lastName": "Mustermann"},
+                "breakStatus": "STARTED" if start else "FINISHED",
+            },
+        )
 
     def _clock_in(self, req):
         """Like Calamari: time is local, without zone or fraction (it answered
@@ -287,25 +377,41 @@ class _Handler(BaseHTTPRequestHandler):
         today, now = self.fake.now.split("T")
         if not any(end is None for _, _, end in self.fake.shifts):
             self.fake.shifts.append((today, now, None))
-        return self._send(200, {"person": {"firstName": "Erika", "lastName": "Mustermann"},
-                                "shiftStatus": self.fake.clock_in_status or "STARTED"})
+        return self._send(
+            200,
+            {
+                "person": {"firstName": "Erika", "lastName": "Mustermann"},
+                "shiftStatus": self.fake.clock_in_status or "STARTED",
+            },
+        )
 
     def _register(self, req):
         if not req.get("redirect_uris"):
             return self._send(400, {"error": "invalid_request"})
         client_id, secret = secrets.token_hex(6), secrets.token_hex(12)
         self.fake.clients[client_id] = {"secret": secret, **req}
-        self._send(201, {"client_id": client_id, "client_secret": secret,
-                         "redirect_uris": req["redirect_uris"],
-                         "token_endpoint_auth_method": "client_secret_basic"})
+        self._send(
+            201,
+            {
+                "client_id": client_id,
+                "client_secret": secret,
+                "redirect_uris": req["redirect_uris"],
+                "token_endpoint_auth_method": "client_secret_basic",
+            },
+        )
 
     def _authorize(self, q):
         q = {k: v[0] for k, v in q.items()}
         client = self.fake.clients.get(q.get("client_id"))
-        if (not client or q.get("redirect_uri") not in client["redirect_uris"]
-                or q.get("response_type") != "code"
-                or q.get("code_challenge_method") != "S256" or not q.get("code_challenge")
-                or q.get("resource") != self.fake.mcp_url or q.get("scope") != "mcp"):
+        if (
+            not client
+            or q.get("redirect_uri") not in client["redirect_uris"]
+            or q.get("response_type") != "code"
+            or q.get("code_challenge_method") != "S256"
+            or not q.get("code_challenge")
+            or q.get("resource") != self.fake.mcp_url
+            or q.get("scope") != "mcp"
+        ):
             return self._send(400, {"error": "invalid_request", "query": q})
         code = secrets.token_hex(8)
         self.fake.codes[code] = q
@@ -331,8 +437,7 @@ class _Handler(BaseHTTPRequestHandler):
             req = self.fake.codes.pop(form.get("code"), None)
             verifier = form.get("code_verifier", "")
             challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
-            if (not req or challenge != req["code_challenge"]
-                    or form.get("redirect_uri") != req["redirect_uri"]):
+            if not req or challenge != req["code_challenge"] or form.get("redirect_uri") != req["redirect_uri"]:
                 return self._send(400, {"error": "invalid_grant"})
             return self._send(200, self.fake.issue_tokens())
         if form.get("grant_type") == "refresh_token":
@@ -357,10 +462,15 @@ class _Handler(BaseHTTPRequestHandler):
             self.fake.sessions.add(session)
             version = self.fake.protocol_version or msg["params"]["protocolVersion"]
             self.fake.session_versions[session] = version
-            return self._reply(msg["id"], {"protocolVersion": version,
-                                           "capabilities": {"tools": {}},
-                                           "serverInfo": {"name": "fake-calamari", "version": "0"}},
-                               {"Mcp-Session-Id": session})
+            return self._reply(
+                msg["id"],
+                {
+                    "protocolVersion": version,
+                    "capabilities": {"tools": {}},
+                    "serverInfo": {"name": "fake-calamari", "version": "0"},
+                },
+                {"Mcp-Session-Id": session},
+            )
         if session not in self.fake.sessions:
             return self._send(404, {"error": "unknown session"})
         if self.headers.get("MCP-Protocol-Version") != self.fake.session_versions[session]:
@@ -371,8 +481,10 @@ class _Handler(BaseHTTPRequestHandler):
         if session not in self.fake.initialized_sessions:
             return self._send(400, {"error": "not initialized"})
         if method == "tools/list":
-            tools = [{"name": n, "description": "fake " + n, "inputSchema": {"type": "object", "properties": {}}}
-                     for n in ("getMyProfile", "clockIn", "clockOut", "checkTimesheetOverlap")]
+            tools = [
+                {"name": n, "description": "fake " + n, "inputSchema": {"type": "object", "properties": {}}}
+                for n in ("getMyProfile", "clockIn", "clockOut", "checkTimesheetOverlap")
+            ]
             return self._reply(msg["id"], {"tools": tools})
         if method == "tools/call":
             name = msg["params"]["name"]
@@ -388,17 +500,39 @@ class _Handler(BaseHTTPRequestHandler):
             if name == "getPublicHolidays":
                 args = msg["params"]["arguments"]
                 found = [h for h in self.fake.holidays if h["start"] <= args["to"] and h["end"] >= args["from"]]
-                return self._reply(msg["id"], {"content": [{"type": "text", "text": json.dumps(
-                    {"from": args["from"], "to": args["to"], "holidays": found})}]})
+                return self._reply(
+                    msg["id"],
+                    {
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": json.dumps({"from": args["from"], "to": args["to"], "holidays": found}),
+                            }
+                        ]
+                    },
+                )
             if name == "search":
                 # Without peopleUuids the real tool returns the whole company.
                 args = msg["params"]["arguments"]
                 people = args.get("peopleUuids")
-                found = [a for uuid, a in self.fake.absences
-                         if (people is None or uuid in people)
-                         and a["start"][:10] <= args["to"] and a["end"][:10] >= args["from"]]
-                return self._reply(msg["id"], {"content": [{"type": "text", "text": json.dumps(
-                    {"returned": len(found), "nextCursor": None, "absences": found})}]})
+                found = [
+                    a
+                    for uuid, a in self.fake.absences
+                    if (people is None or uuid in people)
+                    and a["start"][:10] <= args["to"]
+                    and a["end"][:10] >= args["from"]
+                ]
+                return self._reply(
+                    msg["id"],
+                    {
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": json.dumps({"returned": len(found), "nextCursor": None, "absences": found}),
+                            }
+                        ]
+                    },
+                )
             if name == "getWorkPlan":
                 return self._reply(msg["id"], {"content": [{"type": "text", "text": json.dumps(self.fake.work_plan)}]})
             if name == "getMyProfile":
@@ -409,9 +543,11 @@ class _Handler(BaseHTTPRequestHandler):
     def _overlap(self, msg_id, args):
         """Mimics Calamari: an entry overlaps a window if they share any instant
         (touching ends do not count), a running entry reaches up to now."""
+
         def secs(hms):
             h, m, *s = (int(p) for p in hms.split(":"))
             return h * 3600 + m * 60 + (s[0] if s else 0)
+
         today, now = self.fake.now.split("T")
         dates = []
         for e in args["entries"]:
@@ -451,7 +587,8 @@ class _Handler(BaseHTTPRequestHandler):
         if self.fake.response_mode == "sse":
             # A server notification first, as real streams may interleave.
             notice = {"jsonrpc": "2.0", "method": "notifications/message", "params": {"level": "info"}}
-            body = ("event: message\ndata: %s\n\nevent: message\ndata: %s\n\n"
-                    % (json.dumps(notice), json.dumps(payload))).encode()
+            body = (
+                "event: message\ndata: %s\n\nevent: message\ndata: %s\n\n" % (json.dumps(notice), json.dumps(payload))
+            ).encode()
             return self._send(200, body, headers, "text/event-stream")
         self._send(200, payload, headers)
