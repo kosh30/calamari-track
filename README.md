@@ -26,10 +26,11 @@ It talks to Calamari in two ways, both hidden behind the helper `bin/calamari`:
 
 ## Installation
 
-From git:
+From GitHub, which installs the latest release; `omarchy plugin update`
+brings the next one:
 
 ```sh
-omarchy plugin add <git-url> --enable
+omarchy plugin add https://github.com/kosh30/calamari-track.git --enable
 ```
 
 Or from a local checkout, by symlink:
@@ -70,6 +71,24 @@ loaded and needs `omarchy-restart-shell` after a change.
 
 Every command prints one JSON object. Failures, the REST requests sent and
 every stamp go to the journal: `journalctl -t calamari-tracker`.
+
+## Removal
+
+```sh
+omarchy plugin remove kosh.calamari-tracker
+```
+
+This leaves your login and the API key in the keyring, and a little state
+(reminders already sent, "Heute frei") on disk. Remove them with:
+
+```sh
+secret-tool clear service kosh.calamari-tracker
+rm -r ~/.local/state/calamari-tracker
+```
+
+The shell keeps your settings in the plugin's bar entry in
+`~/.config/omarchy/shell.json`; delete that entry by hand if you want them
+gone too.
 
 ## Settings
 
@@ -136,11 +155,14 @@ workarounds are deliberate, see the ADRs:
 
 ## Development
 
-- Tests: `node --test js/` and `python3 -m unittest`
-- Lint: `/usr/lib/qt6/bin/qmllint -I lint *.qml` (refresh the snapshots with
-  `lint/refresh.sh`)
+Development happens on `main`, and pull requests target `main`. The default
+branch `stable` only moves at a release. Checks, commit and changelog rules
+and how to release: [CONTRIBUTING.md](CONTRIBUTING.md). Changes per
+release: [CHANGELOG.md](CHANGELOG.md). Security issues: [SECURITY.md](SECURITY.md).
+
 - Terms: [CONTEXT.md](CONTEXT.md), decisions: [docs/adr/](docs/adr/),
   order of the work: [docs/PLAN.md](docs/PLAN.md)
+- Lint snapshots of omarchy-shell: refresh with `lint/refresh.sh`
 
 ## License
 
