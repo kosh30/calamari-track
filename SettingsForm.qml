@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "js/contrast.mjs" as Contrast
 import "js/scrollindicator.mjs" as ScrollIndicator
 import "js/settingsform.mjs" as SettingsFormLogic
 
@@ -23,6 +24,9 @@ Column {
     property var errors: ({})
     property string saveError: ""
     property real maxFieldsHeight: Style.space(440)
+
+    // How far the quiet things on this page may step back (js/contrast.mjs).
+    readonly property var strength: Contrast.strengths(Color.foreground, Color.background)
 
     function load() {
         root.fields = SettingsFormLogic.formFields(root.schema, root.service ? root.service.settings : null)
@@ -132,12 +136,7 @@ Column {
             width: Style.space(3)
             height: place.height
             radius: width / 2
-            // Stepped back like a secondary label, and for the same reason
-            // split by the theme's polarity (see ActionButton.qml): a light
-            // theme has less room to spend, and at the dark alpha the bar
-            // measured 2.5:1 there, under the 3:1 a control needs to be made
-            // out at all.
-            color: Util.alpha(Color.foreground, Color.background.hslLightness > 0.5 ? 0.7 : 0.55)
+            color: Util.alpha(Color.foreground, root.strength.mark)
         }
     }
 
@@ -166,11 +165,14 @@ Column {
         }
     }
 
-    // The version comes from manifest.json, its only copy.
+    // The version comes from manifest.json, its only copy. Not Color.muted,
+    // which a theme is free to put anywhere: Catppuccin Latte sets it to a
+    // grey that stands at 1.9:1 on its own background, and this line was
+    // unreadable there.
     Text {
         width: parent.width
         visible: text !== ""
-        color: Color.muted
+        color: Util.alpha(Color.foreground, root.strength.quiet)
         font.family: Style.font.family
         font.pixelSize: Style.font.bodySmall
         text: root.version ? "Calamari Tracker " + root.version : ""

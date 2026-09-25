@@ -6,6 +6,7 @@
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "js/contrast.mjs" as Contrast
 
 // A panel button that says its rank before its label is read.
 //
@@ -23,8 +24,9 @@ import qs.Ui
 //
 // The colours are the theme's foreground at three strengths rather than
 // Qt.darker: darkening the dark foreground of a light theme would make a
-// secondary action louder than the main one. How far back the quiet strength
-// steps is not the same on both, though — see _quietAlpha.
+// secondary action louder than the main one. How far back the quiet ones step
+// is the theme's business rather than a constant — js/contrast.mjs works it
+// out from what the theme leaves between its foreground and its background.
 //
 // Set `label`, not `text`: the capitals are put on here.
 BorderSurface {
@@ -46,22 +48,16 @@ BorderSurface {
     // "Heute frei" would carry nothing but its fill.
     readonly property bool _framed: root.primary || root.selected
 
-    // How far a quiet label steps back. A light theme has far less room
-    // between foreground and background than a dark one — measured on the
-    // running shell, Catppuccin Latte offers 6.5:1 where Solitude offers 11:1
-    // — so the alpha that reads as quiet on dark spends all of it and lands at
-    // 2.8:1, under the 4.5:1 a label of this size needs. The step is therefore
-    // smaller on a light theme. The rank survives that: the frame, the size and
+    // How far the quiet strengths may step back on this theme. The rank
+    // survives a theme that leaves them little room: the frame, the size and
     // the capitals carry it, the colour only seconds them.
-    readonly property bool _onLight: Color.background.hslLightness > 0.5
-    readonly property real _quietAlpha: root._onLight ? 0.85 : 0.62
-    readonly property real _disabledAlpha: root._onLight ? 0.5 : 0.35
+    readonly property var _strength: Contrast.strengths(Color.foreground, Color.background)
 
     // Full strength for the main action and for whatever the pointer is on.
     // Switched on beats both, so the theme's own selected colour still shows;
     // disabled beats everything, so a button that cannot be pressed never
     // renders at full strength.
-    readonly property color _labelColor: !root.enabled ? Util.alpha(Color.foreground, root._disabledAlpha) : root.selected ? Style.selectedStateColor(Color.foreground, Color.accent) : root.primary || root._hot ? Color.foreground : Util.alpha(Color.foreground, root._quietAlpha)
+    readonly property color _labelColor: !root.enabled ? Util.alpha(Color.foreground, root._strength.inert) : root.selected ? Style.selectedStateColor(Color.foreground, Color.accent) : root.primary || root._hot ? Color.foreground : Util.alpha(Color.foreground, root._strength.quiet)
 
     readonly property var _hoverBorder: Border.controlSpec("hover-cursor", Color.foreground, Color.accent)
     readonly property var _normalBorder: Border.controlSpec("normal", Color.foreground, Color.accent)

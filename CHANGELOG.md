@@ -15,6 +15,10 @@ All notable changes to this plugin are documented here. The format follows
 - The panel's buttons show their rank: what the page is for keeps its frame, everything beside it steps back into small capitals, and a button that cannot be pressed right now looks the part.
 - The settings show a thin bar at their right edge while fields stand below the window, so it is no longer a guess whether there is more to scroll to.
 
+### Fixed
+
+- On a light theme the version line under the settings was practically invisible. Everything the panel dims now keeps its contrast, whichever theme you run.
+
 ## [0.2.0] - 2026-09-25
 
 ### Added
