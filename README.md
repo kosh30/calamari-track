@@ -144,4 +144,6 @@ workarounds are deliberate, see the ADRs:
 
 ## License
 
-MIT
+MIT, see [LICENSE](LICENSE). The copies of other people's work under `lint/`
+keep their own copyright and licence; they are listed with their notices in
+[THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md).

@@ -1,6 +1,8 @@
 import QtQuick
 
 // Lint-only stand-in for the shell's keyboard-navigable panel frame.
+// Derived from ax1g/quickshell-screentime-plugin, commit 2c7b75a,
+// MIT, Copyright (c) 2026 agx. See THIRD-PARTY-LICENSES.md.
 // Covers exactly the API our Panel.qml uses; the real frame lives in
 // omarchy-shell and is far richer (layer-shell window, focus, animation).
 Item {
