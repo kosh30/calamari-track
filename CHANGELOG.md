@@ -6,6 +6,8 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-25
+
 ### Added
 
 - See how far the day's core time has run, as a thin bar in the panel with the time left (“noch 2:15 bis Ende der Kernzeit”). Days without a core time and days off leave it out.
@@ -27,5 +29,6 @@ All notable changes to this plugin are documented here. The format follows
 - Log in with your company's Calamari login, e.g. Microsoft SSO; login and API key stay in the system keyring.
 - Change the settings in the panel under “Einstellungen”, which also shows the plugin's version.
 
-[Unreleased]: https://github.com/kosh30/calamari-track/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/kosh30/calamari-track/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/kosh30/calamari-track/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kosh30/calamari-track/releases/tag/v0.1.0

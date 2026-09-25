@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "kosh.calamari-tracker",
   "name": "Calamari Tracker",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "kosh",
   "license": "MIT",
   "description": "Stempelt die eigene Arbeitszeit in Calamari über den offiziellen MCP-Server und erinnert an vergessenes Ein- und Ausstempeln",
