@@ -22,10 +22,24 @@ export function pollMinutes(baseMinutes, failures) {
   return Math.max(baseMinutes, Math.min(baseMinutes * 2 ** failures, MAX_MINUTES))
 }
 
+// The failures that no waiting fixes: they sit there until the user acts.
+// Naming a next attempt would be a lie, so the tooltip names the remedy
+// instead. Same causes as STAMP_CAUSES in shiftclock.mjs, but as a whole
+// sentence, because the bar has no failed action to put in front of them.
+// AUTH_REQUIRED is missing on purpose: it turns authState to "required",
+// so the bar shows the view "auth" and never gets here.
+const USER_ACTION_HINTS = {
+  API_URL_REQUIRED: "Calamari: REST-API-URL fehlt, bitte in den Einstellungen setzen",
+  API_KEY_REQUIRED: "Calamari: API-Key fehlt, bitte bin/calamari api-key ausführen",
+  API_KEY_REJECTED: "Calamari lehnt den API-Key ab, bitte bin/calamari api-key erneut ausführen",
+  API_TERMINAL_MISSING: "Calamari: API Terminal fehlt in Clockin",
+  API_SCOPE_MISSING: "Calamari: dem API-Key fehlt eine Berechtigung",
+}
+
 // The bar's tooltip for a failed poll with the error code.
 export function errorTooltip(code, retryMinutes) {
   const retry = `nächster Versuch in ${retryMinutes} Min`
   if (code === "NETWORK") return `Calamari nicht erreichbar, ${retry}`
   if (code === "RATE_LIMITED") return `Calamari: zu viele Anfragen, ${retry}`
-  return "Calamari: Fehler"
+  return USER_ACTION_HINTS[code] || "Calamari: Fehler"
 }
