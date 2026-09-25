@@ -3,6 +3,7 @@ import qs.Commons
 import qs.Ui
 import "js/shiftclock.mjs" as ShiftClock
 import "js/reminders.mjs" as Reminders
+import "js/panelheader.mjs" as PanelHeader
 
 // Popup panel toggled from the bar icon: login state, shift status and
 // clocking in/out (page "main"); on right-click a small menu (page "menu")
@@ -25,6 +26,18 @@ Panel {
     // After the final warning: the countdown to the auto-close.
     readonly property string countdown: service ? Reminders.countdownText(service.decision, service.now) : ""
 
+    // The header block (js/panelheader.mjs): the duration as the page's
+    // largest number, the line placing it, and the core-time progress. Null
+    // while no login stands, when the shift says nothing worth a header.
+    readonly property var headerModel: authState === "ok" && service !== null && view !== null ? PanelHeader.headerView({
+        view: view,
+        state: service.shiftState,
+        now: service.now,
+        day: service.dayInfo,
+        config: service.config
+    }) : null
+    readonly property var progress: headerModel ? headerModel.progress : null
+
     // A button's text, with "…" while its own action runs.
     // During the countdown clocking out is "Jetzt ausstempeln".
     function actionText(action) {
@@ -43,24 +56,6 @@ Panel {
         if (root.authState === "error")
             return "Calamari nicht erreichbar"
         return "Verbinde …"
-    }
-
-    function shiftText() {
-        var view = root.view
-        var shift = root.service ? root.service.shiftState : null
-        if (!view || view.kind === "unknown")
-            return "Schichtstatus wird abgefragt …"
-        if (view.kind === "error")
-            return "Schichtstatus unbekannt"
-        if (view.kind === "reminder")
-            return "Noch nicht eingestempelt, die Kernzeit läuft"
-        if (view.kind === "break")
-            return "Pause seit " + ShiftClock.breakSinceText(shift) + " (" + view.text + ")"
-        if (view.kind === "idle")
-            return shift.clockedOutAt ? "Feierabend seit " + shift.clockedOutAt : "Keine laufende Schicht"
-        if (shift.startedAt)
-            return "Schicht läuft seit " + shift.startedAt + " (" + view.text + ")"
-        return "Schicht läuft"
     }
 
     property string page: "main"
@@ -129,12 +124,71 @@ Panel {
                     width: parent.width
                     spacing: Style.space(8)
 
-                    Text {
-                        text: "Calamari Tracker"
-                        color: Color.foreground
-                        font.family: Style.font.family
-                        font.pixelSize: Style.font.body
-                        font.bold: true
+                    // The page's anchor: the running duration as the largest
+                    // number, the line placing it, and the progress through
+                    // today's core time. The "Calamari Tracker" title used to
+                    // sit here; the number is the better anchor, and dropping
+                    // the title pays for the remaining-time line.
+                    Column {
+                        visible: root.headerModel !== null
+                        width: parent.width
+                        spacing: Style.space(4)
+
+                        Text {
+                            visible: text !== ""
+                            color: Color.foreground
+                            font.family: Style.font.family
+                            font.pixelSize: Style.fontPx(1.5)
+                            font.bold: true
+                            text: root.headerModel ? root.headerModel.duration : ""
+                        }
+
+                        Text {
+                            width: parent.width
+                            wrapMode: Text.Wrap
+                            color: Qt.darker(Color.foreground, 1.4)
+                            font.family: Style.font.family
+                            font.pixelSize: Style.font.bodySmall
+                            text: root.headerModel ? root.headerModel.caption : ""
+                        }
+
+                        // Progress through the core time: absent on a day
+                        // without one and before it starts, so there is never
+                        // an empty bar. Two rectangles, the shell's own way
+                        // with a read-only meter (Ui has no such component).
+                        Rectangle {
+                            visible: root.progress !== null
+                            width: parent.width
+                            height: Style.space(4)
+                            radius: height / 2
+                            color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.15)
+
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                height: parent.height
+                                radius: parent.radius
+                                color: Color.accent
+                                width: parent.width * (root.progress ? root.progress.fraction : 0)
+
+                                Behavior on width {
+                                    NumberAnimation {
+                                        duration: 320
+                                        easing.type: Easing.OutCubic
+                                    }
+                                }
+                            }
+                        }
+
+                        Text {
+                            width: parent.width
+                            visible: root.progress !== null
+                            wrapMode: Text.Wrap
+                            color: Qt.darker(Color.foreground, 1.4)
+                            font.family: Style.font.family
+                            font.pixelSize: Style.font.caption
+                            text: root.progress ? root.progress.text : ""
+                        }
                     }
 
                     Text {
@@ -144,16 +198,6 @@ Panel {
                         font.family: Style.font.family
                         font.pixelSize: Style.font.body
                         text: root.loginText()
-                    }
-
-                    Text {
-                        width: parent.width
-                        visible: root.authState === "ok" && root.service !== null
-                        wrapMode: Text.Wrap
-                        color: Color.foreground
-                        font.family: Style.font.family
-                        font.pixelSize: Style.font.body
-                        text: root.shiftText()
                     }
 
                     Text {
