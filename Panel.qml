@@ -63,8 +63,20 @@ Panel {
 
     property string page: "main"
 
+    // Armed for exactly one write to `page` — the one below it — and cleared
+    // again straight after. The width binding re-evaluates while that
+    // assignment runs, so statement order is what decides whether the step is
+    // a movement. A binding on `opened` would instead have to win a race
+    // against onOpenedChanged, which writes `page` itself on the way out.
+    property bool widthMoves: false
+
     function showPage(name) {
+        // `opened` is still false when the bar widget opens the panel onto a
+        // page, because it calls this before open(). That is the contract this
+        // reads: a panel not yet on screen arrives at its width without moving.
+        root.widthMoves = root.opened
         root.page = name
+        root.widthMoves = false
         if (name === "settings")
             settingsForm.load()
     }
@@ -92,6 +104,20 @@ Panel {
         focusTarget: keyCatcher
         contentWidth: panel.fittedContentWidth(Style.space(root.page === "settings" ? 420 : 320))
         contentHeight: panel.fittedContentHeight(content.implicitHeight)
+
+        // The card carries this sideways as it goes: the host keeps the card
+        // centred under the bar icon, so its origin is derived from the width
+        // and follows it frame for frame. Nothing holds back a size change out
+        // of the content, because the width has no way of hearing about one —
+        // it reads `page` and the screen and nothing else. 140 ms is the card's
+        // own fade (Ui/KeyboardPanel.qml).
+        Behavior on contentWidth {
+            enabled: root.widthMoves
+            NumberAnimation {
+                duration: 140
+                easing.type: Easing.OutCubic
+            }
+        }
 
         PanelKeyCatcher {
             id: keyCatcher

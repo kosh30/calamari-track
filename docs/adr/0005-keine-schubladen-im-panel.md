@@ -36,9 +36,20 @@ die Einstellungen. Wer dort steht, weiß, wie er hinkam.
   — sie liegen weiter im Baum, zählen aber weder zur Höhe der Spalte noch zur
   Tab-Reihenfolge. Ein laufender Wechsel kann keine Seite unerreichbar machen,
   weil es keinen laufenden Wechsel gibt.
-- Das Panel behält vorerst einen einzigen Größenvertrag: `contentWidth` und
-  `contentHeight` folgen der sichtbaren Seite ohne Animation. Damit bleibt der
-  Sprung der Panelbreite von 320 auf 420 beim Wechsel auf die Einstellungen ein
-  Sprung. Diese Entscheidung verbietet nicht, ihn zu einer Bewegung zu machen:
-  das ist eine eigene und viel kleinere Frage, weil sie weder Abschneiden noch
-  gleichzeitig existierende Seiten braucht. Sie steht als eigenes Ticket.
+- **Die Höhe folgt der sichtbaren Seite ohne Animation.** `contentHeight`
+  liest die `implicitHeight` der Seite, und die ändert sich auch ohne
+  Seitenwechsel: eine Fehlermeldung erscheint, die Schichtdauer wird länger,
+  die Anmeldezeile wechselt. Vor allem aber gilt hier der erste Punkt oben:
+  Nichts schneidet ab, also zeichnet eine Karte, die auf ihre volle Höhe
+  wächst, den Rest des Formulars für die Dauer der Bewegung auf den Desktop —
+  gemessen mit einem `Behavior on contentHeight` standen „Pausen-Erinnerung“,
+  „Feierabend“ und die Felder darunter ohne Karte dahinter auf dem
+  Hintergrundbild. Eine bewegte Höhe braucht damit dasselbe abschneidende
+  Sichtfenster wie die Schubladen und scheitert an derselben Härte.
+- **Die Breite tut es nicht mehr.** Der Sprung von 320 auf 420 beim Wechsel auf
+  die Einstellungen ist seit [#12](https://github.com/kosh30/calamari-track/issues/12)
+  eine Bewegung. Das war hier schon als eigene und viel kleinere Frage angelegt,
+  und sie ist es geblieben: die Breite liest nur die sichtbare Seite und den
+  Bildschirm, nie den Inhalt, und ein Seitenwechsel im offenen Panel ist das
+  einzige, was sie bewegt. Weder Abschneiden noch gleichzeitig existierende
+  Seiten sind dafür nötig.

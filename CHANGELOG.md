@@ -15,6 +15,7 @@ All notable changes to this plugin are documented here. The format follows
 
 - The panel's buttons show their rank: what the page is for keeps its frame, everything beside it steps back into spaced capitals, and a button that cannot be pressed right now looks the part.
 - The settings stand in labelled cards instead of one flat list, and the seven core times share a single explanation instead of carrying one each.
+- The panel widens into the settings instead of jumping there, so the step from the menu is one short movement rather than a snap to a new size.
 
 ### Fixed
 
