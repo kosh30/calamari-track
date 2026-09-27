@@ -1,141 +1,141 @@
-# Implementierungsplan: Calamari Tracker
+# Implementation plan: Calamari Tracker
 
-Grundlage: [CONTEXT.md](../CONTEXT.md) (Begriffe) und [ADR 0001](adr/0001-calamari-mcp-statt-rest-api.md) (Zugriff über den MCP-Server).
-Der Plan besteht aus vertikalen Scheiben. Jede Scheibe endet mit etwas, das man ausprobieren kann. Die Reihenfolge baut die Risiken zuerst ab.
+Basis: [CONTEXT.md](../CONTEXT.md) (terminology) and [ADR 0001](adr/0001-calamari-mcp-instead-of-rest-api.md) (access through the MCP server).
+The plan consists of vertical slices. Every slice ends with something you can try out. The order takes the risks down first.
 
-## Architektur
+## Architecture
 
 ```
 ┌──────────── omarchy-shell (Quickshell) ─────────────┐
 │  Widget.qml + Panel.qml    ◄──►  Service.qml         │
-│                                   │  Timer, IdleMonitor, State-Datei
-│                                   │  js/reminders.mjs  (reine Logik)
-│                                   │  js/daycalendar.mjs (reine Logik)
-│                                   ▼  Process (JSON auf stdout)
-│                             bin/calamari  (Python, nur stdlib)
+│                                   │  Timer, IdleMonitor, state file
+│                                   │  js/reminders.mjs  (pure logic)
+│                                   │  js/daycalendar.mjs (pure logic)
+│                                   ▼  Process (JSON on stdout)
+│                             bin/calamari  (Python, stdlib only)
 └───────────────────────────────────│─────────────────┘
                                     ▼ HTTPS, OAuth Bearer
                gateway.eu-west-1.calamari.io/mcp-server/mcp
 ```
 
-- **`bin/calamari`** ist die einzige Stelle, die mit Calamari spricht. Sie kümmert sich um OAuth, das MCP-Protokoll (Streamable HTTP, JSON-RPC) und die Übersetzung der Tools in einfache Befehle. Die Ausgabe ist immer JSON, `{"ok":false,"error":{"code":…}}` bei Fehlern.
-- **`Service.qml`** hält den Laufzeitzustand, ruft den Helfer auf, misst die Aktivität und verschickt Benachrichtigungen. Er trifft selbst keine Entscheidungen, sondern fragt dafür die JS-Logik.
-- **`js/*.mjs`** enthält reine Funktionen ohne Qt, die mit `node --test` getestet werden. Kernstück ist `decide(now, day, state, config) → { barState, actions[] }`.
-- **Lokaler Zustand** liegt in `$XDG_STATE_HOME/calamari-tracker/state.json` (atomic write): laufende Pause, Feierabend, „Heute frei“, verschickte Erinnerungen, letzte Aktivität, bekannte Startzeit, Verschiebungen durch „+1 h“.
-- **Secrets** liegen im Keyring über `secret-tool` (`service kosh.calamari-tracker`, `key client` / `key tokens`).
+- **`bin/calamari`** is the only place that talks to Calamari. It takes care of OAuth, the MCP protocol (streamable HTTP, JSON-RPC) and the translation of the tools into simple commands. The output is always JSON, `{"ok":false,"error":{"code":…}}` on errors.
+- **`Service.qml`** holds the runtime state, calls the helper, measures the activity and sends the notifications. It makes no decisions itself but asks the JS logic for them.
+- **`js/*.mjs`** contains pure functions without Qt, tested with `node --test`. The core piece is `decide(now, day, state, config) → { barState, actions[] }`.
+- **Local state** lives in `$XDG_STATE_HOME/calamari-tracker/state.json` (atomic write): running break, end of day, „Heute frei“, reminders sent, last activity, known start time, shifts by „+1 h“.
+- **Secrets** live in the keyring through `secret-tool` (`service kosh.calamari-tracker`, `key client` / `key tokens`).
 
-## Scheibe 0: Gerüst
+## Slice 0: Scaffold
 
-- `git init`, `.gitignore`, `manifest.json` (ID `kosh.calamari-tracker`, Kinds `service` + `bar-widget`, `keepLoaded`).
-- Symlink `~/.config/omarchy/plugins/kosh.calamari-tracker → ~/Work/calamari_tracker`, dann rescan + enable.
-- Leeres `Service.qml` und `Widget.qml` mit einem statischen Icon in der Bar.
-- qmllint-Importkontext in `lint/`: wörtliche Snapshots von omarchy-shell (`lint/refresh.sh`) plus Quickshell-Stubs aus dem Screen-Time-Plugin.
-- Testbefehle: `node --test js/` und `python3 -m unittest`.
+- `git init`, `.gitignore`, `manifest.json` (ID `kosh.calamari-tracker`, kinds `service` + `bar-widget`, `keepLoaded`).
+- Symlink `~/.config/omarchy/plugins/kosh.calamari-tracker → ~/Work/calamari_tracker`, then rescan + enable.
+- Empty `Service.qml` and `Widget.qml` with a static icon in the bar.
+- qmllint import context in `lint/`: literal snapshots of omarchy-shell (`lint/refresh.sh`) plus Quickshell stubs from the screen-time plugin.
+- Test commands: `node --test js/` and `python3 -m unittest`.
 
-**Fertig, wenn** das Icon in der Bar erscheint und eine Änderung daran nach `omarchy-restart-shell` zu sehen ist (beim Speichern lädt nichts neu, siehe `CLAUDE.md`).
+**Done when** the icon appears in the bar and a change to it is visible after `omarchy-restart-shell` (nothing reloads on save, see `CLAUDE.md`).
 
-## Scheibe 1: OAuth-Login (größtes Risiko)
+## Slice 1: OAuth login (the biggest risk)
 
 - `bin/calamari login`:
-  - Discovery: `/.well-known/oauth-protected-resource/mcp-server/mcp` → Authorization-Server-Metadaten.
-  - Dynamic Client Registration mit Redirect `http://127.0.0.1:<freier Port>/callback`. Die Client-Daten kommen in den Keyring.
-  - Authorization Code + PKCE S256, `resource`-Parameter = MCP-URL. Der Browser öffnet sich per `xdg-open`, ein lokaler HTTP-Server empfängt den Code.
-  - Token-Tausch, Tokens in den Keyring.
-- Automatischer Refresh bei `401` oder abgelaufenem Token. Scheitert er, gibt es den Fehlercode `AUTH_REQUIRED`.
-- `bin/calamari whoami` → `getMyProfile` als Rauchtest. Dafür braucht es die MCP-Session: `initialize` → `Mcp-Session-Id` → `notifications/initialized` → `tools/call`.
-- Unit-Tests für PKCE, Token-Ablauf und MCP-Antworten (JSON und SSE-Frames), mit einem Fake-HTTP-Server.
+  - Discovery: `/.well-known/oauth-protected-resource/mcp-server/mcp` → authorization server metadata.
+  - Dynamic client registration with redirect `http://127.0.0.1:<free port>/callback`. The client data goes into the keyring.
+  - Authorization code + PKCE S256, `resource` parameter = the MCP URL. The browser opens through `xdg-open`, a local HTTP server receives the code.
+  - Token exchange, tokens into the keyring.
+- Automatic refresh on `401` or an expired token. If it fails, the error code is `AUTH_REQUIRED`.
+- `bin/calamari whoami` → `getMyProfile` as a smoke test. That needs the MCP session: `initialize` → `Mcp-Session-Id` → `notifications/initialized` → `tools/call`.
+- Unit tests for PKCE, token expiry and MCP answers (JSON and SSE frames), with a fake HTTP server.
 
-**Fertig, wenn** `bin/calamari login` im Browser per Microsoft-SSO durchläuft und `bin/calamari whoami` deinen Namen zeigt, auch nach einem Token-Refresh.
-**Fallback, falls DCR für eigene Clients gesperrt ist:** Neu entscheiden. Wir haben keinen Weg, ohne Rückfrage bei dir weiterzumachen.
+**Done when** `bin/calamari login` runs through in the browser over Microsoft SSO and `bin/calamari whoami` shows your name, after a token refresh too.
+**Fallback if DCR is blocked for own clients:** decide anew. We have no way to carry on without asking you.
 
-## Scheibe 2: Status und Stempeln im Helfer
+## Slice 2: Status and stamping in the helper
 
-- `status` → `checkTimesheetOverlap(heute, jetzt−2min … jetzt, skipNotEligibleDays=false)` → `{"running": bool}`.
-- `start-time` → Intervallhalbierung über den Tag auf die Minute genau (etwa 10 Aufrufe) → `{"startedAt": "HH:MM"}`. Mit `--after HH:MM` lassen sich Folgeschichten nach einer Pause finden.
-- `worked-today` → Summe der Schichten von heute. Dazu wird die Lücken- und Schichtsuche wiederverwendet, sonst entfällt das und das Panel zeigt nur die Schichtdauer. *Offen: der Aufwand wird in dieser Scheibe gemessen.*
-- `clock-in`, `clock-out` → `clockIn`/`clockOut`, danach sofort erneut `status`.
-- `day-info --date YYYY-MM-DD` → `getWorkPlan` + `getPublicHolidays` + `search(peopleUuids=[ich])`, zusammengefasst zu `{workingDay, coreStart, coreEnd, holiday, halfDay, absence}`. Der Arbeitsplan wird einmal täglich gecacht.
-- Das Verhalten des Overlap-Checks wird dokumentiert, und ein manueller Prüfbefehl erkennt, wenn Calamari es ändert.
+- `status` → `checkTimesheetOverlap(today, now−2min … now, skipNotEligibleDays=false)` → `{"running": bool}`.
+- `start-time` → bisection over the day, accurate to the minute (about 10 calls) → `{"startedAt": "HH:MM"}`. With `--after HH:MM`, shifts following a break can be found.
+- `worked-today` → the sum of today's shifts. The gap and shift search is reused for that; otherwise it is dropped and the panel only shows the shift duration. *Open: the effort is measured in this slice.*
+- `clock-in`, `clock-out` → `clockIn`/`clockOut`, then `status` again straight away.
+- `day-info --date YYYY-MM-DD` → `getWorkPlan` + `getPublicHolidays` + `search(peopleUuids=[me])`, collected into `{workingDay, coreStart, coreEnd, holiday, halfDay, absence}`. The work schedule is cached once a day.
+- The behaviour of the overlap check is documented, and a manual check command detects when Calamari changes it.
 
-**Fertig, wenn** `status`, `start-time` und `day-info` den echten Zustand liefern und `clock-out` / `clock-in` im Test den Status umschalten. Das ist einmal manuell mit dir zu testen, weil es echte Stempelungen erzeugt.
+**Done when** `status`, `start-time` and `day-info` deliver the real state and `clock-out` / `clock-in` flip the status in a test. That is to be tested manually with you once, because it creates real stampings.
 
-## Scheibe 3: Status in der Bar
+## Slice 3: Status in the bar
 
-- `Service.qml`: Die Abfrage läuft alle 3 Min (konfigurierbar), sofort beim Öffnen des Panels und nach jeder eigenen Aktion.
-- Die Bar zeigt Icon + Schichtdauer (`󰔟 3:42`). Die Dauer tickt lokal ab der bekannten Startzeit weiter.
-- Farben: grau (keine Schicht), grün (Schicht läuft), gelb (Pause), rot (Stempel-Erinnerung aktiv), Warnsymbol (Fehler oder Anmeldung nötig).
+- `Service.qml`: the query runs every 3 min (configurable), immediately when the panel opens and after every action of our own.
+- The bar shows icon + shift duration (`󰔟 3:42`). The duration goes on ticking locally from the known start time.
+- Colours: grey (no shift), green (shift running), yellow (break), red (stamp reminder active), warning symbol (error or login needed).
 
-**Fertig, wenn** ein Einstempeln im Web nach spätestens einer Abfrage in der Bar erscheint.
+**Done when** a clock-in in the web appears in the bar after one query at the latest.
 
-## Scheibe 4: Panel mit Aktionen
+## Slice 4: Panel with actions
 
-- Das Panel nach dem Muster von notification-center (`Panel` + `KeyboardPanel`).
-- Inhalt:
-  - Status, Schichtdauer, Gesamtzeit heute (falls in Scheibe 2 machbar)
-  - Einstempeln/Ausstempeln (Ausstempeln = Feierabend)
-  - Pause beginnen/beenden, nur bei laufender Schicht (ursprünglich Ausstempeln + Markierung bzw. Einstempeln; seit ADR 0003 echte Pause per REST `break-start`/`break-stop`)
+- The panel after the pattern of notification-center (`Panel` + `KeyboardPanel`).
+- Contents:
+  - status, shift duration, total time today (if feasible in slice 2)
+  - clock in / clock out (clocking out = end of day)
+  - begin / end break, only during a running shift (originally clocking out + a marker, and clocking in again; since ADR 0003 a real break over REST `break-start`/`break-stop`)
   - „Heute frei“
-  - Fehlerzeile mit „Neu anmelden“, die `bin/calamari login` startet
-- Die laufende Pause und der Feierabend werden im State gespeichert und überleben einen Neustart der Shell.
+  - an error line with „Neu anmelden“, which starts `bin/calamari login`
+- The running break and the end of day are stored in the state and survive a restart of the shell.
 
-**Fertig, wenn** alle Buttons wirken und die Pause einen Shell-Neustart übersteht.
+**Done when** all buttons work and the break survives a shell restart.
 
-## Scheibe 5: Erinnerungslogik (TDD, reine Funktionen)
+## Slice 5: Reminder logic (TDD, pure functions)
 
-- `js/daycalendar.mjs`: Arbeitstag, Kernzeit (inkl. halbem Feiertag), freier Tag, lokale Überschreibungen aus der Config.
-- `js/reminders.mjs`: `decide(now, day, state, config)` liefert fällige Aktionen: `stamp-reminder`, `break-reminder`, `soft-hint`, `final-warning`, `auto-close`. Dazu den Bar-Zustand und den Zeitpunkt der nächsten Prüfung.
-- Testfälle, mindestens:
-  - Kernzeit ohne Schicht: sofort erinnern, dann alle 5 Min, bis zum Ende der Kernzeit.
-  - Feierabend um 15:30: keine Erinnerungen mehr, auch nicht bis 16:45.
-  - Pause 12:00: um 12:30 Pausen-Erinnerung, danach alle 5 Min.
-  - Freier Tag (Feiertag, Urlaub, Schalter): keine Stempel-Erinnerung.
-  - 24.12. mit halbem Feiertag: Kernzeit endet um 12:00.
-  - Sanfter Hinweis genau einmal, 30 Min nach Ende der Kernzeit.
-  - Letzte Warnung um 19:00, Auto-Abschluss 15 Min später, „+1 h“ verschiebt beides, Obergrenze 23:00.
-  - Wochenende mit laufender Schicht: kein Stempel-Hinweis, aber letzte Warnung und Auto-Abschluss.
-  - Schicht vom Vortag lief bis zum Tagesende: Korrektur-Hinweis, kein Stempeln (ADR 0002).
-- Alle Zeiten kommen aus der Config (Werte siehe Zusammenfassung in CONTEXT/Grilling).
+- `js/daycalendar.mjs`: working day, core time (including a half public holiday), day off, local overrides from the config.
+- `js/reminders.mjs`: `decide(now, day, state, config)` delivers the actions due: `stamp-reminder`, `break-reminder`, `soft-hint`, `final-warning`, `auto-close`. Along with the bar state and the moment of the next check.
+- Test cases, at least:
+  - core time without a shift: remind at once, then every 5 min, until the end of core time.
+  - end of day at 15:30: no more reminders, not even up to 16:45.
+  - break at 12:00: break reminder at 12:30, then every 5 min.
+  - day off (public holiday, holiday, switch): no stamp reminder.
+  - 24 December with a half public holiday: core time ends at 12:00.
+  - soft hint exactly once, 30 min after the end of core time.
+  - final warning at 19:00, auto-close 15 min later, „+1 h“ shifts both, upper limit 23:00.
+  - weekend with a running shift: no stamp hint, but a final warning and an auto-close.
+  - a shift from the previous day ran to the day's end: a correction hint, no stamping (ADR 0002).
+- All times come from the config (for the values see the summary in CONTEXT/grilling).
 
-**Fertig, wenn** alle Tests grün sind und das Modul keine Qt-Abhängigkeit hat.
+**Done when** all tests are green and the module has no Qt dependency.
 
-## Scheibe 6: Benachrichtigungen verdrahten
+## Slice 6: Wiring up the notifications
 
-- Der Service ruft `decide` beim Timer, beim Statuswechsel und beim Resume auf und führt die Aktionen aus.
-- Versand über `omarchy-notification-send … -p` (eigene Glyphe). Mit `-r <id>` wird die vorige Erinnerung desselben Typs ersetzt, statt sie zu stapeln.
-- Ein Klick (`--exec omarchy-shell kosh.calamari-tracker openPanel`) öffnet das Panel. Dafür gibt es einen `IpcHandler` im Widget bzw. Service.
+- The service calls `decide` on the timer, on a status change and on resume, and carries out the actions.
+- Sending through `omarchy-notification-send … -p` (a glyph of our own). With `-r <id>` the previous reminder of the same type is replaced instead of stacked.
+- A click (`--exec omarchy-shell kosh.calamari-tracker openPanel`) opens the panel. There is an `IpcHandler` in the widget and the service for that.
 
-**Fertig, wenn** jede Erinnerungsart einmal mit verkürzten Test-Zeiten aus der Config sichtbar ausgelöst wurde.
+**Done when** every kind of reminder has been visibly triggered once with shortened test times from the config.
 
-## Scheibe 7: Letzte Warnung und Auto-Abschluss
+## Slice 7: Final warning and auto-close
 
-- Nach der letzten Warnung zeigt das Panel einen Countdown und die Buttons „+1 h weiterarbeiten“ / „Jetzt ausstempeln“.
-- Auto-Abschluss: `clock-out`. Danach die Notification „Schicht um HH:MM automatisch beendet, letzte Aktivität HH:MM, bitte in Calamari korrigieren“. Ein Klick öffnet Calamari im Browser.
+- After the final warning the panel shows a countdown and the buttons „+1 h weiterarbeiten“ / „Jetzt ausstempeln“.
+- Auto-close: `clock-out`. Then the notification „Schicht um HH:MM automatisch beendet, letzte Aktivität HH:MM, bitte in Calamari korrigieren“. A click opens Calamari in the browser.
 
-**Fertig, wenn** der ganze Ablauf mit verkürzten Zeiten gegen echte Calamari-Stempelungen einmal durchgelaufen ist (mit dir abgestimmt).
+**Done when** the whole sequence has run through once with shortened times against real Calamari stampings (agreed with you).
 
-## Scheibe 8: Letzte Aktivität und Tagesende-Abschluss
+## Slice 8: Last activity and the day-end close
 
-- `IdleMonitor` (Quickshell.Wayland) mit dem Lock-Timeout aus der omarchy-shell-Idle-Config: Beginnt der Leerlauf, wird die Zeit als letzte Aktivität gespeichert.
-- Ein Heartbeat schreibt jede Minute `lastSeen` in den State. Liegt beim nächsten Tick eine Lücke von mehr als 5 Min, war das Gerät im Suspend, und die letzte Aktivität ist der letzte Heartbeat vor der Lücke.
-- Resume oder Shell-Start: Kennt der State eine laufende Schicht von einem früheren Tag, fragt `day-end`, ob sie bis zum Tagesende lief. Wenn ja, hat Calamari sie um 23:59 beendet und es gibt einen Korrektur-Hinweis, kein Stempeln (ADR 0002).
-  - *Zu prüfen in der Scheibe:* Zählt eine über Mitternacht laufende Schicht beim Overlap-Check für „heute“? Falls nicht, wird der Vortag geprüft.
+- `IdleMonitor` (Quickshell.Wayland) with the lock timeout from the omarchy-shell idle config: when the idle starts, the time is stored as the last activity.
+- A heartbeat writes `lastSeen` into the state every minute. If there is a gap of more than 5 min at the next tick, the device was suspended, and the last activity is the last heartbeat before the gap.
+- Resume or shell start: if the state knows a running shift from an earlier day, `day-end` is asked whether it ran to the day's end. If so, Calamari ended it at 23:59 and there is a correction hint, no stamping (ADR 0002).
+  - *To check in this slice:* does a shift running past midnight count for "today" in the overlap check? If not, the previous day is checked.
 
-**Fertig, wenn** das Szenario „Deckel zu mit laufender Schicht, später wieder auf“ den richtigen Hinweis mit der richtigen Uhrzeit bringt.
+**Done when** the scenario "lid closed with a running shift, opened again later" brings the right hint with the right time.
 
-## Scheibe 9: Config und Feinschliff
+## Slice 9: Config and finishing touches
 
-- `barWidget.schema` im Manifest für alle Werte:
-  - Abfrage-Intervall, Intervall der Stempel-Erinnerung, Pausen-Grenze
-  - Versatz des sanften Hinweises, Uhrzeit der letzten Warnung, Wartezeit bis zum Auto-Abschluss
-  - Dauer von „+1 h“, Obergrenze
-  - Überschreibungen für Arbeitsplan und Kernzeit
-- Fehlerzustände: kein Netz, `AUTH_REQUIRED`, `429`. Die Abfrage wird dann seltener (Backoff), und die Bar zeigt den Fehler.
-- README (Installation, `login`, Grenzen laut ADR), damit das Plugin veröffentlicht werden kann. Keine Secrets oder Firmendaten im Repo.
+- `barWidget.schema` in the manifest for all values:
+  - query interval, interval of the stamp reminder, break limit
+  - offset of the soft hint, time of the final warning, wait until the auto-close
+  - duration of „+1 h“, upper limit
+  - overrides for the work schedule and core time
+- Error states: no network, `AUTH_REQUIRED`, `429`. The query then goes to a lower rate (backoff), and the bar shows the error.
+- README (installation, `login`, the limits according to the ADRs), so that the plugin can be published. No secrets or company data in the repo.
 
-**Fertig, wenn** das Plugin eine Arbeitswoche im Alltag läuft, ohne dass du eingreifen musst.
+**Done when** the plugin runs an ordinary working week without you having to step in.
 
-## Später (bewusst nicht im Umfang)
+## Later (deliberately out of scope)
 
-- Wochenübersicht und Saldo (warten auf Timesheet-Tools im MCP)
-- Echte Pausen mit Typ, zurückdatiertes Ausstempeln und ein Status-Tool, sobald der MCP sie anbietet (ADR 0001 dann überarbeiten)
-- Projekte und Beschreibung beim Einstempeln
+- A week overview and a balance (waiting for timesheet tools in MCP)
+- Real breaks with a type, backdated clocking out and a status tool, as soon as MCP offers them (ADR 0001 to be revised then)
+- Projects and a description when clocking in

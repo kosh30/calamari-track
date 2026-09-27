@@ -1,50 +1,54 @@
 # Calamari Tracker
 
-Omarchy-Shell-Plugin (Quickshell), das die eigene Arbeitszeit in Calamari über den offiziellen MCP-Server erfasst und an vergessenes Ein-/Ausstempeln erinnert. Begriffe: `CONTEXT.md`. Architekturentscheidung: `docs/adr/`. Reihenfolge der Umsetzung: `docs/PLAN.md`.
+An Omarchy shell plugin (Quickshell) that tracks your own working time in Calamari through the official MCP server and reminds you of a forgotten clock-in or clock-out. Terminology: `CONTEXT.md`. Architecture decisions: `docs/adr/`. Order of work: `docs/PLAN.md`.
 
 ## Hosting
 
-Dieses Repo liegt auf **GitHub** (`kosh30/calamari-track`), ausdrücklich abweichend von der globalen GitLab-Regel: Releases, GitHub Actions und `gh` gelten hier.
+This repo lives on **GitHub** (`kosh30/calamari-track`), an explicit departure from the global GitLab rule: releases, GitHub Actions and `gh` apply here.
 
-## Befehle
+## Language
 
-- Beitrags-, Commit-, Changelog- und Release-Regeln: `CONTRIBUTING.md` (verbindlich, auch für Agenten)
-- Tests: `node --test js/*.test.mjs` und `python3 -m unittest`
-- Formatieren: `tools/format` (`--check` prüft nur)
-- Log des Helpers (Fehler, gesendete REST-Anfragen, Stempelungen): `journalctl -t calamari-tracker`
-- Lint: `/usr/lib/qt6/bin/qmllint -I lint *.qml` (Snapshots auffrischen: `lint/refresh.sh`)
-- Installiert per Symlink `~/.config/omarchy/plugins/kosh.calamari-tracker`.
-- Eine Änderung wirksam machen: `omarchy-restart-shell` (beim Speichern lädt nichts neu, siehe „Neu laden“)
+Docs, code, comments, commit messages and changelog entries are English. The user interface is German and stays German: on-screen text, the setting labels in `manifest.json` and the notification texts are never translated. Where a doc names something the user sees, it quotes the German verbatim — „Einstempeln“, „Feierabend“, „Heute frei“ — so the doc stays traceable to the screen. `CONTEXT.md` gives every term an English headword and notes the on-screen label beside it.
 
-## Neu laden
+## Commands
 
-**Keine Datei des Plugins lädt beim Speichern neu.** Die Shell überwacht kein QML des Plugins — weder `~/.config/omarchy/plugins` selbst noch irgendetwas darin, und auch nicht das Repo, in das der Symlink zeigt. Sie setzt kein `Quickshell.watchFiles`, und Quickshell hat dafür keinen Schalter auf der Kommandozeile. Ein echtes Verzeichnis statt des Symlinks ändert daran nichts.
+- Contribution, commit, changelog and release rules: `CONTRIBUTING.md` (binding, for agents too)
+- Tests: `node --test js/*.test.mjs` and `python3 -m unittest`
+- Format: `tools/format` (`--check` only checks)
+- Log of the helper (errors, REST requests sent, stampings): `journalctl -t calamari-tracker`
+- Lint: `/usr/lib/qt6/bin/qmllint -I lint *.qml` (refresh the snapshots: `lint/refresh.sh`)
+- Installed by symlink `~/.config/omarchy/plugins/kosh.calamari-tracker`.
+- Make a change take effect: `omarchy-restart-shell` (nothing reloads on save, see "Reloading")
 
-Jede Änderung — `Widget.qml`, `Panel.qml`, `SettingsForm.qml`, `ActionButton.qml`, `Service.qml` — wird also erst nach `omarchy-restart-shell` wirksam. `Service.qml` ist zusätzlich `keepLoaded` und wäre auch auf keinem anderen Weg neu zu laden.
+## Reloading
 
-Darum vor jeder Messung neu starten: eine Änderung, die nicht neu geladen wurde, sieht genauso aus wie eine, die nicht wirkt — und dann wird im Code gesucht, der längst stimmt.
+**No file of the plugin reloads on save.** The shell watches no QML of the plugin — neither `~/.config/omarchy/plugins` itself nor anything in it, nor the checkout the symlink points at. It sets no `Quickshell.watchFiles`, and Quickshell has no command-line switch for it. Installing as a real directory instead of a symlink changes nothing.
 
-## Manuelle Tests
+So every change — `Widget.qml`, `Panel.qml`, `SettingsForm.qml`, `ActionButton.qml`, `Service.qml` — only takes effect after `omarchy-restart-shell`. `Service.qml` is `keepLoaded` on top of that and could not be reloaded by any other route either.
 
-Zum Testen der Oberfläche sind Eingabe-Automatisierung und Bildschirmaufnahmen ausdrücklich erlaubt:
+That is why every measurement starts with a restart: a change that was not reloaded looks exactly like a change that does not work — and then the hunt goes through code that has been right all along.
 
-- `ydotool` (Tasten, Klicks, Maus) — braucht laufenden `ydotoold`
-- `grim` für Screenshots, `slurp` für den Ausschnitt
-- `wf-recorder -g "$(slurp)" -f <datei>.mp4` für Bildschirmaufnahmen (Stop per SIGINT)
-- Screenshots und Aufnahmen dürfen zur Analyse gelesen werden
-- Artefakte gehören ins Scratchpad, nicht ins Repo
-- Vor jeder Messung `omarchy-restart-shell`, siehe „Neu laden“
+## Visual tests
+
+Driving the interface and capturing the screen are explicitly allowed, both by hand and as automated visual tests. An automated test does the same three things in order: restart, act, capture, then read the artefact back and compare.
+
+- `omarchy-restart-shell` first, every time — see "Reloading". Without it a test measures the previous build.
+- `ydotool` for input (keys, clicks, mouse) — needs `ydotoold` running
+- `grim` for screenshots, `slurp` to pick the region; `grim -g "<geometry>"` for a fixed region, which is what a repeatable test wants instead of an interactive pick
+- `wf-recorder -g "$(slurp)" -f <file>.mp4` for screen recordings (stop with SIGINT)
+- Screenshots and recordings may be read back for analysis, and compared against each other frame by frame — a pixel difference of zero is how "nothing happened" is proven
+- Artefacts belong in the scratchpad, never in the repo
 
 ## Agent skills
 
 ### Issue tracker
 
-Issues und Specs sind GitHub Issues in `kosh30/calamari-track` (`gh`). Erledigte Tickets von früher liegen als Archiv unter `.scratch/`. See `docs/agents/issue-tracker.md`.
+Issues and specs are GitHub issues in `kosh30/calamari-track` (`gh`). Tickets resolved earlier sit as an archive under `.scratch/`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-Standard-Vokabular (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
+Standard vocabulary (needs-triage, needs-info, ready-for-agent, ready-for-human, wontfix). See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` + `docs/adr/` im Root. See `docs/agents/domain.md`.
+Single-context: `CONTEXT.md` + `docs/adr/` in the root. See `docs/agents/domain.md`.

@@ -9,10 +9,10 @@ day as off. The user interface is in German.
 It talks to Calamari in two ways, both hidden behind the helper `bin/calamari`:
 
 - the official **MCP server** with your own login (OAuth, e.g. Microsoft SSO),
-  see [ADR 0001](docs/adr/0001-calamari-mcp-statt-rest-api.md);
+  see [ADR 0001](docs/adr/0001-calamari-mcp-instead-of-rest-api.md);
 - the **REST API** with a company API key, for breaks, the project of a
   clock-in and the shift status, which the MCP server cannot do yet, see
-  [ADR 0003](docs/adr/0003-rest-api-fuer-pause-projekt-status.md).
+  [ADR 0003](docs/adr/0003-rest-api-for-break-project-status.md).
 
 ## Requirements
 
@@ -123,11 +123,11 @@ workarounds are deliberate, see the ADRs:
 - **The API key acts for the whole company.** Calamari cannot limit it to one
   person. The helper only ever sends your own e-mail, but whoever holds the key
   can change everyone's times. Once the MCP server offers breaks, projects and
-  the shift status, the key can go ([ADR 0003](docs/adr/0003-rest-api-fuer-pause-projekt-status.md)).
+  the shift status, the key can go ([ADR 0003](docs/adr/0003-rest-api-for-break-project-status.md)).
 - **Start and end times of shifts stamped elsewhere** (web, phone) and the
   question whether yesterday's shift ran to midnight rely on undocumented
   behaviour of the MCP tool `checkTimesheetOverlap`: a running shift counts up
-  to "now". It may break without notice ([ADR 0001](docs/adr/0001-calamari-mcp-statt-rest-api.md)).
+  to "now". It may break without notice ([ADR 0001](docs/adr/0001-calamari-mcp-instead-of-rest-api.md)).
   Check it by hand, with a shift running (not in a break) and the login,
   API key and `apiUrl` set up, since the REST status tells whether one runs:
 
@@ -150,7 +150,7 @@ workarounds are deliberate, see the ADRs:
 - **No shift survives midnight.** The plugin assumes Calamari ends every open
   shift at 23:59, a rule of the company it was built for. The next morning it
   only reminds you to correct that end time
-  ([ADR 0002](docs/adr/0002-kein-uebernacht-abschluss.md)).
+  ([ADR 0002](docs/adr/0002-no-overnight-close.md)).
 - **"Heute gearbeitet" is observed**, not read from Calamari: shifts the plugin
   never saw (shell off) are missing.
 - **Rate limit:** the REST API allows 720 requests per hour and 2880 per day

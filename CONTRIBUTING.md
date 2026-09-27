@@ -9,7 +9,7 @@ These rules are for humans and agents alike.
 - **`stable`** is the default branch on GitHub, and it is what users get:
   `omarchy plugin add` clones it and `omarchy plugin update` fast-forwards
   to it. It only moves at a release, by fast-forward to the tagged commit
-  (see [ADR 0004](docs/adr/0004-auslieferungs-branch-stable.md)).
+  (see [ADR 0004](docs/adr/0004-delivery-branch-stable.md)).
 
 There is no hotfix path around `main`. A fix goes on `main`, unfinished
 work there is finished or reverted, then a normal release follows.
