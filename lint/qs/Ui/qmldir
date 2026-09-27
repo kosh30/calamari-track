@@ -11,3 +11,4 @@ KeyboardPanel 1.0 KeyboardPanel.qml
 Button 1.0 Button.qml
 BorderSurface 1.0 BorderSurface.qml
 TextField 1.0 TextField.qml
+Dropdown 1.0 Dropdown.qml

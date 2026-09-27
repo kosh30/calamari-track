@@ -167,30 +167,26 @@ Column {
                                         text: row.modelData.label
                                     }
 
-                                    // One button per option, the current one
-                                    // marked. It reads root.texts rather than
-                                    // the card's own text, because the card is
-                                    // built once at load() and the texts are
-                                    // what the page edits.
-                                    Row {
+                                    // The shell's own dropdown, which takes
+                                    // { value, label } options exactly as the
+                                    // schema writes them and paints in the
+                                    // panel's palette rather than the platform
+                                    // ComboBox look. The label above is ours
+                                    // already, so it draws none of its own.
+                                    //
+                                    // It reads root.texts, not the card's own
+                                    // text: the card is built once at load()
+                                    // and the texts are what the page edits.
+                                    Dropdown {
                                         width: parent.width
-                                        spacing: Style.space(2)
                                         visible: row.isChoice
-
-                                        Repeater {
-                                            model: row.options
-
-                                            ActionButton {
-                                                required property var modelData
-
-                                                label: modelData.label
-                                                selected: root.texts[row.modelData.key] === modelData.value
-                                                onClicked: {
-                                                    var texts = Object.assign({}, root.texts)
-                                                    texts[row.modelData.key] = modelData.value
-                                                    root.texts = texts
-                                                }
-                                            }
+                                        showLabel: false
+                                        options: row.options
+                                        value: root.texts[row.modelData.key] || ""
+                                        onChanged: function (picked) {
+                                            var texts = Object.assign({}, root.texts)
+                                            texts[row.modelData.key] = picked
+                                            root.texts = texts
                                         }
                                     }
 
