@@ -18,24 +18,24 @@ const white = rgb("#ffffff")
 // What a theme is left with after the colour has stepped back as far as it may.
 const reached = (theme, target) => ratio(mix(theme.fg, theme.bg, alphaFor(theme.fg, theme.bg, target)), theme.bg)
 
-test("Schwarz auf Weiß ist der höchste Kontrast, den es gibt", () => {
+test("black on white is the highest contrast there is", () => {
   assert.equal(Math.round(ratio(black, white)), 21)
 })
 
-test("eine Farbe hat zu sich selbst keinen Kontrast", () => {
+test("a colour has no contrast with itself", () => {
   assert.equal(ratio(latte.fg, latte.fg), 1)
 })
 
-test("die Richtung ist egal", () => {
+test("the direction makes no difference", () => {
   assert.equal(ratio(black, white), ratio(white, black))
 })
 
-test("volle Deckkraft ist der Vordergrund, keine ist der Hintergrund", () => {
+test("full opacity is the foreground, none is the background", () => {
   assert.deepEqual(mix(latte.fg, latte.bg, 1), latte.fg)
   assert.deepEqual(mix(latte.fg, latte.bg, 0), latte.bg)
 })
 
-test("die zurückgetretene Farbe trifft das geforderte Verhältnis", () => {
+test("the colour that has given way meets the ratio required", () => {
   for (const theme of [solitude, latte])
     for (const target of [TEXT, CONTROL]) {
       const got = reached(theme, target)
@@ -44,43 +44,43 @@ test("die zurückgetretene Farbe trifft das geforderte Verhältnis", () => {
     }
 })
 
-test("auf dunklem Grund darf die Farbe weiter zurücktreten als auf hellem", () => {
+test("on a dark ground the colour may give way further than on a light one", () => {
   assert.ok(alphaFor(solitude.fg, solitude.bg, TEXT) < alphaFor(latte.fg, latte.bg, TEXT))
 })
 
-test("ein höheres Ziel verlangt mehr Farbe", () => {
+test("a higher target demands more colour", () => {
   assert.ok(alphaFor(latte.fg, latte.bg, TEXT) > alphaFor(latte.fg, latte.bg, CONTROL))
 })
 
-test("erreicht der Vordergrund das Ziel selbst nicht, wird er nicht verdünnt", () => {
+test("if the foreground does not reach the target itself it is not diluted", () => {
   // Latte's own muted role: 1.9:1 on its background, the trap this replaces.
   const muted = rgb("#acb0be")
   assert.ok(ratio(muted, latte.bg) < TEXT)
   assert.equal(alphaFor(muted, latte.bg, TEXT), 1)
 })
 
-test("mehr als volle Deckkraft gibt es nicht", () => {
+test("there is no more than full opacity", () => {
   for (const theme of [solitude, latte]) assert.ok(alphaFor(theme.fg, theme.bg, 21) <= 1)
 })
 
-test("ein Vordergrund gleich dem Hintergrund bleibt, wie er ist", () => {
+test("a foreground equal to the background stays as it is", () => {
   assert.equal(alphaFor(latte.bg, latte.bg, TEXT), 1)
 })
 
-test("wo das Theme Platz lässt, bleibt die gewählte Stärke stehen", () => {
+test("where the theme leaves room the strength chosen stands", () => {
   const s = strengths(solitude.fg, solitude.bg)
   assert.equal(s.quiet, 0.62)
   assert.equal(s.mark, 0.55)
 })
 
-test("ein enges Theme hebt die Stärken an, bis sie ihre Schwelle halten", () => {
+test("a tight theme raises the strengths until they hold their threshold", () => {
   const s = strengths(latte.fg, latte.bg)
   assert.ok(s.quiet > 0.62)
   assert.ok(ratio(mix(latte.fg, latte.bg, s.quiet), latte.bg) >= TEXT)
   assert.ok(ratio(mix(latte.fg, latte.bg, s.mark), latte.bg) >= CONTROL)
 })
 
-test("die Leiste tritt weiter zurück als die Beschriftung, das Gesperrte am weitesten", () => {
+test("the bar gives way further than the label, the spaced capitals furthest", () => {
   for (const theme of [solitude, latte]) {
     const s = strengths(theme.fg, theme.bg)
     assert.ok(s.mark < s.quiet)
@@ -88,7 +88,7 @@ test("die Leiste tritt weiter zurück als die Beschriftung, das Gesperrte am wei
   }
 })
 
-test("auch das Gesperrte bleibt auf jedem Theme zu erkennen", () => {
+test("the spaced capitals stay legible on every theme too", () => {
   for (const theme of [solitude, latte])
     assert.ok(ratio(mix(theme.fg, theme.bg, strengths(theme.fg, theme.bg).inert), theme.bg) >= CONTROL)
 })

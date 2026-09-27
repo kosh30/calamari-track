@@ -31,13 +31,13 @@ function onBreak(state, from, since, now) {
 const share = (hhmm, from = "09:00", to = "16:45") =>
   (toMinutes(hhmm) - toMinutes(from)) / (toMinutes(to) - toMinutes(from))
 
-test("die Zeile spannt über die Kernzeit und trägt ihre Enden als Beschriftung", () => {
+test("the row spans the core time and carries its ends as labels", () => {
   const v = line(running(emptyState(), "09:30", "11:00"), at("11:00"))
   assert.equal(v.startText, "09:00")
   assert.equal(v.endText, "16:45")
 })
 
-test("die laufende Schicht ist ein Abschnitt von ihrem Beginn bis jetzt", () => {
+test("the running shift is a section from its start until now", () => {
   const v = line(running(emptyState(), "09:30", "11:00"), at("11:00"))
   assert.equal(v.segments.length, 1)
   assert.equal(v.segments[0].from, share("09:30"))
@@ -45,12 +45,12 @@ test("die laufende Schicht ist ein Abschnitt von ihrem Beginn bis jetzt", () => 
   assert.equal(v.segments[0].running, true)
 })
 
-test("die Jetzt-Markierung sitzt auf der laufenden Minute", () => {
+test("the now marker sits on the current minute", () => {
   const v = line(running(emptyState(), "09:30", "11:00"), at("11:00"))
   assert.equal(v.nowFraction, share("11:00"))
 })
 
-test("mehrere Schichten an einem Tag erscheinen als getrennte Abschnitte", () => {
+test("several shifts in a day appear as separate sections", () => {
   const state = ended(ended(emptyState(), "09:00", "12:00"), "13:00", "15:00")
   const v = line(state, at("15:30"))
   assert.equal(v.segments.length, 2)
@@ -61,23 +61,23 @@ test("mehrere Schichten an einem Tag erscheinen als getrennte Abschnitte", () =>
       [share("13:00"), share("15:00")],
     ],
   )
-  // Keine laufende Schicht: kein Abschnitt trägt die Akzentfarbe.
+  // No running shift: no section carries the accent colour.
   assert.deepEqual(
     v.segments.map((s) => s.running),
     [false, false],
   )
 })
 
-test("die laufende Pause ist ausgespart: der Abschnitt endet an ihrem Beginn", () => {
+test("the running break is left out: the section ends at its start", () => {
   const v = line(onBreak(emptyState(), "09:00", "12:30", "12:30"), at("13:10"))
   assert.equal(v.segments.length, 1)
   assert.equal(v.segments[0].to, share("12:30"))
-  // Die Schicht läuft während der Pause weiter.
+  // The shift goes on during the break.
   assert.equal(v.segments[0].running, true)
   assert.equal(v.nowFraction, share("13:10"))
 })
 
-test("eine Schicht vor der Kernzeit weitet die Spanne, statt abgeschnitten zu werden", () => {
+test("a shift before the core time widens the span instead of being cut off", () => {
   const v = line(running(emptyState(), "07:30", "11:00"), at("11:00"))
   assert.equal(v.startText, "07:30")
   assert.equal(v.endText, "16:45")
@@ -85,72 +85,72 @@ test("eine Schicht vor der Kernzeit weitet die Spanne, statt abgeschnitten zu we
   assert.equal(v.segments[0].to, share("11:00", "07:30"))
 })
 
-test("eine Schicht über die Kernzeit hinaus weitet die Spanne bis zu ihrem Ende", () => {
+test("a shift past the core time widens the span up to its end", () => {
   const v = line(ended(emptyState(), "09:00", "18:20"), at("18:30"))
   assert.equal(v.endText, "18:20")
   assert.equal(v.segments[0].to, 1)
 })
 
-test("die laufende Schicht zieht die Spanne über die Kernzeit hinaus bis jetzt", () => {
+test("the running shift pulls the span past the core time up to now", () => {
   const v = line(running(emptyState(), "09:00", "17:30"), at("17:30"))
   assert.equal(v.endText, "17:30")
   assert.equal(v.nowFraction, 1)
 })
 
-test("die laufende Pause hält die Zeile offen, auch nach dem Ende der Kernzeit", () => {
-  // Die Schicht läuft weiter: ohne jetzt in der Spanne verschwände die
-  // Markierung mitten in der laufenden Schicht.
+test("the running break keeps the row open, after the end of the core time too", () => {
+  // The shift goes on: without now inside the span the marker would vanish
+  // in the middle of the running shift.
   const v = line(onBreak(emptyState(), "09:00", "16:30", "16:30"), at("17:00"))
   assert.equal(v.endText, "17:00")
   assert.equal(v.nowFraction, 1)
 })
 
-test("nach dem Feierabend wächst die Zeile nicht mit der Uhr weiter", () => {
-  // Sonst quetschte der gearbeitete Tag im Laufe des Abends immer weiter
-  // nach links, an einem völlig gewöhnlichen Tag.
+test("after the end of day the row does not go on growing with the clock", () => {
+  // Otherwise the day worked would be squeezed further and further to the
+  // left over the course of the evening, on a perfectly ordinary day.
   const abend = ended(emptyState(), "09:00", "16:00")
   assert.equal(line(abend, at("17:30")).endText, "16:45")
   assert.equal(line(abend, at("22:00")).endText, "16:45")
   assert.deepEqual(line(abend, at("22:00")).segments, line(abend, at("17:30")).segments)
 })
 
-test("jenseits des Zeilenendes gibt es keine Jetzt-Markierung, statt einer falschen am Rand", () => {
+test("beyond the row's end there is no now marker, rather than a wrong one at the edge", () => {
   assert.equal(line(ended(emptyState(), "09:00", "16:00"), at("17:30")).nowFraction, null)
 })
 
-test("ohne Stempelung ist die Zeile nach der Kernzeit weg, nicht leer", () => {
+test("with no stamping the row is gone after the core time, not empty", () => {
   assert.equal(line(emptyState(), at("17:30")), null)
 })
 
-test("vor dem Beginn der Kernzeit und ohne Arbeit gibt es keine Zeile", () => {
+test("before the start of the core time and with no work there is no row", () => {
   assert.equal(line(emptyState(), at("07:00")), null)
 })
 
-test("ohne Kernzeit gibt es keine Zeile: freier Tag, Tag ohne Plan", () => {
+test("without a core time there is no row: a day off, a day with no schedule", () => {
   assert.equal(line(running(emptyState(), "09:30", "11:00"), at("11:00"), null), null)
 })
 
-test("in der Kernzeit ohne Stempelung steht die Zeile leer da, mit der Markierung", () => {
+test("during the core time with no stamping the row stands there empty, with the marker", () => {
   const v = line(emptyState(), at("10:00"))
   assert.deepEqual(v.segments, [])
   assert.equal(v.nowFraction, share("10:00"))
 })
 
-test("der Zustand eines anderen Tages trägt keine Abschnitte bei", () => {
+test("the state of another day contributes no sections", () => {
   const yesterday = ended(emptyState(), "09:00", "17:00")
   assert.equal(yesterday.date, "2026-09-22")
   const v = timelineView({ state: yesterday, now: at("10:00", "2026-09-23"), core })
   assert.deepEqual(v.segments, [])
 })
 
-test("eine Schicht ohne bekannten Beginn wird nicht erfunden", () => {
+test("a shift with no known start is not invented", () => {
   const v = line(applyStatus(emptyState(), "running", at("11:00")).state, at("11:00"))
   assert.equal(v.segments.length, 0)
 })
 
-test("Abschnitte stehen nach der Zeit, auch wenn eine Endzeit später nachkam", () => {
-  // end-time kann die Endzeit einer früheren Schicht nachreichen, nachdem
-  // eine spätere schon beendet ist (js/shiftclock.mjs applyEndTime).
+test("sections stand in time order, even when an end time arrived later", () => {
+  // end-time can supply the end time of an earlier shift after a later one
+  // has already ended (js/shiftclock.mjs applyEndTime).
   const state = Object.assign(ended(emptyState(), "13:00", "15:00"), {
     shifts: [
       { start: "13:00", end: "15:00" },
@@ -164,7 +164,7 @@ test("Abschnitte stehen nach der Zeit, auch wenn eine Endzeit später nachkam", 
   )
 })
 
-test("der Tooltip nennt die Kernzeit und die genauen Zeiten der Schichten", () => {
+test("the tooltip names the core time and the exact times of the shifts", () => {
   const state = running(ended(emptyState(), "09:00", "12:00"), "12:30", "14:00")
   assert.equal(
     line(state, at("14:00")).tooltip,
@@ -172,7 +172,7 @@ test("der Tooltip nennt die Kernzeit und die genauen Zeiten der Schichten", () =
   )
 })
 
-test("der Tooltip nennt die laufende Pause und wie genau ihr Beginn bekannt ist", () => {
+test("the tooltip names the running break and how exactly its start is known", () => {
   const known = onBreak(emptyState(), "09:00", "12:30", "12:30")
   assert.equal(
     line(known, at("13:10")).tooltip,
@@ -182,9 +182,9 @@ test("der Tooltip nennt die laufende Pause und wie genau ihr Beginn bekannt ist"
   assert.ok(line(guessed, at("13:10")).tooltip.endsWith("Pause seit spätestens 12:40"))
 })
 
-test("beendete Pausen stecken in den Schichten: der Tooltip sagt das, statt sie auszusparen", () => {
-  // Beendete Pausen liegen nur als Minutensumme im Zustand, nicht als
-  // Intervalle — aussparen lässt sich nur die laufende.
+test("breaks that have ended sit inside the shifts: the tooltip says so instead of leaving them out", () => {
+  // Breaks that have ended sit in the state only as a sum of minutes, not as
+  // intervals — only the running one can be left out.
   const back = applyStatus(onBreak(emptyState(), "09:00", "12:30", "12:30"), "running", at("13:00"), {
     startedAt: "09:00",
   }).state
@@ -192,13 +192,13 @@ test("beendete Pausen stecken in den Schichten: der Tooltip sagt das, statt sie 
   assert.ok(line(back, at("14:00")).tooltip.endsWith("Beendete Pausen: 0:30 (in den Schichten enthalten)"))
 })
 
-test("ohne beendete Pause schweigt der Tooltip darüber", () => {
+test("with no ended break the tooltip stays silent about it", () => {
   assert.ok(!line(ended(emptyState(), "09:00", "12:00"), at("13:00")).tooltip.includes("Beendete Pausen"))
 })
 
-test("die Zeile bleibt heil, wenn die Kernzeit nur eine Minute lang ist", () => {
-  // coreTime() lässt start < end zu, also auch eine Minute (halber Feiertag
-  // auf einen kurzen Plan). Geteilt wird dann durch 1, nicht durch 0.
+test("the row stays intact when the core time is only one minute long", () => {
+  // coreTime() allows start < end, so one minute too (a half public holiday
+  // on a short schedule). The division is then by 1, not by 0.
   const minute = { start: toMinutes("09:00"), end: toMinutes("09:01") }
   const v = line(running(emptyState(), "09:00", "09:00"), at("09:00"), minute)
   assert.equal(v.nowFraction, 0)
@@ -206,22 +206,22 @@ test("die Zeile bleibt heil, wenn die Kernzeit nur eine Minute lang ist", () => 
   assert.equal(v.segments[0].to, 0)
 })
 
-test("ein Abschnitt von wenigen Minuten behält eine Mindestbreite", () => {
-  // Sonst wäre eine Schicht von einer Minute auf 300 Pixeln unsichtbar.
+test("a section of a few minutes keeps a minimum width", () => {
+  // Otherwise a shift of one minute would be invisible across 300 pixels.
   assert.deepEqual(placeSegment({ from: 0.5, to: 0.5 }, 300, 2), { x: 150, width: 2 })
 })
 
-test("ein längerer Abschnitt behält seinen Anteil an der Zeile", () => {
+test("a longer section keeps its share of the row", () => {
   assert.deepEqual(placeSegment({ from: 0, to: 0.5 }, 300, 2), { x: 0, width: 150 })
 })
 
-test("ein Abschnitt am Ende bleibt samt Mindestbreite in der Zeile", () => {
+test("a section at the end stays inside the row, minimum width and all", () => {
   const place = placeSegment({ from: 1, to: 1 }, 300, 2)
   assert.equal(place.x, 298)
   assert.equal(place.width, 2)
 })
 
-test("die Jetzt-Markierung bleibt an beiden Rändern in der Zeile", () => {
+test("the now marker stays inside the row at both edges", () => {
   assert.deepEqual(placeMark(1, 300, 2), { x: 298, width: 2 })
   assert.deepEqual(placeMark(0, 300, 2), { x: 0, width: 2 })
 })

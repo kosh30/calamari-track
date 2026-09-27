@@ -1,5 +1,5 @@
 // The panel's day line: today as one lying line, from the beginning to the
-// end of the core time, with the shifts filled, the running Pause left out
+// end of the core time, with the shifts filled, the running break left out
 // and a mark for "now". No Qt; tested with `node --test js/`.
 //
 // It answers without reading: how much of the day is worked, where the gaps
@@ -7,9 +7,9 @@
 // falls outside it — nothing is cut off, and on an ordinary day the end
 // labels read exactly the core time.
 //
-// What it cannot show: an ended Pause. The state keeps only the sum of
-// today's ended Pauses (breakMinutes), not their spans, and they lie inside
-// the shifts' spans (js/shiftclock.mjs). Only the running Pause has a known
+// What it cannot show: an ended break. The state keeps only the sum of
+// today's ended breaks (breakMinutes), not their spans, and they lie inside
+// the shifts' spans (js/shiftclock.mjs). Only the running break has a known
 // start, so only it is left out; the tooltip names the rest instead of
 // carving holes it cannot place.
 
@@ -18,7 +18,7 @@ import { breakSinceText, inPause } from "./shiftclock.mjs"
 
 // Today's shifts as { start, end } in minutes of the day, in order: the ended
 // ones the plugin saw, plus the running one up to now — or up to the start of
-// the running Pause, which is the gap the line shows.
+// the running break, which is the gap the line shows.
 function shiftSpans(state, now) {
   if (state.date !== ymd(now)) return []
   const spans = state.shifts.map((shift) => ({
@@ -60,7 +60,7 @@ export function timelineView({ state, now, core }) {
   if (!core) return null
   const spans = shiftSpans(state, now)
   const minute = minuteOfDay(now)
-  // While a shift runs, the line reaches to now. After the Feierabend it
+  // While a shift runs, the line reaches to now. After the end of day it
   // stops at the last shift instead: a line that grew with the clock would
   // squeeze the worked day into its left third as the evening goes on.
   const live = state.running === true && state.date === ymd(now) ? [minute] : []

@@ -40,7 +40,7 @@ function todayCore(state, now, day, config) {
 
 // The progress through today's core time, or null when there is none to
 // show. It belongs to the day, not to the shift: it is the same answer in a
-// Pause, after the Feierabend and while the status is unknown.
+// break, after the end of day and while the status is unknown.
 //
 // Before the core time starts there is nothing to be a fraction of, and an
 // empty bar reads as "nothing done" rather than "not yet begun" — so the
@@ -60,7 +60,7 @@ function progress(core, now) {
 export function headerView({ view, state, now, day, config }) {
   const core = todayCore(state, now, day, config)
   return {
-    // barView only fills text for a shift or a Pause whose start is known.
+    // barView only fills text for a shift or a break whose start is known.
     // Anywhere else a number would be invented, so the header shows none.
     duration: view.text || "",
     caption: caption(view, state),

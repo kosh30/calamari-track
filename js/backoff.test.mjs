@@ -4,11 +4,11 @@ import { errorTooltip, failuresAfter, pollMinutes } from "./backoff.mjs"
 
 const fail = (code) => ({ ok: false, error: { code, message: code } })
 
-test("ohne Fehler wird im eingestellten Intervall abgefragt", () => {
+test("without an error the query runs at the interval configured", () => {
   assert.equal(pollMinutes(3, 0), 3)
 })
 
-test("jeder Netz- oder Rate-Limit-Fehler in Folge verdoppelt das Intervall", () => {
+test("every network or rate-limit error in a row doubles the interval", () => {
   let failures = 0
   failures = failuresAfter(failures, fail("NETWORK"))
   assert.equal(pollMinutes(3, failures), 6)
@@ -16,36 +16,36 @@ test("jeder Netz- oder Rate-Limit-Fehler in Folge verdoppelt das Intervall", () 
   assert.equal(pollMinutes(3, failures), 12)
 })
 
-test("das Intervall wächst höchstens bis 30 Minuten", () => {
+test("the interval grows to at most 30 minutes", () => {
   assert.equal(pollMinutes(3, 5), 30)
   assert.equal(pollMinutes(3, 100), 30)
 })
 
-test("ein eingestelltes Intervall über der Obergrenze bleibt", () => {
+test("a configured interval above the upper limit stays", () => {
   assert.equal(pollMinutes(45, 3), 45)
 })
 
-test("nach einer erfolgreichen Antwort gilt wieder das normale Intervall", () => {
+test("after a successful answer the normal interval applies again", () => {
   const failures = failuresAfter(failuresAfter(0, fail("NETWORK")), { ok: true })
   assert.equal(failures, 0)
   assert.equal(pollMinutes(3, failures), 3)
 })
 
-test("andere Fehler ändern das Intervall nicht", () => {
+test("other errors do not change the interval", () => {
   assert.equal(failuresAfter(0, fail("AUTH_REQUIRED")), 0)
   assert.equal(failuresAfter(2, fail("API_KEY_REJECTED")), 2)
 })
 
-test("die Bar nennt Ursache und nächsten Versuch", () => {
+test("the bar names the cause and the next attempt", () => {
   assert.equal(errorTooltip("NETWORK", 6), "Calamari nicht erreichbar, nächster Versuch in 6 Min")
   assert.equal(errorTooltip("RATE_LIMITED", 12), "Calamari: zu viele Anfragen, nächster Versuch in 12 Min")
 })
 
-test("andere Fehler zeigen die Bar wie bisher", () => {
+test("other errors show the bar as before", () => {
   assert.equal(errorTooltip("API_ERROR", 3), "Calamari: Fehler")
 })
 
-test("Fehler, die auf den Benutzer warten, nennen die Abhilfe statt eines nächsten Versuchs", () => {
+test("errors that wait on the user name the remedy instead of a next attempt", () => {
   assert.equal(errorTooltip("API_URL_REQUIRED", 3), "Calamari: REST-API-URL fehlt, bitte in den Einstellungen setzen")
   assert.equal(errorTooltip("API_KEY_REQUIRED", 3), "Calamari: API-Key fehlt, bitte bin/calamari api-key ausführen")
   assert.equal(
@@ -56,13 +56,13 @@ test("Fehler, die auf den Benutzer warten, nennen die Abhilfe statt eines nächs
   assert.equal(errorTooltip("API_SCOPE_MISSING", 3), "Calamari: dem API-Key fehlt eine Berechtigung")
 })
 
-test("kein Warten hilft, also steht in diesen Hinweisen keine Wartezeit", () => {
+test("no waiting helps, so these hints carry no wait time", () => {
   for (const code of ["API_URL_REQUIRED", "API_KEY_REQUIRED", "API_SCOPE_MISSING"])
     assert.ok(!errorTooltip(code, 30).includes("nächster Versuch"), code)
 })
 
 // AUTH_REQUIRED never reaches errorTooltip: it turns authState to
 // "required", and barView answers with the view "auth" before the error.
-test("die nötige Anmeldung bleibt Sache der Ansicht auth", () => {
+test("a login needed stays the business of the auth view", () => {
   assert.equal(errorTooltip("AUTH_REQUIRED", 3), "Calamari: Fehler")
 })

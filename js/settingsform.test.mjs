@@ -7,7 +7,7 @@ const widget = JSON.parse(readFileSync(new URL("../manifest.json", import.meta.u
 const schema = widget.schema
 const byKey = (fields) => Object.fromEntries(fields.map((f) => [f.key, f]))
 
-test("das Formular zeigt jede Einstellung mit ihrem aktuellen Wert oder dem Standardwert", () => {
+test("the form shows every setting with its current value or the default", () => {
   const fields = byKey(formFields(schema, { stampReminderMinutes: 1, coreFriday: "08:00-13:00" }))
   assert.equal(fields.stampReminderMinutes.text, "1")
   assert.equal(fields.pollIntervalMinutes.text, "3")
@@ -23,7 +23,7 @@ test("das Formular zeigt jede Einstellung mit ihrem aktuellen Wert oder dem Stan
 const texts = (changes) =>
   Object.assign(Object.fromEntries(formFields(schema, {}).map((f) => [f.key, f.text])), changes)
 
-test("gültige Eingaben werden zu Einstellungen, Zahlen als Zahlen", () => {
+test("valid input becomes settings, numbers as numbers", () => {
   const r = readForm(
     schema,
     texts({
@@ -43,7 +43,7 @@ test("gültige Eingaben werden zu Einstellungen, Zahlen als Zahlen", () => {
   assert.equal(r.settings.webUrl, "https://firma.calamari.io")
 })
 
-test("ungültige Eingaben nennen, was erwartet wird", () => {
+test("invalid input names what is expected", () => {
   const r = readForm(
     schema,
     texts({
@@ -79,7 +79,7 @@ const groups = [
 
 const keysOf = (group) => group.fields.map((f) => f.key)
 
-test("die Gruppen stehen in der Reihenfolge des Manifests, mit ihren Feldern", () => {
+test("the groups stand in the manifest's order, with their fields", () => {
   const got = formCards(grouped, groups, {})
   assert.deepEqual(
     got.map((g) => g.key),
@@ -89,17 +89,17 @@ test("die Gruppen stehen in der Reihenfolge des Manifests, mit ihren Feldern", (
   assert.deepEqual(keysOf(got[1]), ["a", "c"])
 })
 
-test("eine Gruppe trägt ihren Titel und ihre gemeinsame Erklärung", () => {
+test("a group carries its title and its shared explanation", () => {
   const [, second] = formCards(grouped, groups, {})
   assert.equal(second.title, "Zweite")
   assert.equal(second.description, "Gilt für alle drei")
 })
 
-test("eine Gruppe ohne Felder erscheint nicht", () => {
+test("a group without fields does not appear", () => {
   assert.ok(!formCards(grouped, groups, {}).some((g) => g.key === "empty"))
 })
 
-test("ein Feld ohne Gruppe verschwindet nicht, sondern landet sichtbar am Ende", () => {
+test("a field without a group is not dropped but lands visibly at the end", () => {
   const stray = grouped.concat([{ key: "d", label: "D", type: "string", defaultValue: "" }])
   const got = formCards(stray, groups, {})
   const last = got[got.length - 1]
@@ -107,18 +107,18 @@ test("ein Feld ohne Gruppe verschwindet nicht, sondern landet sichtbar am Ende",
   assert.ok(last.title.length > 0)
 })
 
-test("eine Gruppe, die das Manifest nicht kennt, landet in derselben Sammlung", () => {
+test("a group the manifest does not know lands in the same collection", () => {
   const stray = grouped.concat([{ key: "d", label: "D", type: "string", defaultValue: "", group: "weg" }])
   const last = formCards(stray, groups, {}).at(-1)
   assert.deepEqual(keysOf(last), ["d"])
 })
 
-test("die Felder einer Gruppe tragen ihren Wert wie im flachen Formular", () => {
+test("the fields of a group carry their value as in the flat form", () => {
   const [, second] = formCards(grouped, groups, { a: "gesetzt" })
   assert.equal(second.fields[0].text, "gesetzt")
 })
 
-test("die sieben Kernzeiten stehen als eine Gruppe mit einer gemeinsamen Erklärung", () => {
+test("the seven core times stand as one group with one shared explanation", () => {
   const core = formCards(schema, widget.groups, {}).find((g) => g.fields.some((f) => f.key === "coreMonday"))
   assert.equal(core.fields.length, 7)
   assert.ok(core.description.length > 0)
@@ -127,12 +127,12 @@ test("die sieben Kernzeiten stehen als eine Gruppe mit einer gemeinsamen Erklär
   assert.equal(core.fields[0].label, "Montag")
 })
 
-test("die Texte des Formulars stehen flach beim Schlüssel ihres Feldes", () => {
+test("the form's texts stand flat at their field's key", () => {
   const texts = formTexts(grouped, { a: "gesetzt" })
   assert.deepEqual(texts, { a: "gesetzt", b: "", c: "" })
 })
 
-test("die Texte decken jedes Feld ab, auch das ohne Gruppe", () => {
+test("the texts cover every field, the one without a group too", () => {
   const stray = grouped.concat([{ key: "d", label: "D", type: "string", defaultValue: "x" }])
   assert.deepEqual(Object.keys(formTexts(stray, {})).sort(), ["a", "b", "c", "d"])
 })

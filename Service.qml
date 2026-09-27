@@ -128,7 +128,7 @@ Item {
     }
 
     // "clock-in", "clock-out", "break-start" or "break-end", always now. A
-    // clock-in (with the default project) and the Pause (with the break
+    // clock-in (with the default project) and the break (with the break
     // type) go over REST, docs/adr/0003. A failure is shown, never queued,
     // and never retried another way.
     // notice: the correction hint ({ type, lastActivity }, see
@@ -335,7 +335,7 @@ Item {
         }
         root.setShiftState(result.state)
         // A close that found no shift stamped nothing, and one at the start
-        // of the Pause ended right: either way there is nothing to correct.
+        // of the break ended right: either way there is nothing to correct.
         if (out.ok && out.stamped !== false && !result.endTimeKnown && stampProc.notice)
             root.notify(Object.assign({
                 at: Qt.formatTime(root.now, "HH:mm")

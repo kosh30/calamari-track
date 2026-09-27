@@ -31,123 +31,123 @@ function onBreak(from, since, now) {
   return applyStatus(shift, "break", at(now), { startedAt: from, breakSince: since }).state
 }
 
-test("die laufende Schichtdauer ist die große Zahl, ihre Einordnung steht darunter", () => {
+test("the running shift duration is the large number, its caption stands below it", () => {
   const h = header(running("08:14"), at("11:56"))
   assert.equal(h.duration, "3:42")
   assert.equal(h.caption, "Schicht läuft seit 08:14")
 })
 
-test("die Dauer steckt nicht mehr in der Einordnung, sondern nur in der großen Zahl", () => {
+test("the duration no longer sits in the caption, only in the large number", () => {
   const h = header(running("08:14"), at("11:56"))
   assert.ok(!h.caption.includes("3:42"), h.caption)
 })
 
-test("in der Pause zählt die Pausendauer, und die Einordnung nennt ihren Beginn", () => {
+test("during a break the break duration counts, and the caption names its start", () => {
   const h = header(onBreak("08:00", "12:30", "12:30"), at("13:00"))
   assert.equal(h.duration, "0:30")
   assert.equal(h.caption, "Pause seit 12:30")
 })
 
-test("ist der Beginn der Pause nur geschätzt, sagt die Einordnung das", () => {
+test("if the break's start is only estimated the caption says so", () => {
   const shift = applyStatus(running("08:00"), "break", at("12:40")).state
   assert.equal(header(shift, at("13:00")).caption, "Pause seit spätestens 12:40")
 })
 
-test("ohne laufende Schicht gibt es keine Zahl, nur die Einordnung", () => {
+test("with no running shift there is no number, only the caption", () => {
   const idle = applyStatus(emptyState(), "stopped", at("17:30")).state
   const h = header(idle, at("18:00"))
   assert.equal(h.duration, "")
   assert.equal(h.caption, "Keine laufende Schicht")
 })
 
-test("nach dem eigenen Feierabend nennt die Einordnung dessen Uhrzeit", () => {
+test("after your own end of day the caption names its time", () => {
   const out = applyStamp(running("08:00"), "clock-out", { ok: true }, at("17:30")).state
   assert.equal(header(out, at("18:00")).caption, "Feierabend seit 17:30")
 })
 
-test("solange der Status unbekannt ist, steht dort keine Zahl", () => {
+test("as long as the status is unknown no number stands there", () => {
   const h = header(emptyState(), at("09:30"))
   assert.equal(h.duration, "")
   assert.equal(h.caption, "Schichtstatus wird abgefragt …")
 })
 
-test("im Fehlerfall bleibt die Zahl leer und die Einordnung sagt, was nicht geht", () => {
+test("on an error the number stays empty and the caption says what is not working", () => {
   const h = header(running("08:00"), at("11:00"), { viewOpts: { failed: true } })
   assert.equal(h.duration, "")
   assert.equal(h.caption, "Schichtstatus unbekannt")
 })
 
-test("fehlt die Anmeldung, sagt die Einordnung das statt einer Schichtangabe", () => {
-  // Das Panel zeigt den Kopfbereich dann nicht, aber barView kennt die Art
-  // "auth", und headerView antwortet für jede Art, die es liefert.
+test("if the login is missing the caption says so instead of a shift reading", () => {
+  // The panel does not show the header area then, but barView knows the kind
+  // "auth", and headerView answers for every kind it delivers.
   const h = header(running("08:00"), at("11:00"), { viewOpts: { authState: "required" } })
   assert.equal(h.duration, "")
   assert.equal(h.caption, "Anmeldung nötig")
 })
 
-test("läuft die Kernzeit ohne Schicht, sagt die Einordnung das", () => {
+test("if the core time is running with no shift the caption says so", () => {
   const idle = applyStatus(emptyState(), "stopped", at("09:30")).state
   const h = header(idle, at("09:30"), { viewOpts: { reminding: true } })
   assert.equal(h.duration, "")
   assert.equal(h.caption, "Noch nicht eingestempelt, die Kernzeit läuft")
 })
 
-test("läuft eine Schicht, deren Beginn Calamari nicht kennt, gibt es keine erfundene Zahl", () => {
+test("when a shift runs whose start Calamari does not know there is no invented number", () => {
   const h = header(applyStatus(emptyState(), "running", at("11:00")).state, at("11:00"))
   assert.equal(h.duration, "")
   assert.equal(h.caption, "Schicht läuft")
 })
 
-test("der Balken misst die Kernzeit: zur Hälfte durch ist er halb voll", () => {
-  // 09:00–16:45 ist 465 Minuten, die Hälfte liegt 232,5 Minuten später.
+test("the bar measures the core time: half way through it is half full", () => {
+  // 09:00–16:45 is 465 minutes, half of it lies 232.5 minutes later.
   const h = header(running("08:00"), at("12:52"))
   assert.equal(Math.round(h.progress.fraction * 100), 50)
   assert.equal(h.progress.text, "noch 3:53 bis Ende der Kernzeit")
 })
 
-test("die Restzeit zählt bis zum Ende der Kernzeit, nicht bis zum Feierabend", () => {
+test("the time left counts to the end of the core time, not to the end of day", () => {
   assert.equal(header(running("08:00"), at("16:00")).progress.text, "noch 0:45 bis Ende der Kernzeit")
 })
 
-test("vor dem Beginn der Kernzeit gibt es keinen leeren Balken", () => {
+test("before the start of the core time there is no empty bar", () => {
   assert.equal(header(running("07:30"), at("08:00")).progress, null)
 })
 
-test("ab dem Beginn der Kernzeit ist der Balken da, auch wenn er noch bei null steht", () => {
+test("from the start of the core time the bar is there, even while it still stands at zero", () => {
   const h = header(running("07:30"), at("09:00"))
   assert.equal(h.progress.fraction, 0)
   assert.equal(h.progress.text, "noch 7:45 bis Ende der Kernzeit")
 })
 
-test("nach dem Ende der Kernzeit ist der Balken voll und sagt es", () => {
+test("after the end of the core time the bar is full and says so", () => {
   const h = header(running("08:00"), at("17:30"))
   assert.equal(h.progress.fraction, 1)
   assert.equal(h.progress.text, "Kernzeit beendet")
 })
 
-test("ohne Kernzeit entfällt der Balken ersatzlos", () => {
+test("without a core time the bar is dropped with nothing in its place", () => {
   assert.equal(header(running("08:00"), at("11:00"), { day: null }).progress, null)
   const noCore = { date: "2026-09-22", workingDay: false }
   assert.equal(header(running("08:00"), at("11:00"), { day: noCore }).progress, null)
 })
 
-test("an einem freien Tag entfällt der Balken", () => {
+test("on a day off the bar is dropped", () => {
   const holiday = Object.assign({}, workday, { holiday: { halfDay: false } })
   assert.equal(header(running("08:00"), at("11:00"), { day: holiday }).progress, null)
 })
 
-test("„Heute frei“ nimmt den Balken weg, ohne die Schicht anzurühren", () => {
+test("„Heute frei“ takes the bar away without touching the shift", () => {
   const state = setDayOff(running("08:00"), true, at("11:00"))
   const h = header(state, at("11:00"))
   assert.equal(h.progress, null)
   assert.equal(h.duration, "3:00")
 })
 
-test("ein „Heute frei“ von gestern nimmt den heutigen Balken nicht weg", () => {
-  // Der Schalter gilt nur für seinen Tag (ShiftClock.dayOffToday), und der
-  // Knopf im Panel zeigt ihn morgens wieder aus. Bleibt der Status hängen
-  // (Backoff nach einem Neustart), darf der Balken nicht still verschwinden,
-  // während der Knopf „Heute frei" aus zeigt.
+test("a „Heute frei“ from yesterday does not take today's bar away", () => {
+  // The switch applies only to its own day (ShiftClock.dayOffToday), and the
+  // button in the panel shows it off again in the morning. If the status hangs
+  // (backoff after a restart), the bar must not silently disappear while the
+  // button „Heute frei" shows off.
   const yesterday = setDayOff(emptyState(), true, at("11:00", "2026-09-21"))
   assert.equal(yesterday.dayOff, true)
   assert.equal(yesterday.date, "2026-09-21")
@@ -155,43 +155,43 @@ test("ein „Heute frei“ von gestern nimmt den heutigen Balken nicht weg", () 
   assert.equal(h.progress.text, "noch 5:45 bis Ende der Kernzeit")
 })
 
-test("die Tagesangabe eines anderen Tages zählt nicht", () => {
+test("the day reading of another day does not count", () => {
   const yesterday = Object.assign({}, workday, { date: "2026-09-21" })
   assert.equal(header(running("08:00"), at("11:00"), { day: yesterday }).progress, null)
 })
 
-test("der Balken hängt am Tag, nicht an der Schicht: auch in der Pause und ohne Schicht", () => {
+test("the bar hangs on the day, not on the shift: during a break and with no shift too", () => {
   const pause = onBreak("08:00", "12:00", "12:00")
   assert.equal(header(pause, at("12:52")).progress.text, "noch 3:53 bis Ende der Kernzeit")
   const idle = applyStatus(emptyState(), "stopped", at("12:52")).state
   assert.equal(header(idle, at("12:52")).progress.text, "noch 3:53 bis Ende der Kernzeit")
 })
 
-test("die Einstellung einer eigenen Kernzeit schlägt den Plan aus Calamari", () => {
+test("a core time set by hand beats the schedule from Calamari", () => {
   const own = { coreTuesday: "10:00-12:00" }
   const h = header(running("08:00"), at("11:00"), { config: own })
   assert.equal(Math.round(h.progress.fraction * 100), 50)
   assert.equal(h.progress.text, "noch 1:00 bis Ende der Kernzeit")
 })
 
-test("die Einstellung „frei“ nimmt den Balken weg", () => {
+test("the setting „frei“ takes the bar away", () => {
   const h = header(running("08:00"), at("11:00"), { config: { coreTuesday: "frei" } })
   assert.equal(h.progress, null)
 })
 
-test("der Kopfbereich gibt die Tageszeile mit weiter", () => {
+test("the header area passes the day row on as well", () => {
   const h = header(running("08:14"), at("11:56"))
   assert.equal(h.timeline.startText, "08:14")
   assert.equal(h.timeline.endText, "16:45")
   assert.equal(h.timeline.segments.length, 1)
 })
 
-test("die Einstellung „frei“ nimmt auch die Tageszeile weg", () => {
+test("the setting „frei“ takes the day row away too", () => {
   assert.equal(header(running("08:00"), at("11:00"), { config: { coreTuesday: "frei" } }).timeline, null)
 })
 
-test("ein „Heute frei“ von gestern nimmt auch die Tageszeile nicht weg", () => {
-  // Dieselbe Filterung wie beim Balken: die Kernzeit wird einmal bestimmt.
+test("a „Heute frei“ from yesterday does not take the day row away either", () => {
+  // The same filtering as for the bar: the core time is determined once.
   const yesterday = setDayOff(emptyState(), true, at("11:00", "2026-09-21"))
   assert.notEqual(header(yesterday, at("11:00")).timeline, null)
 })

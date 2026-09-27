@@ -9,7 +9,7 @@ import "js/daytimeline.mjs" as DayTimeline
 // Popup panel toggled from the bar icon: login state, shift status and
 // clocking in/out (page "main"); on right-click a small menu (page "menu")
 // leading to the settings (page "settings", SettingsForm.qml). Clocking
-// out means Feierabend (js/shiftclock.mjs).
+// out means the end of day (js/shiftclock.mjs).
 Panel {
     id: root
     moduleName: "kosh.calamari-tracker"
@@ -220,7 +220,7 @@ Panel {
                         }
 
                         // The day as one lying line (js/daytimeline.mjs): the
-                        // shifts filled, the running Pause left out, a mark for
+                        // shifts filled, the running break left out, a mark for
                         // "now", the span's ends written underneath. Deliberately
                         // without a background track behind the filled parts — a
                         // faintly filled full line reads as a loading bar instead

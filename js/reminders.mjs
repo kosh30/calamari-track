@@ -154,9 +154,9 @@ export function postpone(state, settings, now) {
   return Object.assign({}, state, { postponedTo: toHhmm(minute) })
 }
 
-// A Pause: its reminder and, as in the shift, the final warning and the
-// auto-close (a Pause still open in the evening is a forgotten Feierabend).
-// No soft hint. The auto-close ends the shift at the Pause's start.
+// A break: its reminder and, as in the shift, the final warning and the
+// auto-close (a break still open in the evening is a forgotten end of day).
+// No soft hint. The auto-close ends the shift at the break's start.
 function decidePause(now, state, config) {
   const pause = decideBreak(now, state, config)
   const r = decideEvening(now, state, config)
@@ -166,14 +166,14 @@ function decidePause(now, state, config) {
   return r
 }
 
-// The Pause reminder: from breakLimitMinutes into the Pause on, every
+// The break reminder: from breakLimitMinutes into the break on, every
 // breakReminderMinutes. Any day, working or not.
 function decideBreak(now, state, config) {
   const minute = minuteOfDay(now)
   const since = toMinutes(state.breakSince)
   const limit = since + config.breakLimitMinutes
   if (minute < limit) return Object.assign(quiet(), { nextCheckAt: atMinute(now, limit) })
-  // A reminder sent before this Pause began belongs to an earlier one.
+  // A reminder sent before this break began belongs to an earlier one.
   return repeating(now, state, { type: "break-reminder" }, config.breakReminderMinutes, since, null)
 }
 
@@ -202,8 +202,8 @@ function decideStamp(now, day, state, config) {
   const minute = minuteOfDay(now)
   const { start: coreStart, end: coreEnd } = core
   if (minute < coreStart) return Object.assign(quiet(), { nextCheckAt: atMinute(now, coreStart) })
-  // Only "noch gar nicht eingestempelt" earns a reminder; a Feierabend or a
-  // Pause implies a shift today.
+  // Only "not clocked in at all yet" earns a reminder; an end of day or a
+  // break implies a shift today.
   if (minute >= coreEnd || state.running !== false || state.stampedToday || state.clockedOutAt) return quiet()
   const r = repeating(now, state, { type: "stamp-reminder" }, config.stampReminderMinutes, 0, coreEnd)
   return Object.assign(r, { barState: "reminder" })

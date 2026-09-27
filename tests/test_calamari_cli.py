@@ -176,7 +176,7 @@ class CalamariCliTest(unittest.TestCase):
     def test_without_login_auth_is_required(self):
         self.assert_error(self.run_helper("whoami"), "AUTH_REQUIRED")
 
-    # Schichtstatus
+    # Shift status
 
     def test_status_sees_a_running_shift(self):
         self.login()
@@ -341,7 +341,7 @@ class CalamariCliTest(unittest.TestCase):
     def test_start_time_rejects_a_malformed_after(self):
         self.assert_error(self.run_helper("start-time", "--after", "7 Uhr"), "USAGE")
 
-    # Stempeln
+    # Stamping
 
     def clock_ins(self):
         return [req for path, req in self.fake.rest_calls if path == "/clockin/terminal/v1/clock-in"]
@@ -419,7 +419,7 @@ class CalamariCliTest(unittest.TestCase):
         self.assertNotIn("clockIn", [n for n, _ in self.fake.tool_calls])
         self.assertEqual(self.fake.shifts, [])
 
-    # Pause (docs/adr/0003)
+    # Break (docs/adr/0003)
 
     def break_calls(self, which):
         return [req for path, req in self.fake.rest_calls if path == "/clockin/terminal/v1/break-" + which]
@@ -497,7 +497,7 @@ class CalamariCliTest(unittest.TestCase):
         self.assert_error((code, out), "API_ERROR")
         self.assertIn("NO_STARTED_SHIFT", out["error"]["message"])
 
-    # Feierabend aus der Pause (ticket 05)
+    # End of day out of the break (ticket 05)
 
     def clock_outs(self):
         return [req for path, req in self.fake.rest_calls if path == "/clockin/terminal/v1/clock-out"]
@@ -590,7 +590,7 @@ class CalamariCliTest(unittest.TestCase):
         self.assertEqual((code, out["stamped"]), (0, False))
         self.assertNotIn("clockOut", [n for n, _ in self.fake.tool_calls])
 
-    # Prüfbefehl für das Overlap-Verhalten
+    # Check command for the overlap behaviour
 
     def test_check_overlap_confirms_that_a_running_shift_reaches_now(self):
         self.login()
