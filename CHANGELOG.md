@@ -6,6 +6,8 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-27
+
 ### Added
 
 - Pick the language in the settings: English, German, Polish or Russian. English is the default, and the panel switches as soon as you save.
@@ -45,6 +47,7 @@ All notable changes to this plugin are documented here. The format follows
 - Log in with your company's Calamari login, e.g. Microsoft SSO; login and API key stay in the system keyring.
 - Change the settings in the panel under “Einstellungen”, which also shows the plugin's version.
 
-[Unreleased]: https://github.com/kosh30/calamari-track/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/kosh30/calamari-track/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/kosh30/calamari-track/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/kosh30/calamari-track/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/kosh30/calamari-track/releases/tag/v0.1.0

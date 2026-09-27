@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "kosh.calamari-tracker",
   "name": "Calamari Tracker",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": "kosh",
   "license": "MIT",
   "description": "Stamps your own working time in Calamari through the official MCP server and reminds you of a forgotten clock-in or clock-out",
