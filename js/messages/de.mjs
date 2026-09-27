@@ -109,9 +109,46 @@ export const de = {
   "validate.integer": (p) => `Eine ganze Zahl von ${p.min} bis ${p.max}`,
   "validate.time": "Eine Uhrzeit wie 19:00",
   "validate.coreTime": (p) => `Leer, „${p.off}“ oder eine Kernzeit wie 09:00-16:45`,
+  "validate.choice": (p) => `Eines von: ${p.options}`,
   "validate.url": "Leer oder eine Adresse wie https://firma.calamari.io",
 
   "coreTime.off": "frei",
 
   "date.dayMonth": (p) => `${p.day}.${p.month}.`,
+
+  // The settings page: one id per schema group and per field key. The
+  // manifest keeps the structure and an English label as the last resort;
+  // what the form shows comes from here.
+
+  "group.general": "Allgemein",
+  "group.polling": "Abfrage und Erinnerungen",
+  "group.break": "Pause",
+  "group.closing": "Feierabend",
+  "group.core": "Kernzeiten",
+  "group.connection": "Verbindung",
+  "group.naming": "Projekt und Pausentyp",
+  "group.core.description": (p) =>
+    `Je Wochentag HH:MM-HH:MM, „${p.off}“ für einen freien Tag, oder leer für den Arbeitsplan aus Calamari.`,
+
+  "setting.language": "Sprache",
+  "setting.pollIntervalMinutes": "Abfrage-Intervall (Minuten)",
+  "setting.stampReminderMinutes": "Stempel-Erinnerung wiederholen alle (Minuten)",
+  "setting.breakLimitMinutes": "Pausen-Erinnerung nach (Minuten)",
+  "setting.breakReminderMinutes": "Pausen-Erinnerung wiederholen alle (Minuten)",
+  "setting.softHintMinutes": "Sanfter Hinweis nach Ende der Kernzeit (Minuten)",
+  "setting.finalWarningTime": "Uhrzeit der letzten Warnung (HH:MM)",
+  "setting.autoCloseMinutes": "Auto-Abschluss nach der letzten Warnung (Minuten)",
+  "setting.extendMinutes": "Verschiebung durch „+1 h“ (Minuten)",
+  "setting.hardLimitTime": "Obergrenze für den Auto-Abschluss (HH:MM)",
+  "setting.webUrl": "Calamari im Browser (z.B. https://firma.calamari.io)",
+  "setting.apiUrl": "Calamari-REST-API, z.B. https://firma.calamari.io/api (Key per bin/calamari api-key)",
+  "setting.defaultProject": "Standard-Projekt beim Einstempeln (Name in Calamari, leer = Check-in)",
+  "setting.breakType": "Pausentyp (Name in Calamari, leer = Break)",
+  "setting.coreMonday": "Montag",
+  "setting.coreTuesday": "Dienstag",
+  "setting.coreWednesday": "Mittwoch",
+  "setting.coreThursday": "Donnerstag",
+  "setting.coreFriday": "Freitag",
+  "setting.coreSaturday": "Samstag",
+  "setting.coreSunday": "Sonntag",
 }

@@ -127,6 +127,7 @@ export const en = {
   "validate.integer": (p) => `A whole number from ${p.min} to ${p.max}`,
   "validate.time": "A time of day like 19:00",
   "validate.coreTime": (p) => `Empty, “${p.off}” or a core time like 09:00-16:45`,
+  "validate.choice": (p) => `One of: ${p.options}`,
   "validate.url": "Empty or an address like https://company.calamari.io",
 
   // The word for a weekday with no core time. A stored token as well as a
@@ -136,4 +137,40 @@ export const en = {
   // A day without a year, for the hint about a shift Calamari closed at 23:59.
   // Each locale orders it its own way; English puts the month first.
   "date.dayMonth": (p) => `${p.month}/${p.day}`,
+
+  // The settings page: one id per schema group and per field key. The
+  // manifest keeps the structure and an English label as the last resort;
+  // what the form shows comes from here.
+
+  "group.general": "General",
+  "group.polling": "Polling and reminders",
+  "group.break": "Break",
+  "group.closing": "End of day",
+  "group.core": "Core times",
+  "group.connection": "Connection",
+  "group.naming": "Project and break type",
+  "group.core.description": (p) =>
+    `Per weekday HH:MM-HH:MM, “${p.off}” for a day off, or empty for the work schedule from Calamari.`,
+
+  "setting.language": "Language",
+  "setting.pollIntervalMinutes": "Polling interval (minutes)",
+  "setting.stampReminderMinutes": "Repeat the stamp reminder every (minutes)",
+  "setting.breakLimitMinutes": "Break reminder after (minutes)",
+  "setting.breakReminderMinutes": "Repeat the break reminder every (minutes)",
+  "setting.softHintMinutes": "Soft hint after the end of core time (minutes)",
+  "setting.finalWarningTime": "Time of the final warning (HH:MM)",
+  "setting.autoCloseMinutes": "Auto-close after the final warning (minutes)",
+  "setting.extendMinutes": "Shift from the “+1 h” button (minutes)",
+  "setting.hardLimitTime": "Upper limit for the auto-close (HH:MM)",
+  "setting.webUrl": "Calamari in the browser (e.g. https://company.calamari.io)",
+  "setting.apiUrl": "Calamari REST API, e.g. https://company.calamari.io/api (key via bin/calamari api-key)",
+  "setting.defaultProject": "Default project when clocking in (name in Calamari, empty = Check-in)",
+  "setting.breakType": "Break type (name in Calamari, empty = Break)",
+  "setting.coreMonday": "Monday",
+  "setting.coreTuesday": "Tuesday",
+  "setting.coreWednesday": "Wednesday",
+  "setting.coreThursday": "Thursday",
+  "setting.coreFriday": "Friday",
+  "setting.coreSaturday": "Saturday",
+  "setting.coreSunday": "Sunday",
 }

@@ -1,6 +1,9 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
-import { LOCALES, DEFAULT_LOCALE, translator, t, knownLocale, catalogue } from "./i18n.mjs"
+import { readFileSync } from "node:fs"
+import { LOCALES, DEFAULT_LOCALE, translator, t, knownLocale, catalogue, hasMessage } from "./i18n.mjs"
+
+const widget = JSON.parse(readFileSync(new URL("../manifest.json", import.meta.url), "utf8")).barWidget
 
 // Every message that takes values, with the values it takes. The table is not
 // documentation: the test below fails when a function message is missing from
@@ -40,6 +43,8 @@ const PARAMS = {
   "login.asUser": { name: "Erika Mustermann" },
   "validate.integer": { min: 1, max: 60 },
   "validate.coreTime": { off: "OFF" },
+  "validate.choice": { options: "English, Deutsch" },
+  "group.core.description": { off: "OFF" },
   "date.dayMonth": { day: "21", month: "09" },
 }
 
@@ -158,4 +163,39 @@ test("the word for a day without a core time is the locale's own", () => {
   assert.equal(translator("de")("coreTime.off"), "frei")
   assert.equal(translator("pl")("coreTime.off"), "wolne")
   assert.equal(translator("ru")("coreTime.off"), "выходной")
+})
+
+// The settings form falls back to the manifest's own label when the catalogue
+// lacks an id. That fallback is for a field just added, not for the normal
+// case, so the normal case is asserted here: a field or group the catalogue
+// does not know would otherwise show an English label in a Russian form and
+// nothing would fail.
+test("the catalogue names every schema field, in every locale", () => {
+  for (const field of widget.schema) {
+    const id = `setting.${field.key}`
+    assert.ok(hasMessage(id), `no catalogue entry for ${id}`)
+    for (const locale of LOCALES) {
+      assert.notEqual(translator(locale)(id).trim(), "", `${locale} ${id}`)
+    }
+  }
+})
+
+test("the catalogue names every schema group, in every locale", () => {
+  for (const group of widget.groups) {
+    const id = `group.${group.key}`
+    assert.ok(hasMessage(id), `no catalogue entry for ${id}`)
+    for (const locale of LOCALES) {
+      assert.notEqual(translator(locale)(id).trim(), "", `${locale} ${id}`)
+    }
+  }
+})
+
+test("the language setting offers exactly the locales that have a catalogue", () => {
+  const field = widget.schema.find((entry) => entry.key === "language")
+  assert.deepEqual(
+    field.options.map((option) => option.value),
+    LOCALES,
+  )
+  assert.equal(field.defaultValue, DEFAULT_LOCALE)
+  assert.equal(widget.defaults.language, DEFAULT_LOCALE)
 })

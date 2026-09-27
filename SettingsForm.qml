@@ -6,6 +6,7 @@ import qs.Ui
 import "js/contrast.mjs" as Contrast
 import "js/scrollindicator.mjs" as ScrollIndicator
 import "js/settingsform.mjs" as SettingsFormLogic
+import "js/i18n.mjs" as I18n
 
 // The settings page of the panel: one text field per entry of the
 // manifest's barWidget.schema, grouped into cards by that schema's own
@@ -24,7 +25,9 @@ Column {
     readonly property var schema: root.widget ? root.widget.schema || [] : []
     readonly property var groups: root.widget ? root.widget.groups || [] : []
     readonly property string version: root.service && root.service.manifest ? root.service.manifest.version || "" : ""
-    // Filled when the page opens, then edited in place; errors after "Speichern".
+    // The service's translator, English while there is no service yet.
+    readonly property var t: root.service && root.service.t ? root.service.t : I18n.t
+    // Filled when the page opens, then edited in place; errors after saving.
     property var cards: []
     property var texts: ({})
     property var errors: ({})
@@ -38,27 +41,27 @@ Column {
 
     function load() {
         var settings = root.service ? root.service.settings : null
-        root.cards = SettingsFormLogic.formCards(root.schema, root.groups, settings)
-        root.texts = SettingsFormLogic.formTexts(root.schema, settings)
+        root.cards = SettingsFormLogic.formCards(root.schema, root.groups, settings, root.t)
+        root.texts = SettingsFormLogic.formTexts(root.schema, settings, root.t)
         root.errors = {}
         root.saveError = ""
     }
 
     function save() {
-        var result = SettingsFormLogic.readForm(root.schema, root.texts)
+        var result = SettingsFormLogic.readForm(root.schema, root.texts, root.t)
         root.errors = result.errors
         if (!result.settings)
             return
         if (root.service.saveSettings(result.settings))
             root.done()
         else
-            root.saveError = "Speichern nicht möglich: die Shell hat die Einstellungen nicht übernommen."
+            root.saveError = root.t("settings.saveFailed")
     }
 
     spacing: Style.space(6)
 
     Text {
-        text: "Einstellungen"
+        text: root.t("settings.title")
         color: Color.foreground
         font.family: Style.font.family
         font.pixelSize: Style.font.body
@@ -148,6 +151,10 @@ Column {
                                     id: row
 
                                     required property var modelData
+                                    // A field the manifest gave a fixed set of
+                                    // values is picked, not typed.
+                                    readonly property var options: modelData.options || []
+                                    readonly property bool isChoice: row.options.length > 0
                                     width: cardColumn.width
                                     spacing: Style.space(2)
 
@@ -160,7 +167,35 @@ Column {
                                         text: row.modelData.label
                                     }
 
+                                    // One button per option, the current one
+                                    // marked. It reads root.texts rather than
+                                    // the card's own text, because the card is
+                                    // built once at load() and the texts are
+                                    // what the page edits.
+                                    Row {
+                                        width: parent.width
+                                        spacing: Style.space(2)
+                                        visible: row.isChoice
+
+                                        Repeater {
+                                            model: row.options
+
+                                            ActionButton {
+                                                required property var modelData
+
+                                                label: modelData.label
+                                                selected: root.texts[row.modelData.key] === modelData.value
+                                                onClicked: {
+                                                    var texts = Object.assign({}, root.texts)
+                                                    texts[row.modelData.key] = modelData.value
+                                                    root.texts = texts
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     TextField {
+                                        visible: !row.isChoice
                                         width: parent.width
                                         text: row.modelData.text
                                         onTextEdited: {
@@ -229,12 +264,12 @@ Column {
         spacing: Style.space(8)
 
         ActionButton {
-            label: "Abbrechen"
+            label: root.t("settings.cancel")
             onClicked: root.done()
         }
 
         ActionButton {
-            label: "Speichern"
+            label: root.t("settings.save")
             primary: true
             onClicked: root.save()
         }

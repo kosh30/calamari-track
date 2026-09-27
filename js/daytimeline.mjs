@@ -58,6 +58,10 @@ function tooltip(core, spans, state, t) {
 // is { from, to, running }, both ends a share of the line, and nowFraction is
 // the share "now" sits at, null when it lies outside the line.
 export function timelineView({ state, now, core, t = defaultT }) {
+  // QML hands an unset `var` property over as null, and a default parameter
+  // only answers to undefined — so the default is taken here rather than in
+  // the signature. Without it the first t(...) throws a bare TypeError.
+  t = t || defaultT
   // A day without a core time has no window to be a share of: the line is
   // absent, as the header's core-time bar is (js/panelheader.mjs).
   if (!core) return null

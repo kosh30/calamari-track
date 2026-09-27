@@ -5,8 +5,11 @@
   "version": "0.2.0",
   "author": "kosh",
   "license": "MIT",
-  "description": "Stempelt die eigene Arbeitszeit in Calamari über den offiziellen MCP-Server und erinnert an vergessenes Ein- und Ausstempeln",
-  "kinds": ["service", "bar-widget"],
+  "description": "Stamps your own working time in Calamari through the official MCP server and reminds you of a forgotten clock-in or clock-out",
+  "kinds": [
+    "service",
+    "bar-widget"
+  ],
   "keepLoaded": true,
   "entryPoints": {
     "service": "Service.qml",
@@ -14,11 +17,12 @@
   },
   "barWidget": {
     "displayName": "Calamari Tracker",
-    "description": "Schichtstatus und Stempeln für Calamari",
+    "description": "Shift status and stamping for Calamari",
     "category": "Productivity",
     "allowMultiple": false,
     "defaultSection": "right",
     "defaults": {
+      "language": "en",
       "pollIntervalMinutes": 3,
       "stampReminderMinutes": 5,
       "breakLimitMinutes": 30,
@@ -42,36 +46,66 @@
     },
     "groups": [
       {
+        "key": "general",
+        "title": "General"
+      },
+      {
         "key": "polling",
-        "title": "Abfrage und Erinnerungen"
+        "title": "Polling and reminders"
       },
       {
         "key": "break",
-        "title": "Pause"
+        "title": "Break"
       },
       {
         "key": "closing",
-        "title": "Feierabend"
+        "title": "End of day"
       },
       {
         "key": "core",
-        "title": "Kernzeiten",
-        "description": "Je Wochentag HH:MM-HH:MM, „frei“ für einen freien Tag, oder leer für den Arbeitsplan aus Calamari."
+        "title": "Core times",
+        "description": "Per weekday HH:MM-HH:MM, “off” for a day off, or empty for the work schedule from Calamari."
       },
       {
         "key": "connection",
-        "title": "Verbindung"
+        "title": "Connection"
       },
       {
         "key": "naming",
-        "title": "Projekt und Pausentyp"
+        "title": "Project and break type"
       }
     ],
     "schema": [
       {
+        "key": "language",
+        "type": "string",
+        "format": "choice",
+        "options": [
+          {
+            "value": "en",
+            "label": "English"
+          },
+          {
+            "value": "de",
+            "label": "Deutsch"
+          },
+          {
+            "value": "pl",
+            "label": "Polski"
+          },
+          {
+            "value": "ru",
+            "label": "Русский"
+          }
+        ],
+        "label": "Language",
+        "defaultValue": "en",
+        "group": "general"
+      },
+      {
         "key": "pollIntervalMinutes",
         "type": "integer",
-        "label": "Abfrage-Intervall (Minuten)",
+        "label": "Polling interval (minutes)",
         "min": 1,
         "max": 60,
         "defaultValue": 3,
@@ -80,7 +114,7 @@
       {
         "key": "stampReminderMinutes",
         "type": "integer",
-        "label": "Stempel-Erinnerung wiederholen alle (Minuten)",
+        "label": "Repeat the stamp reminder every (minutes)",
         "min": 1,
         "max": 60,
         "defaultValue": 5,
@@ -89,7 +123,7 @@
       {
         "key": "breakLimitMinutes",
         "type": "integer",
-        "label": "Pausen-Erinnerung nach (Minuten)",
+        "label": "Break reminder after (minutes)",
         "min": 1,
         "max": 240,
         "defaultValue": 30,
@@ -98,7 +132,7 @@
       {
         "key": "breakReminderMinutes",
         "type": "integer",
-        "label": "Pausen-Erinnerung wiederholen alle (Minuten)",
+        "label": "Repeat the break reminder every (minutes)",
         "min": 1,
         "max": 60,
         "defaultValue": 5,
@@ -107,7 +141,7 @@
       {
         "key": "softHintMinutes",
         "type": "integer",
-        "label": "Sanfter Hinweis nach Ende der Kernzeit (Minuten)",
+        "label": "Soft hint after the end of core time (minutes)",
         "min": 0,
         "max": 240,
         "defaultValue": 30,
@@ -116,7 +150,7 @@
       {
         "key": "finalWarningTime",
         "type": "string",
-        "label": "Uhrzeit der letzten Warnung (HH:MM)",
+        "label": "Time of the final warning (HH:MM)",
         "format": "time",
         "defaultValue": "19:00",
         "group": "closing"
@@ -124,7 +158,7 @@
       {
         "key": "autoCloseMinutes",
         "type": "integer",
-        "label": "Auto-Abschluss nach der letzten Warnung (Minuten)",
+        "label": "Auto-close after the final warning (minutes)",
         "min": 1,
         "max": 120,
         "defaultValue": 15,
@@ -133,7 +167,7 @@
       {
         "key": "extendMinutes",
         "type": "integer",
-        "label": "Verschiebung durch „+1 h“ (Minuten)",
+        "label": "Shift from the “+1 h” button (minutes)",
         "min": 5,
         "max": 240,
         "defaultValue": 60,
@@ -142,7 +176,7 @@
       {
         "key": "hardLimitTime",
         "type": "string",
-        "label": "Obergrenze für den Auto-Abschluss (HH:MM)",
+        "label": "Upper limit for the auto-close (HH:MM)",
         "format": "time",
         "defaultValue": "23:00",
         "group": "closing"
@@ -150,7 +184,7 @@
       {
         "key": "webUrl",
         "type": "string",
-        "label": "Calamari im Browser (z.B. https://firma.calamari.io)",
+        "label": "Calamari in the browser (e.g. https://company.calamari.io)",
         "format": "url",
         "defaultValue": "",
         "group": "connection"
@@ -158,7 +192,7 @@
       {
         "key": "apiUrl",
         "type": "string",
-        "label": "Calamari-REST-API, z.B. https://firma.calamari.io/api (Key per bin/calamari api-key)",
+        "label": "Calamari REST API, e.g. https://company.calamari.io/api (key via bin/calamari api-key)",
         "format": "url",
         "defaultValue": "",
         "group": "connection"
@@ -166,21 +200,21 @@
       {
         "key": "defaultProject",
         "type": "string",
-        "label": "Standard-Projekt beim Einstempeln (Name in Calamari, leer = Check-in)",
+        "label": "Default project when clocking in (name in Calamari, empty = Check-in)",
         "defaultValue": "Check-in",
         "group": "naming"
       },
       {
         "key": "breakType",
         "type": "string",
-        "label": "Pausentyp (Name in Calamari, leer = Break)",
+        "label": "Break type (name in Calamari, empty = Break)",
         "defaultValue": "Break",
         "group": "naming"
       },
       {
         "key": "coreMonday",
         "type": "string",
-        "label": "Montag",
+        "label": "Monday",
         "format": "coreTime",
         "defaultValue": "",
         "group": "core"
@@ -188,7 +222,7 @@
       {
         "key": "coreTuesday",
         "type": "string",
-        "label": "Dienstag",
+        "label": "Tuesday",
         "format": "coreTime",
         "defaultValue": "",
         "group": "core"
@@ -196,7 +230,7 @@
       {
         "key": "coreWednesday",
         "type": "string",
-        "label": "Mittwoch",
+        "label": "Wednesday",
         "format": "coreTime",
         "defaultValue": "",
         "group": "core"
@@ -204,7 +238,7 @@
       {
         "key": "coreThursday",
         "type": "string",
-        "label": "Donnerstag",
+        "label": "Thursday",
         "format": "coreTime",
         "defaultValue": "",
         "group": "core"
@@ -212,7 +246,7 @@
       {
         "key": "coreFriday",
         "type": "string",
-        "label": "Freitag",
+        "label": "Friday",
         "format": "coreTime",
         "defaultValue": "",
         "group": "core"
@@ -220,7 +254,7 @@
       {
         "key": "coreSaturday",
         "type": "string",
-        "label": "Samstag",
+        "label": "Saturday",
         "format": "coreTime",
         "defaultValue": "",
         "group": "core"
@@ -228,7 +262,7 @@
       {
         "key": "coreSunday",
         "type": "string",
-        "label": "Sonntag",
+        "label": "Sunday",
         "format": "coreTime",
         "defaultValue": "",
         "group": "core"

@@ -2,19 +2,36 @@
 // (from the manifest's barWidget.schema) and how to read them back. No Qt;
 // tested with `node --test js/`.
 
-import { t as defaultT } from "./i18n.mjs"
+import { hasMessage, t as defaultT } from "./i18n.mjs"
 import { CORE_TIME_OFF } from "./daycalendar.mjs"
 
 // One field per schema entry: { key, label, type, text }, text being the
 // current value (or the default) as the form shows it.
 export function formFields(schema, settings, t = defaultT) {
+  // QML hands an unset `var` property over as null, and a default parameter
+  // only answers to undefined — so the default is taken here rather than in
+  // the signature. Without it the first t(...) throws a bare TypeError.
+  t = t || defaultT
   return schema.map((field) => {
     const value =
       settings && settings[field.key] !== undefined && settings[field.key] !== null
         ? settings[field.key]
         : field.defaultValue
-    return { key: field.key, label: field.label, type: field.type, text: shown(field, value, t) }
+    const entry = { key: field.key, label: labelOf(field, t), type: field.type, text: shown(field, value, t) }
+    // A choice carries its options along, so the form can offer them without
+    // reading the schema a second time. The option labels are endonyms and
+    // stay as the manifest wrote them.
+    if (field.format === "choice") entry.options = field.options || []
+    return entry
   })
+}
+
+// The label is the catalogue's. The manifest's own label is the last resort,
+// for a field added without one — tests/test_manifest.py keeps that from being
+// the normal case.
+function labelOf(field, t) {
+  const id = `setting.${field.key}`
+  return hasMessage(id) ? t(id) : field.label || field.key
 }
 
 // The stored core-time token is a German word whatever the language (ADR 0006),
@@ -28,7 +45,28 @@ function shown(field, value, t) {
 // The form's texts, flat by key, which is how they are edited and read back:
 // a card is a way of showing the fields, never a unit anything is saved by.
 export function formTexts(schema, settings, t = defaultT) {
-  return Object.fromEntries(formFields(schema, settings, t).map((field) => [field.key, field.text]))
+  // QML hands an unset `var` property over as null, and a default parameter
+  // only answers to undefined — so the default is taken here rather than in
+  // the signature. Without it the first t(...) throws a bare TypeError.
+  t = t || defaultT
+  // Not Object.fromEntries: Quickshell's JS engine does not have it, and the
+  // failure is silent — the assignment throws, the property keeps its old
+  // value, and the form looks right while holding nothing (js/enginecompat.test.mjs).
+  const texts = {}
+  for (const field of formFields(schema, settings, t)) texts[field.key] = field.text
+  return texts
+}
+
+function titleOf(group, t) {
+  const id = `group.${group.key}`
+  return hasMessage(id) ? t(id) : group.title || ""
+}
+
+// Only the core-time group carries one today, and it names the locale's word
+// for a day off, so it is a message with a value rather than a constant.
+function descriptionOf(group, t) {
+  const id = `group.${group.key}.description`
+  return hasMessage(id) ? t(id, { off: t("coreTime.off") }) : group.description || ""
 }
 
 // Where a field goes whose group the manifest does not name, or names and
@@ -41,6 +79,10 @@ const STRAY_KEY = "other"
 // each { key, title, description, fields }. Empty groups fall away, and
 // whatever is left over lands in one card at the end.
 export function formCards(schema, groups, settings, t = defaultT) {
+  // QML hands an unset `var` property over as null, and a default parameter
+  // only answers to undefined — so the default is taken here rather than in
+  // the signature. Without it the first t(...) throws a bare TypeError.
+  t = t || defaultT
   const declared = groups || []
   const known = new Set(declared.map((group) => group.key))
   const fields = formFields(schema, settings, t)
@@ -51,8 +93,8 @@ export function formCards(schema, groups, settings, t = defaultT) {
   const cards = declared
     .map((group) => ({
       key: group.key,
-      title: group.title || "",
-      description: group.description || "",
+      title: titleOf(group, t),
+      description: descriptionOf(group, t),
       fields: where(group.key),
     }))
     .filter((card) => card.fields.length > 0)
@@ -96,6 +138,12 @@ const READERS = {
     },
     message: t("validate.coreTime", { off: t("coreTime.off") }),
   }),
+  choice: (field, t) => ({
+    read: (text) => ((field.options || []).some((option) => option.value === text) ? text : undefined),
+    message: t("validate.choice", {
+      options: (field.options || []).map((option) => option.label).join(", "),
+    }),
+  }),
   url: (field, t) => ({
     read: (text) => (text === "" || /^https?:\/\/\S+$/.test(text) ? text : undefined),
     message: t("validate.url"),
@@ -111,6 +159,10 @@ function readerFor(field, t) {
 // Reads the form texts ({ key: text }) back. Returns { settings, errors }:
 // settings is null while any field is wrong, errors maps keys to messages.
 export function readForm(schema, texts, t = defaultT) {
+  // QML hands an unset `var` property over as null, and a default parameter
+  // only answers to undefined — so the default is taken here rather than in
+  // the signature. Without it the first t(...) throws a bare TypeError.
+  t = t || defaultT
   const settings = {}
   const errors = {}
   for (const field of schema) {

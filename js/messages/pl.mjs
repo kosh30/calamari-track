@@ -116,9 +116,46 @@ export const pl = {
   "validate.integer": (p) => `Liczba całkowita od ${p.min} do ${p.max}`,
   "validate.time": "Godzina, na przykład 19:00",
   "validate.coreTime": (p) => `Puste, „${p.off}” lub czas podstawowy, na przykład 09:00-16:45`,
+  "validate.choice": (p) => `Jedno z: ${p.options}`,
   "validate.url": "Puste lub adres, na przykład https://firma.calamari.io",
 
   "coreTime.off": "wolne",
 
   "date.dayMonth": (p) => `${p.day}.${p.month}.`,
+
+  // The settings page: one id per schema group and per field key. The
+  // manifest keeps the structure and an English label as the last resort;
+  // what the form shows comes from here.
+
+  "group.general": "Ogólne",
+  "group.polling": "Odpytywanie i przypomnienia",
+  "group.break": "Przerwa",
+  "group.closing": "Koniec pracy",
+  "group.core": "Czasy podstawowe",
+  "group.connection": "Połączenie",
+  "group.naming": "Projekt i typ przerwy",
+  "group.core.description": (p) =>
+    `Na każdy dzień tygodnia HH:MM-HH:MM, „${p.off}” dla dnia wolnego, albo puste dla planu pracy z Calamari.`,
+
+  "setting.language": "Język",
+  "setting.pollIntervalMinutes": "Interwał odpytywania (minuty)",
+  "setting.stampReminderMinutes": "Powtarzaj przypomnienie o wejściu co (minuty)",
+  "setting.breakLimitMinutes": "Przypomnienie o przerwie po (minuty)",
+  "setting.breakReminderMinutes": "Powtarzaj przypomnienie o przerwie co (minuty)",
+  "setting.softHintMinutes": "Delikatna wskazówka po końcu czasu podstawowego (minuty)",
+  "setting.finalWarningTime": "Godzina ostatniego ostrzeżenia (HH:MM)",
+  "setting.autoCloseMinutes": "Automatyczne zamknięcie po ostatnim ostrzeżeniu (minuty)",
+  "setting.extendMinutes": "Przesunięcie przyciskiem „+1 h” (minuty)",
+  "setting.hardLimitTime": "Górna granica automatycznego zamknięcia (HH:MM)",
+  "setting.webUrl": "Calamari w przeglądarce (np. https://firma.calamari.io)",
+  "setting.apiUrl": "Calamari REST API, np. https://firma.calamari.io/api (klucz przez bin/calamari api-key)",
+  "setting.defaultProject": "Domyślny projekt przy wejściu (nazwa w Calamari, puste = Check-in)",
+  "setting.breakType": "Typ przerwy (nazwa w Calamari, puste = Break)",
+  "setting.coreMonday": "Poniedziałek",
+  "setting.coreTuesday": "Wtorek",
+  "setting.coreWednesday": "Środa",
+  "setting.coreThursday": "Czwartek",
+  "setting.coreFriday": "Piątek",
+  "setting.coreSaturday": "Sobota",
+  "setting.coreSunday": "Niedziela",
 }

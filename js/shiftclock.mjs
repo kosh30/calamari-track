@@ -145,6 +145,10 @@ function addShift(state, start, end) {
 
 // The panel's line for the observed total of today ("" before any).
 export function workedText(state, now, t = defaultT) {
+  // QML hands an unset `var` property over as null, and a default parameter
+  // only answers to undefined — so the default is taken here rather than in
+  // the signature. Without it the first t(...) throws a bare TypeError.
+  t = t || defaultT
   const minutes = workedMinutes(state, now)
   return minutes > 0 ? t("shift.workedToday", { span: toSpan(minutes) }) : ""
 }
@@ -286,6 +290,10 @@ export function barView({ state, now, authState, failed, reminding }) {
 
 // When the running break began, as far as the plugin knows.
 export function breakSinceText(state, t = defaultT) {
+  // QML hands an unset `var` property over as null, and a default parameter
+  // only answers to undefined — so the default is taken here rather than in
+  // the signature. Without it the first t(...) throws a bare TypeError.
+  t = t || defaultT
   return state.breakStartUnknown ? t("break.sinceAtLatest", { time: state.breakSince }) : state.breakSince
 }
 
@@ -309,6 +317,10 @@ const STAMP_LABEL_IDS = {
 // The panel's button text for a stamp action; undefined for an action that has
 // none, which is how the panel asks whether to show a button at all.
 export function stampLabel(action, t = defaultT) {
+  // QML hands an unset `var` property over as null, and a default parameter
+  // only answers to undefined — so the default is taken here rather than in
+  // the signature. Without it the first t(...) throws a bare TypeError.
+  t = t || defaultT
   const id = STAMP_LABEL_IDS[action]
   return id ? t(id) : undefined
 }
@@ -383,6 +395,10 @@ export function endOfDayAction(view) {
 // throttling us. endTimeKnown: the clock-out ended the shift at its
 // break's start, so the end time needs no correction.
 export function applyStamp(state, action, out, now, t = defaultT) {
+  // QML hands an unset `var` property over as null, and a default parameter
+  // only answers to undefined — so the default is taken here rather than in
+  // the signature. Without it the first t(...) throws a bare TypeError.
+  t = t || defaultT
   return Object.assign({ endTimeKnown: false }, stampResult(state, action, out, now, t))
 }
 

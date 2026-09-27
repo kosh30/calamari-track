@@ -59,6 +59,10 @@ function progress(core, now, t) {
 // view is the bar's view (js/shiftclock.mjs barView), day today's
 // `day-info` (null until it arrives), config the widget settings.
 export function headerView({ view, state, now, day, config, t = defaultT }) {
+  // QML hands an unset `var` property over as null, and a default parameter
+  // only answers to undefined — so the default is taken here rather than in
+  // the signature. Without it the first t(...) throws a bare TypeError.
+  t = t || defaultT
   const core = todayCore(state, now, day, config)
   return {
     // barView only fills text for a shift or a break whose start is known.

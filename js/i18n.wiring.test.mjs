@@ -15,7 +15,7 @@ import { notification } from "./reminders.mjs"
 import { headerView } from "./panelheader.mjs"
 import { errorTooltip } from "./backoff.mjs"
 import { timelineView } from "./daytimeline.mjs"
-import { readForm } from "./settingsform.mjs"
+import { formCards, formFields, formTexts, readForm } from "./settingsform.mjs"
 
 const de = translator("de")
 const at = (clock) => new Date(`2026-09-22T${clock}`)
@@ -87,4 +87,39 @@ test("settingsform: every locale's word for a day off stores the one token", () 
     // And the canonical token is accepted whatever the language.
     assert.equal(readForm(schema, { coreMonday: "frei" }, t).settings.coreMonday, "frei", locale)
   }
+})
+
+// QML hands an unset `var` property over as null, where a default parameter
+// only answers to undefined. Node never does this, so nothing above would have
+// caught it: the plugin failed in the running shell with a bare TypeError from
+// inside settingsform.mjs while every test stayed green.
+test("a null translator falls back to English instead of throwing", () => {
+  const schema = [{ key: "pollIntervalMinutes", type: "integer", min: 1, max: 60, defaultValue: 3 }]
+  assert.equal(formTexts(schema, {}, null).pollIntervalMinutes, "3")
+  assert.equal(formFields(schema, {}, null)[0].label, "Polling interval (minutes)")
+  assert.equal(formCards(schema, [], {}, null).length, 1)
+  assert.equal(
+    readForm(schema, { pollIntervalMinutes: "999" }, null).errors.pollIntervalMinutes,
+    "A whole number from 1 to 60",
+  )
+  assert.equal(stampLabel("clock-in", null), "Clock in")
+  assert.equal(errorTooltip("NETWORK", 6, null), "Calamari cannot be reached, next attempt in 6 min")
+  assert.equal(
+    notification({ type: "soft-hint", coreEnd: "16:45" }, null, {}, {}, null).headline,
+    "A shift is still running",
+  )
+  assert.equal(
+    headerView({ view: { kind: "error", text: "" }, state: {}, now: at("11:00"), day: null, config: {}, t: null })
+      .caption,
+    "Shift status unknown",
+  )
+  const state = Object.assign(emptyState(), { date: "2026-09-22", running: false })
+  assert.equal(
+    timelineView({ state, now: at("11:00"), core: { start: 540, end: 1005 }, t: null }).tooltip,
+    "Core time 09:00–16:45",
+  )
+  assert.equal(
+    applyStamp(emptyState(), "break-start", { ok: false, error: { code: "NETWORK" } }, at("11:00"), null).error,
+    "Begin break failed: Calamari cannot be reached. Nothing will be filed later.",
+  )
 })

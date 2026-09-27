@@ -13,7 +13,7 @@ test("the form shows every setting with its current value or the default", () =>
   assert.equal(fields.pollIntervalMinutes.text, "3")
   assert.equal(fields.coreFriday.text, "08:00-13:00")
   assert.equal(fields.finalWarningTime.text, "19:00")
-  assert.equal(fields.stampReminderMinutes.label, "Stempel-Erinnerung wiederholen alle (Minuten)")
+  assert.equal(fields.stampReminderMinutes.label, "Repeat the stamp reminder every (minutes)")
   assert.deepEqual(
     formFields(schema, {}).map((f) => f.key),
     schema.map((f) => f.key),
@@ -124,7 +124,7 @@ test("the seven core times stand as one group with one shared explanation", () =
   assert.ok(core.description.length > 0)
   // The explanation moved to the card, so the fields are just the weekdays.
   assert.deepEqual(keysOf(core)[0], "coreMonday")
-  assert.equal(core.fields[0].label, "Montag")
+  assert.equal(core.fields[0].label, "Monday")
 })
 
 test("the form's texts stand flat at their field's key", () => {

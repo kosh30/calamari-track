@@ -40,6 +40,10 @@ const USER_ACTION_IDS = {
 
 // The bar's tooltip for a failed poll with the error code.
 export function errorTooltip(code, retryMinutes, t = defaultT) {
+  // QML hands an unset `var` property over as null, and a default parameter
+  // only answers to undefined — so the default is taken here rather than in
+  // the signature. Without it the first t(...) throws a bare TypeError.
+  t = t || defaultT
   const retry = t("backoff.retryIn", { minutes: retryMinutes })
   if (code === "NETWORK") return t("backoff.network", { retry })
   if (code === "RATE_LIMITED") return t("backoff.rateLimited", { retry })

@@ -4,6 +4,8 @@ An Omarchy shell plugin that records your own working time in Calamari (the "Clo
 
 ## Language
 
+The headwords are English, as the code's own identifiers are. Where a term is something the user reads, the German label is given beside it — the interface is translated (ADR 0006), so that label is what the German UI shows, not the only one there is.
+
 ### Time tracking
 
 **Shift**:
@@ -14,11 +16,11 @@ _Avoid_: work in progress, session, entry
 A shift that has been started in Calamari and not yet ended, no matter whether it was clocked in from the plugin, the web or the phone.
 _Avoid_: WIP, running time
 
-**Clock in / clock out** (on screen: „Einstempeln“ / „Ausstempeln“):
+**Clock in / clock out** (German UI: „Einstempeln“ / „Ausstempeln“):
 The start and the end of a shift respectively.
 _Avoid_: start/stop
 
-**Break** (on screen: „Pause beginnen“ / „Pause beenden“):
+**Break** (German UI: „Pause beginnen“ / „Pause beenden“):
 An interruption within a running shift that Calamari stores as a break (with a break type). It can only begin from a running shift and is not the end of day; the shift goes on during the break.
 _Avoid_: gap between two shifts
 
@@ -29,7 +31,7 @@ _Avoid_: "Ohne Projekt" (that is Calamari's own name for the absence of a projec
 **Default project**:
 The project the plugin gives every clock-in of its own. Configurable, "Check-in" by default.
 
-**End of day** (on screen: „Feierabend“):
+**End of day** (German UI: „Feierabend“):
 The state after clocking out on a working day. From then on there are no more stamp reminders that day. Clocking in again stays possible.
 _Avoid_: end of business, sign off
 
@@ -48,11 +50,11 @@ The user's weekly schedule in Calamari. It fixes, for every weekday, whether it 
 **Working day**:
 A day that is a working day according to the work schedule.
 
-**Core time** (on screen: „Kernzeiten“):
+**Core time** (German UI: „Kernzeiten“):
 The window of a working day, according to the work schedule, in which a running shift is expected. A half public holiday shortens it.
 _Avoid_: working hours, normal hours
 
-**Day off** (on screen: „Heute frei“):
+**Day off** (German UI: „Heute frei“):
 A working day on which no stamp reminders come: because of a public holiday, an absence (holiday, sickness) or because the user marked it off by hand.
 _Avoid_: rest day, off-day
 

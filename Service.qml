@@ -6,6 +6,7 @@ import "js/shiftclock.mjs" as ShiftClock
 import "js/reminders.mjs" as Reminders
 import "js/activity.mjs" as Activity
 import "js/backoff.mjs" as Backoff
+import "js/i18n.mjs" as I18n
 
 // Headless singleton for the plugin. Owns the runtime state, the poll timer
 // and the calls to bin/calamari. Decisions live in js/shiftclock.mjs and
@@ -91,9 +92,16 @@ Item {
     // (js/backoff.mjs); the first answer that comes through resets it. Every
     // helper call of a poll counts (status, day-end, start-time, end-time).
     property int pollFailures: 0
+    // The language, and the translator every text of the plugin goes through
+    // (ADR 0006). It lives here because the service is keepLoaded and already
+    // owns the settings, so the panel and the bar read one translator rather
+    // than each building its own.
+    readonly property string language: root.setting("language", I18n.DEFAULT_LOCALE)
+    readonly property var t: I18n.translator(root.language)
+
     readonly property int retryMinutes: Backoff.pollMinutes(root.setting("pollIntervalMinutes", 3), root.pollFailures)
     readonly property int pollInterval: root.retryMinutes * 60 * 1000
-    readonly property string errorTooltip: Backoff.errorTooltip(root.errorCode, root.retryMinutes)
+    readonly property string errorTooltip: Backoff.errorTooltip(root.errorCode, root.retryMinutes, root.t)
     readonly property string helper: Qt.resolvedUrl("bin/calamari").toString().replace(/^file:\/\//, "")
     // Added to the shell's environment for every helper call: the REST API
     // of the setting apiUrl (docs/adr/0003); without one the REST commands
@@ -192,7 +200,7 @@ Item {
     property var noticeQueue: []
 
     function notify(action) {
-        var text = Reminders.notification(action, root.dayInfo, root.shiftState, root.config)
+        var text = Reminders.notification(action, root.dayInfo, root.shiftState, root.config, root.t)
         var webUrl = root.setting("webUrl", "")
         var click = text.click === "panel" ? ["omarchy-shell", "shell", "summon", "kosh.calamari-tracker"] : webUrl ? ["xdg-open", webUrl] : []
         root.noticeQueue = root.noticeQueue.concat([
@@ -326,7 +334,7 @@ Item {
 
     function applyStamp(action, out) {
         root.now = new Date()
-        var result = ShiftClock.applyStamp(root.shiftState, action, out, root.now)
+        var result = ShiftClock.applyStamp(root.shiftState, action, out, root.now, root.t)
         root.stampError = result.error
         stampProc.pollWhenDone = result.pollNow
         if (out.ok) {

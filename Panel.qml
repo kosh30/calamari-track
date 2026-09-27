@@ -4,6 +4,7 @@ import qs.Ui
 import "js/shiftclock.mjs" as ShiftClock
 import "js/reminders.mjs" as Reminders
 import "js/panelheader.mjs" as PanelHeader
+import "js/i18n.mjs" as I18n
 import "js/daytimeline.mjs" as DayTimeline
 
 // Popup panel toggled from the bar icon: login state, shift status and
@@ -21,11 +22,13 @@ Panel {
     readonly property string authState: service ? service.authState : "unknown"
     readonly property bool loggingIn: service ? service.loggingIn === true : false
     readonly property var view: service ? service.barView : null
+    // The service's translator, English while there is no service yet.
+    readonly property var t: service ? service.t : I18n.t
     readonly property var stampAction: authState === "ok" && view !== null ? ShiftClock.stampAction(view) : null
     readonly property var breakAction: authState === "ok" && view !== null ? ShiftClock.breakAction(view) : null
     readonly property var endOfDayAction: authState === "ok" && view !== null ? ShiftClock.endOfDayAction(view) : null
     // After the final warning: the countdown to the auto-close.
-    readonly property string countdown: service ? Reminders.countdownText(service.decision, service.now) : ""
+    readonly property string countdown: service ? Reminders.countdownText(service.decision, service.now, service.t) : ""
 
     // The header block (js/panelheader.mjs): the duration as the page's
     // largest number, the line placing it, the core-time progress and the day
@@ -36,29 +39,32 @@ Panel {
         state: service.shiftState,
         now: service.now,
         day: service.dayInfo,
-        config: service.config
+        config: service.config,
+        t: service.t
     }) : null
     readonly property var progress: headerModel ? headerModel.progress : null
     readonly property var timeline: headerModel ? headerModel.timeline : null
 
     // A button's text, with "…" while its own action runs.
-    // During the countdown clocking out is "Jetzt ausstempeln".
+    // During the countdown clocking out says so instead.
     function actionText(action) {
         var busy = root.service !== null && root.service.stampingAction === action
-        var label = action === "clock-out" && root.countdown !== "" ? "Jetzt ausstempeln" : ShiftClock.stampLabel(action)
+        var label = action === "clock-out" && root.countdown !== "" ? root.t("stamp.clockOutNow") : ShiftClock.stampLabel(action, root.t)
         return label + (busy ? " …" : "")
     }
 
     function loginText() {
         if (root.loggingIn)
-            return "Anmeldung im Browser läuft …"
+            return root.t("login.inBrowser")
         if (root.authState === "ok")
-            return root.service.userName ? "Angemeldet als " + root.service.userName : "Angemeldet"
+            return root.service.userName ? root.t("login.asUser", {
+                name: root.service.userName
+            }) : root.t("login.signedIn")
         if (root.authState === "required")
-            return "Anmeldung nötig"
+            return root.t("login.required")
         if (root.authState === "error")
-            return "Calamari nicht erreichbar"
-        return "Verbinde …"
+            return root.t("login.unreachable")
+        return root.t("login.connecting")
     }
 
     property string page: "main"
@@ -133,7 +139,7 @@ Panel {
 
                 ActionButton {
                     visible: root.page === "menu"
-                    label: "Einstellungen"
+                    label: root.t("panel.settings")
                     iconText: "󰒓"
                     primary: true
                     onClicked: root.showPage("settings")
@@ -329,7 +335,7 @@ Panel {
 
                     ActionButton {
                         visible: root.service !== null && root.service.decision.canExtend === true
-                        label: Reminders.extendLabel(root.service ? root.service.config : null)
+                        label: Reminders.extendLabel(root.service ? root.service.config : null, root.t)
                         onClicked: root.service.postpone()
                     }
 
@@ -340,7 +346,7 @@ Panel {
                         color: Color.foreground
                         font.family: Style.font.family
                         font.pixelSize: Style.font.body
-                        text: root.service ? ShiftClock.workedText(root.service.shiftState, root.service.now) : ""
+                        text: root.service ? ShiftClock.workedText(root.service.shiftState, root.service.now, root.t) : ""
                     }
 
                     ActionButton {
@@ -369,7 +375,7 @@ Panel {
                     ActionButton {
                         visible: root.service !== null && root.authState === "ok"
                         readonly property bool dayOff: root.service !== null && root.service.dayOff
-                        label: dayOff ? "Heute frei (zurücknehmen)" : "Heute frei"
+                        label: dayOff ? root.t("panel.dayOffUndo") : root.t("panel.dayOff")
                         tooltipText: "Keine Stempel-Erinnerungen bis morgen"
                         selected: dayOff
                         onClicked: root.service.setDayOff(!dayOff)

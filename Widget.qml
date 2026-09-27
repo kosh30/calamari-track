@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell.Io
 import qs.Commons
 import qs.Ui
+import "js/i18n.mjs" as I18n
 
 // Bar entry point: the icon in the bar plus the popup panel it toggles.
 // The bar identifies an open popup by this widget (slot.activeItem), so the
@@ -17,6 +18,8 @@ BarWidget {
             kind: "unknown",
             text: ""
         })
+    // The service's translator, English while there is no service yet.
+    readonly property var t: service && service.t ? service.t : I18n.t
     readonly property bool alerting: view.kind === "auth" || view.kind === "error"
     readonly property color barForeground: bar ? bar.barForeground : Color.foreground
 
@@ -37,19 +40,19 @@ BarWidget {
     function viewTooltip() {
         switch (root.view.kind) {
         case "auth":
-            return "Calamari: Anmeldung nötig"
+            return root.t("bar.authRequired")
         case "error":
             return root.service.errorTooltip
         case "running":
-            return "Calamari: Schicht läuft"
+            return root.t("bar.running")
         case "reminder":
-            return "Calamari: noch nicht eingestempelt"
+            return root.t("bar.reminder")
         case "break":
-            return "Calamari: Pause"
+            return root.t("bar.break")
         case "idle":
-            return "Calamari: keine laufende Schicht"
+            return root.t("bar.idle")
         }
-        return "Calamari Tracker"
+        return root.t("bar.name")
     }
 
     // The theme's green and yellow from colors.toml; the shell palette has none.

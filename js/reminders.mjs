@@ -222,6 +222,10 @@ export function markSent(state, type, now) {
 // stamped out, or for { type: "day-end-closed", date, lastActivity }, the
 // hint about a day Calamari itself ended (js/shiftclock.mjs applyDayEnd).
 export function notification(action, day, state, settings, t = defaultT) {
+  // QML hands an unset `var` property over as null, and a default parameter
+  // only answers to undefined — so the default is taken here rather than in
+  // the signature. Without it the first t(...) throws a bare TypeError.
+  t = t || defaultT
   const panel = (headline, body) => ({ headline, body, click: "panel" })
   if (action.type === "soft-hint")
     return panel(t("notify.softHint.headline"), t("notify.softHint.body", { coreEnd: action.coreEnd }))
@@ -269,6 +273,10 @@ function dayOf(stamp, t) {
 
 // The panel's countdown line for a decision with a pending auto-close.
 export function countdownText(decision, now, t = defaultT) {
+  // QML hands an unset `var` property over as null, and a default parameter
+  // only answers to undefined — so the default is taken here rather than in
+  // the signature. Without it the first t(...) throws a bare TypeError.
+  t = t || defaultT
   if (!decision.autoCloseAt) return ""
   const left = Math.max(Math.ceil((decision.autoCloseAt - now) / 60000), 0)
   return t("panel.countdown", { at: toHhmm(minuteOfDay(decision.autoCloseAt)), left })
@@ -276,6 +284,10 @@ export function countdownText(decision, now, t = defaultT) {
 
 // The text of the panel's "work on" button for the configured shift.
 export function extendLabel(settings, t = defaultT) {
+  // QML hands an unset `var` property over as null, and a default parameter
+  // only answers to undefined — so the default is taken here rather than in
+  // the signature. Without it the first t(...) throws a bare TypeError.
+  t = t || defaultT
   const minutes = withDefaults(settings).extendMinutes
   return minutes === 60 ? t("panel.extendHour") : t("panel.extendMinutes", { minutes })
 }

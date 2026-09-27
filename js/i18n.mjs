@@ -38,6 +38,12 @@ export function translator(locale) {
 // The default translator, for a call that names no locale.
 export const t = translator(DEFAULT_LOCALE)
 
+// Whether an id exists at all. The settings form asks before falling back to
+// the manifest's own label, so a missing entry shows a label rather than a key.
+export function hasMessage(id) {
+  return Object.prototype.hasOwnProperty.call(en, id)
+}
+
 // Whether a locale has a catalogue of its own, for the settings to offer it.
 export function knownLocale(locale) {
   return Object.prototype.hasOwnProperty.call(CATALOGUES, locale)

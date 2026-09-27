@@ -8,6 +8,7 @@ All notable changes to this plugin are documented here. The format follows
 
 ### Added
 
+- Pick the language in the settings: English, German, Polish or Russian. English is the default, and the panel switches as soon as you save.
 - See the shape of the day in the panel: one line over the core time with today's shifts filled in, a mark for now, and the exact times on hover.
 - The settings show a thin bar at their right edge while fields stand below the window, so it is no longer a guess whether there is more to scroll to.
 

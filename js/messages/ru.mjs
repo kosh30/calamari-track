@@ -117,9 +117,46 @@ export const ru = {
   "validate.integer": (p) => `Целое число от ${p.min} до ${p.max}`,
   "validate.time": "Время, например 19:00",
   "validate.coreTime": (p) => `Пусто, «${p.off}» или основное время, например 09:00-16:45`,
+  "validate.choice": (p) => `Одно из: ${p.options}`,
   "validate.url": "Пусто или адрес, например https://firma.calamari.io",
 
   "coreTime.off": "выходной",
 
   "date.dayMonth": (p) => `${p.day}.${p.month}.`,
+
+  // The settings page: one id per schema group and per field key. The
+  // manifest keeps the structure and an English label as the last resort;
+  // what the form shows comes from here.
+
+  "group.general": "Общие",
+  "group.polling": "Опрос и напоминания",
+  "group.break": "Перерыв",
+  "group.closing": "Конец рабочего дня",
+  "group.core": "Основное время",
+  "group.connection": "Подключение",
+  "group.naming": "Проект и тип перерыва",
+  "group.core.description": (p) =>
+    `На каждый день недели HH:MM-HH:MM, «${p.off}» для выходного, или пусто для рабочего плана из Calamari.`,
+
+  "setting.language": "Язык",
+  "setting.pollIntervalMinutes": "Интервал опроса (минуты)",
+  "setting.stampReminderMinutes": "Повторять напоминание об отметке каждые (минуты)",
+  "setting.breakLimitMinutes": "Напоминание о перерыве через (минуты)",
+  "setting.breakReminderMinutes": "Повторять напоминание о перерыве каждые (минуты)",
+  "setting.softHintMinutes": "Мягкая подсказка после конца основного времени (минуты)",
+  "setting.finalWarningTime": "Время последнего предупреждения (HH:MM)",
+  "setting.autoCloseMinutes": "Автозакрытие после последнего предупреждения (минуты)",
+  "setting.extendMinutes": "Сдвиг кнопкой «+1 ч» (минуты)",
+  "setting.hardLimitTime": "Верхняя граница автозакрытия (HH:MM)",
+  "setting.webUrl": "Calamari в браузере (например, https://firma.calamari.io)",
+  "setting.apiUrl": "Calamari REST API, например https://firma.calamari.io/api (ключ через bin/calamari api-key)",
+  "setting.defaultProject": "Проект по умолчанию при входе (имя в Calamari, пусто = Check-in)",
+  "setting.breakType": "Тип перерыва (имя в Calamari, пусто = Break)",
+  "setting.coreMonday": "Понедельник",
+  "setting.coreTuesday": "Вторник",
+  "setting.coreWednesday": "Среда",
+  "setting.coreThursday": "Четверг",
+  "setting.coreFriday": "Пятница",
+  "setting.coreSaturday": "Суббота",
+  "setting.coreSunday": "Воскресенье",
 }

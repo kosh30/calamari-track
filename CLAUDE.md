@@ -8,7 +8,11 @@ This repo lives on **GitHub** (`kosh30/calamari-track`), an explicit departure f
 
 ## Language
 
-Docs, code, comments, commit messages and changelog entries are English. The user interface is German and stays German: on-screen text, the setting labels in `manifest.json` and the notification texts are never translated. Where a doc names something the user sees, it quotes the German verbatim — „Einstempeln“, „Feierabend“, „Heute frei“ — so the doc stays traceable to the screen. `CONTEXT.md` gives every term an English headword and notes the on-screen label beside it.
+Docs, code, comments, commit messages and changelog entries are English. The interface is translated: English by default, plus German, Polish and Russian, all of it through the catalogue in `js/messages/` (ADR 0006). A string a user can see belongs there and nowhere else — a literal in a QML file or a logic module is a string that three languages will never get, and nothing fails when it happens.
+
+Three things stay untranslated on purpose. Calamari's own values — the project name, the break type — are quoted inside a message, never looked up as one. `"frei"` is the stored token for a weekday without a core time: the form shows the locale's word for it and always saves `frei`. And `manifest.description` with `barWidget.displayName` cannot be translated at all, because the shell reads them from the file before any plugin code runs.
+
+Where a doc quotes on-screen text it is quoting one language, usually German, and `CONTEXT.md` says which.
 
 ## Commands
 
