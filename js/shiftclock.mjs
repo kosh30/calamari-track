@@ -363,7 +363,7 @@ export function breakAction(view) {
 }
 
 // End of day instead of the break's end: only in a break.
-export function feierabendAction(view) {
+export function endOfDayAction(view) {
   return view.kind === "break" ? "break-clock-out" : null
 }
 

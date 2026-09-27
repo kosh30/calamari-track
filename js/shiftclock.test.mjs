@@ -10,7 +10,7 @@ import {
   breakAction,
   dayOffToday,
   emptyState,
-  feierabendAction,
+  endOfDayAction,
   helperCommand,
   pendingDayEnd,
   applyEndTime,
@@ -643,9 +643,9 @@ test("with no known times it stays with first seeing it and with the start-time 
 const pausedAt = (since, begun = "09:00") => breakStart(clockIn(emptyState(), begun), since)
 
 test("in a break the panel offers the end of day, otherwise not", () => {
-  assert.equal(feierabendAction({ kind: "break", text: "0:10" }), "break-clock-out")
-  assert.equal(feierabendAction({ kind: "running", text: "1:00" }), null)
-  assert.equal(feierabendAction({ kind: "idle", text: "" }), null)
+  assert.equal(endOfDayAction({ kind: "break", text: "0:10" }), "break-clock-out")
+  assert.equal(endOfDayAction({ kind: "running", text: "1:00" }), null)
+  assert.equal(endOfDayAction({ kind: "idle", text: "" }), null)
   assert.equal(stampLabel("break-clock-out"), "Feierabend")
   assert.deepEqual(helperCommand("break-clock-out", { defaultProject: "X", breakType: "Y" }), ["clock-out-break"])
 })
