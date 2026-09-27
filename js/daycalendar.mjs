@@ -3,11 +3,16 @@
 
 import { toMinutes } from "./daytime.mjs"
 
+// The stored value that makes a weekday non-working. It stays this German
+// word in every language: settings already on disk say it, and renaming it
+// would be a silent migration of every core-time setting (ADR 0006).
+export const CORE_TIME_OFF = "frei"
+
 // Where a half holiday splits the day.
 const HALF_DAY = 12 * 60
 
 // The widget settings coreMonday .. coreSunday override the work plan:
-// "HH:MM-HH:MM" is the core time, "frei" makes the weekday non-working,
+// "HH:MM-HH:MM" is the core time, CORE_TIME_OFF makes the weekday non-working,
 // anything else (empty, unreadable) keeps the plan from Calamari.
 const OVERRIDE_KEYS = [
   "coreSunday",
@@ -29,7 +34,7 @@ function clockTime(text) {
 function plannedCore(day, config) {
   const weekday = new Date(`${day.date}T12:00:00`).getDay()
   const text = String((config && config[OVERRIDE_KEYS[weekday]]) || "")
-  if (text.trim().toLowerCase() === "frei") return null
+  if (text.trim().toLowerCase() === CORE_TIME_OFF) return null
   const match = OVERRIDE.exec(text)
   const start = match && clockTime(match[1])
   const end = match && clockTime(match[2])
@@ -40,7 +45,7 @@ function plannedCore(day, config) {
 
 // Core time of the day as { start, end } in minutes of the day, or null on
 // a day without one: no working day, or a free day (public holiday, time
-// off for the whole day, the panel switch "Heute frei").
+// off for the whole day, the panel's day-off switch).
 export function coreTime(day, state, config) {
   if (state.dayOff) return null
   if (day.holiday && !day.holiday.halfDay) return null

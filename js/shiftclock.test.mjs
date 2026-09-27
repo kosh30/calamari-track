@@ -144,7 +144,7 @@ test("clocking in after the end of day lifts it and the duration counts from now
 test("if Calamari reports no running shift after clocking in, Calamari counts and the panel says so", () => {
   const r = applyStamp(emptyState(), "clock-in", { ok: true, running: false }, at("08:00"))
   assert.deepEqual(view(r.state, "08:00"), { kind: "idle", text: "" })
-  assert.equal(r.error, "Einstempeln: Calamari meldet keine laufende Schicht. Bitte im Web prüfen.")
+  assert.equal(r.error, "Clock in: Calamari reports no running shift. Please check in the web.")
   assert.equal(r.pollNow, true)
 })
 
@@ -187,19 +187,16 @@ test("a failed stamping names the action and the cause, and that nothing is file
     applyStamp(running("09:40", "17:00"), action, { ok: false, error: { code, message } }, at("17:30")).error
   assert.equal(
     fail("clock-out", "NETWORK"),
-    "Ausstempeln fehlgeschlagen: Calamari nicht erreichbar. Es wird nichts nachgereicht.",
+    "Clock out failed: Calamari cannot be reached. Nothing will be filed later.",
   )
   assert.equal(
     fail("clock-in", "RATE_LIMITED"),
-    "Einstempeln fehlgeschlagen: zu viele Anfragen, bitte gleich erneut versuchen. Es wird nichts nachgereicht.",
+    "Clock in failed: too many requests, please try again shortly. Nothing will be filed later.",
   )
-  assert.equal(
-    fail("clock-in", "AUTH_REQUIRED"),
-    "Einstempeln fehlgeschlagen: Anmeldung nötig. Es wird nichts nachgereicht.",
-  )
+  assert.equal(fail("clock-in", "AUTH_REQUIRED"), "Clock in failed: login needed. Nothing will be filed later.")
   assert.equal(
     fail("clock-out", "MCP_ERROR", "clockOut: no started shift"),
-    "Ausstempeln fehlgeschlagen: clockOut: no started shift. Es wird nichts nachgereicht.",
+    "Clock out failed: clockOut: no started shift. Nothing will be filed later.",
   )
 })
 
@@ -213,27 +210,24 @@ test("if clocking in over REST fails the panel names the cause in plain words", 
     ).error
   assert.equal(
     fail("API_TERMINAL_MISSING"),
-    "Einstempeln fehlgeschlagen: API Terminal fehlt in Calamari Clockin. Es wird nichts nachgereicht.",
+    "Clock in failed: no API Terminal in Calamari Clockin. Nothing will be filed later.",
   )
   assert.equal(
     fail("API_SCOPE_MISSING"),
-    "Einstempeln fehlgeschlagen: keine Berechtigung für den API-Key. Es wird nichts nachgereicht.",
+    "Clock in failed: the API key lacks a permission. Nothing will be filed later.",
   )
   assert.equal(
     fail("API_KEY_REQUIRED"),
-    "Einstempeln fehlgeschlagen: kein API-Key, bitte bin/calamari api-key ausführen. Es wird nichts nachgereicht.",
+    "Clock in failed: no API key, please run bin/calamari api-key. Nothing will be filed later.",
   )
-  assert.equal(
-    fail("API_KEY_REJECTED"),
-    "Einstempeln fehlgeschlagen: Calamari lehnt den API-Key ab. Es wird nichts nachgereicht.",
-  )
+  assert.equal(fail("API_KEY_REJECTED"), "Clock in failed: Calamari rejects the API key. Nothing will be filed later.")
   assert.equal(
     fail("API_URL_REQUIRED"),
-    "Einstempeln fehlgeschlagen: keine REST-API-URL, bitte in den Einstellungen setzen. Es wird nichts nachgereicht.",
+    "Clock in failed: no REST API URL, please set it in the settings. Nothing will be filed later.",
   )
   assert.equal(
     fail("PROJECT_UNKNOWN", { project: "Kunde B" }),
-    "Einstempeln fehlgeschlagen: Projekt „Kunde B“ gibt es in Calamari nicht. Es wird nichts nachgereicht.",
+    "Clock in failed: there is no project “Kunde B” in Calamari. Nothing will be filed later.",
   )
 })
 
@@ -268,7 +262,7 @@ test("while a stamp reminder is due the bar shows it", () => {
   assert.equal(barView({ state, now: at("09:10"), authState: "ok", failed: true, reminding: true }).kind, "error")
 })
 
-test("„Heute frei“ applies only to the day it was set on", () => {
+test("„Today off“ applies only to the day it was set on", () => {
   const state = setDayOff(applyStatus(emptyState(), "stopped", at("08:00")).state, true, at("08:00"))
   assert.equal(dayOffToday(state, at("23:59")), true)
   // after midnight, even before the first poll of the new day
@@ -324,8 +318,8 @@ test("a failed break names the action and leaves the status standing", () => {
   const state = clockIn(emptyState(), "09:00")
   const fail = (action) =>
     applyStamp(state, action, { ok: false, error: { code: "NETWORK", message: "" } }, at("12:00"))
-  assert.match(fail("break-start").error, /^Pause beginnen fehlgeschlagen/)
-  assert.match(fail("break-end").error, /^Pause beenden fehlgeschlagen/)
+  assert.match(fail("break-start").error, /^Begin break failed/)
+  assert.match(fail("break-end").error, /^End break failed/)
   assert.equal(fail("break-start").state, state)
 })
 
@@ -336,17 +330,14 @@ test("an unknown break type names its name", () => {
     { ok: false, error: { code: "BREAK_TYPE_UNKNOWN", message: "raw", breakType: "Siesta" } },
     at("12:00"),
   )
-  assert.equal(
-    r.error,
-    "Pause beginnen fehlgeschlagen: Pausentyp „Siesta“ gibt es in Calamari nicht. Es wird nichts nachgereicht.",
-  )
+  assert.equal(r.error, "Begin break failed: there is no break type “Siesta” in Calamari. Nothing will be filed later.")
 })
 
 test("if Calamari reports no break after beginning one the panel says so and asks again", () => {
   const state = clockIn(emptyState(), "09:00")
   const r = applyStamp(state, "break-start", { ok: true, onBreak: false }, at("12:00"))
   assert.equal(view(r.state, "12:00").kind, "running")
-  assert.equal(r.error, "Pause beginnen: Calamari meldet keine Pause. Bitte im Web prüfen.")
+  assert.equal(r.error, "Begin break: Calamari reports no break. Please check in the web.")
   assert.equal(r.pollNow, true)
 })
 
@@ -354,7 +345,7 @@ test("if Calamari still reports a break after ending one it stays and the panel 
   const state = breakStart(clockIn(emptyState(), "09:00"), "12:00")
   const r = applyStamp(state, "break-end", { ok: true, onBreak: true }, at("12:30"))
   assert.deepEqual(view(r.state, "12:30"), { kind: "break", text: "0:30" })
-  assert.equal(r.error, "Pause beenden: Calamari meldet weiter eine Pause. Bitte im Web prüfen.")
+  assert.equal(r.error, "End break: Calamari reports a break still. Please check in the web.")
   assert.equal(r.pollNow, true)
 })
 
@@ -379,15 +370,15 @@ test("if no shift was running at all at the clock-out it is not an end of day an
   const r = applyStamp(state, "clock-out", { ok: true, running: false, stamped: false }, at("16:00"))
   assert.equal(r.state.clockedOutAt, null)
   assert.deepEqual(view(r.state, "16:00"), { kind: "idle", text: "" })
-  assert.equal(r.error, "Ausstempeln: Calamari meldet keine laufende Schicht.")
+  assert.equal(r.error, "Clock out: Calamari reports no running shift.")
   assert.equal(r.pollNow, true)
   assert.equal(workedMinutes(r.state, at("16:00")), 0)
 })
 
 test("the buttons are named after the actions", () => {
-  assert.equal(stampLabel("break-start"), "Pause beginnen")
-  assert.equal(stampLabel("break-end"), "Pause beenden")
-  assert.equal(stampLabel("clock-out"), "Ausstempeln")
+  assert.equal(stampLabel("break-start"), "Begin break")
+  assert.equal(stampLabel("break-end"), "End break")
+  assert.equal(stampLabel("clock-out"), "Clock out")
 })
 
 test("if a shift was last running yesterday the plugin asks in the morning about the previous day's end", () => {
@@ -490,7 +481,7 @@ test("the panel names the total time observed today as soon as there is one", ()
   assert.equal(workedText(clockIn(emptyState(), "09:00"), at("09:00")), "")
   assert.equal(
     workedText(clockOut(clockIn(emptyState(), "09:00"), "12:05"), at("13:00")),
-    "Heute gearbeitet (beobachtet): 3:05",
+    "Worked today (observed): 3:05",
   )
 })
 
@@ -598,7 +589,7 @@ test("after a break started elsewhere its time still does not count towards toda
 
 test("the break names its start, or that it is not known", () => {
   assert.equal(breakSinceText(breakStart(clockIn(emptyState(), "09:00"), "12:00")), "12:00")
-  assert.equal(breakSinceText(seenBreak("09:00", "12:10")), "spätestens 12:10")
+  assert.equal(breakSinceText(seenBreak("09:00", "12:10")), "12:10 at the latest")
 })
 
 test("ending a break started elsewhere keeps the shift's start time", () => {
@@ -646,7 +637,7 @@ test("in a break the panel offers the end of day, otherwise not", () => {
   assert.equal(endOfDayAction({ kind: "break", text: "0:10" }), "break-clock-out")
   assert.equal(endOfDayAction({ kind: "running", text: "1:00" }), null)
   assert.equal(endOfDayAction({ kind: "idle", text: "" }), null)
-  assert.equal(stampLabel("break-clock-out"), "Feierabend")
+  assert.equal(stampLabel("break-clock-out"), "End of day")
   assert.deepEqual(helperCommand("break-clock-out", { defaultProject: "X", breakType: "Y" }), ["clock-out-break"])
 })
 
@@ -687,7 +678,7 @@ test("if no shift was running any more at the end of day out of the break the pa
     at("17:35"),
   )
   assert.equal(r.state.clockedOutAt, null)
-  assert.equal(r.error, "Feierabend: Calamari meldet keine laufende Schicht.")
+  assert.equal(r.error, "End of day: Calamari reports no running shift.")
   assert.equal(r.pollNow, true)
 })
 

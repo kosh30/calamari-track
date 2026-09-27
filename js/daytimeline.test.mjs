@@ -168,7 +168,7 @@ test("the tooltip names the core time and the exact times of the shifts", () => 
   const state = running(ended(emptyState(), "09:00", "12:00"), "12:30", "14:00")
   assert.equal(
     line(state, at("14:00")).tooltip,
-    ["Kernzeit 09:00–16:45", "Schicht 09:00–12:00", "Schicht seit 12:30 (läuft)"].join("\n"),
+    ["Core time 09:00–16:45", "Shift 09:00–12:00", "Shift since 12:30 (running)"].join("\n"),
   )
 })
 
@@ -176,10 +176,10 @@ test("the tooltip names the running break and how exactly its start is known", (
   const known = onBreak(emptyState(), "09:00", "12:30", "12:30")
   assert.equal(
     line(known, at("13:10")).tooltip,
-    ["Kernzeit 09:00–16:45", "Schicht seit 09:00 (läuft)", "Pause seit 12:30"].join("\n"),
+    ["Core time 09:00–16:45", "Shift since 09:00 (running)", "Break since 12:30"].join("\n"),
   )
   const guessed = applyStatus(running(emptyState(), "09:00"), "break", at("12:40")).state
-  assert.ok(line(guessed, at("13:10")).tooltip.endsWith("Pause seit spätestens 12:40"))
+  assert.ok(line(guessed, at("13:10")).tooltip.endsWith("Break since 12:40 at the latest"))
 })
 
 test("breaks that have ended sit inside the shifts: the tooltip says so instead of leaving them out", () => {
@@ -189,7 +189,7 @@ test("breaks that have ended sit inside the shifts: the tooltip says so instead 
     startedAt: "09:00",
   }).state
   assert.equal(back.breakMinutes, 30)
-  assert.ok(line(back, at("14:00")).tooltip.endsWith("Beendete Pausen: 0:30 (in den Schichten enthalten)"))
+  assert.ok(line(back, at("14:00")).tooltip.endsWith("Breaks ended: 0:30 (contained in the shifts)"))
 })
 
 test("with no ended break the tooltip stays silent about it", () => {

@@ -15,6 +15,7 @@
 
 import { minuteOfDay, toHhmm, toMinutes, toSpan, ymd } from "./daytime.mjs"
 import { breakSinceText, inPause } from "./shiftclock.mjs"
+import { t as defaultT } from "./i18n.mjs"
 
 // Today's shifts as { start, end } in minutes of the day, in order: the ended
 // ones the plugin saw, plus the running one up to now — or up to the start of
@@ -37,15 +38,17 @@ function shiftSpans(state, now) {
 }
 
 // The exact times behind the picture, as the tooltip spells them.
-function tooltip(core, spans, state) {
-  const lines = [`Kernzeit ${toHhmm(core.start)}–${toHhmm(core.end)}`]
+function tooltip(core, spans, state, t) {
+  const lines = [t("timeline.coreTime", { from: toHhmm(core.start), to: toHhmm(core.end) })]
   for (const span of spans)
     lines.push(
-      span.running ? `Schicht seit ${toHhmm(span.start)} (läuft)` : `Schicht ${toHhmm(span.start)}–${toHhmm(span.end)}`,
+      span.running
+        ? t("timeline.shiftSince", { from: toHhmm(span.start) })
+        : t("timeline.shiftRange", { from: toHhmm(span.start), to: toHhmm(span.end) }),
     )
-  if (inPause(state)) lines.push(`Pause seit ${breakSinceText(state)}`)
+  if (inPause(state)) lines.push(t("timeline.breakSince", { since: breakSinceText(state, t) }))
   const ended = state.breakMinutes || 0
-  if (ended > 0) lines.push(`Beendete Pausen: ${toSpan(ended)} (in den Schichten enthalten)`)
+  if (ended > 0) lines.push(t("timeline.endedBreaks", { span: toSpan(ended) }))
   return lines.join("\n")
 }
 
@@ -54,7 +57,7 @@ function tooltip(core, spans, state) {
 // draw, else { startText, endText, segments, nowFraction, tooltip }: a segment
 // is { from, to, running }, both ends a share of the line, and nowFraction is
 // the share "now" sits at, null when it lies outside the line.
-export function timelineView({ state, now, core }) {
+export function timelineView({ state, now, core, t = defaultT }) {
   // A day without a core time has no window to be a share of: the line is
   // absent, as the header's core-time bar is (js/panelheader.mjs).
   if (!core) return null
@@ -76,7 +79,7 @@ export function timelineView({ state, now, core }) {
     endText: toHhmm(end),
     segments: spans.map((span) => ({ from: share(span.start), to: share(span.end), running: span.running })),
     nowFraction,
-    tooltip: tooltip(core, spans, state),
+    tooltip: tooltip(core, spans, state, t),
   }
 }
 

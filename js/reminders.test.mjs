@@ -112,8 +112,8 @@ test("yesterday's work schedule does not apply today", () => {
 
 test("the stamp reminder names the start of the core time", () => {
   assert.deepEqual(notification({ type: "stamp-reminder" }, workday), {
-    headline: "Noch nicht eingestempelt",
-    body: "Die Kernzeit läuft seit 09:00.",
+    headline: "Not clocked in yet",
+    body: "The core time has been running since 09:00.",
     click: "panel",
   })
 })
@@ -168,17 +168,17 @@ test("an absence by the hour is not a day off", () => {
   assert.deepEqual(types(decide(at("10:00"), day, noShift("10:00"), config)), ["stamp-reminder"])
 })
 
-test("with „Heute frei“ there is no stamp reminder today, after a restart too", () => {
+test("with „Today off“ there is no stamp reminder today, after a restart too", () => {
   const state = restoreState(JSON.stringify(setDayOff(noShift("08:00"), true, at("08:00"))))
   assert.deepEqual(decide(at("10:00"), withDay({}), state, config), quietDay)
 })
 
-test("„Heute frei“ can be taken back", () => {
+test("„Today off“ can be taken back", () => {
   const state = setDayOff(setDayOff(noShift("08:00"), true, at("08:00")), false, at("10:00"))
   assert.deepEqual(types(decide(at("10:00"), withDay({}), state, config)), ["stamp-reminder"])
 })
 
-test("„Heute frei“ no longer applies the next day", () => {
+test("„Today off“ no longer applies the next day", () => {
   const monday = setDayOff(
     applyStatus(emptyState(), "stopped", at("08:00", "2026-09-21")).state,
     true,
@@ -286,8 +286,8 @@ test("after the break ends no break reminder comes any more", () => {
 
 test("the break reminder names the start of the break", () => {
   assert.deepEqual(notification({ type: "break-reminder" }, workday, onBreak("12:00")), {
-    headline: "Pause läuft noch",
-    body: "Die Pause läuft seit 12:00.",
+    headline: "The break is still running",
+    body: "The break has been running since 12:00.",
     click: "panel",
   })
 })
@@ -439,19 +439,19 @@ test("the logic's defaults are the manifest's", () => {
 test("the soft hint, the final warning and the correction hint name their times", () => {
   const hint = decide(at("17:15"), workday, working(), eveningConfig).actions[0]
   assert.deepEqual(notification(hint, workday, working()), {
-    headline: "Schicht läuft noch",
-    body: "Die Kernzeit endete um 16:45.",
+    headline: "A shift is still running",
+    body: "The core time ended at 16:45.",
     click: "panel",
   })
   const warning = decide(at("19:00"), workday, hinted(), eveningConfig).actions[0]
   assert.deepEqual(notification(warning, workday, hinted()), {
-    headline: "Letzte Warnung",
-    body: "Auto-Abschluss um 19:15. Im Panel: +1 h weiterarbeiten oder jetzt ausstempeln.",
+    headline: "Final warning",
+    body: "Auto-close at 19:15. In the panel: +1 h more work or clock out now.",
     click: "panel",
   })
   assert.deepEqual(notification({ type: "auto-closed", at: "19:15", lastActivity: null }, workday, hinted()), {
-    headline: "Schicht automatisch beendet",
-    body: "Um 19:15 ausgestempelt. Bitte die Endzeit in Calamari korrigieren.",
+    headline: "Shift ended automatically",
+    body: "Clocked out at 19:15. Please correct the end time in Calamari.",
     click: "calamari",
   })
 })
@@ -459,13 +459,13 @@ test("the soft hint, the final warning and the correction hint name their times"
 test("after the final warning the panel shows a countdown to the auto-close", () => {
   const state = markSent(hinted(), "final-warning", at("19:00"))
   const r = decide(at("19:03"), workday, state, eveningConfig)
-  assert.equal(countdownText(r, new Date("2026-09-22T19:03:30")), "Auto-Abschluss um 19:15, noch 12 Min")
+  assert.equal(countdownText(r, new Date("2026-09-22T19:03:30")), "Auto-close at 19:15, 12 min left")
   assert.equal(countdownText(decide(at("18:00"), workday, hinted(), eveningConfig), at("18:00")), "")
 })
 
 test("the button that shifts it names the duration configured", () => {
-  assert.equal(extendLabel({}), "+1 h weiterarbeiten")
-  assert.equal(extendLabel({ extendMinutes: 90 }), "+90 Min weiterarbeiten")
+  assert.equal(extendLabel({}), "+1 h more work")
+  assert.equal(extendLabel({ extendMinutes: 90 }), "+90 min more work")
 })
 
 test("the final warning names the shift configured", () => {
@@ -473,7 +473,7 @@ test("the final warning names the shift configured", () => {
   const warning = decide(at("19:00"), workday, hinted(), own).actions[0]
   assert.match(
     notification(warning, workday, hinted(), own).body,
-    /Im Panel: \+90 Min weiterarbeiten oder jetzt ausstempeln\.$/,
+    /In the panel: \+90 min more work or clock out now\.$/,
   )
 })
 
@@ -511,8 +511,8 @@ test("the hint about the day-end close names the last activity of that day", () 
       morningAfter(),
     ),
     {
-      headline: "Schicht vom Vortag beendet",
-      body: "Die Schicht vom 22.09. lief bis zum Tagesende, Calamari hat sie um 23:59 beendet. Bitte die Endzeit dort auf 17:59 korrigieren (letzte Aktivität).",
+      headline: "Yesterday's shift ended",
+      body: "The shift of 09/22 ran to the day's end, Calamari ended it at 23:59. Please correct the end time there to 17:59 (the last activity).",
       click: "calamari",
     },
   )
@@ -522,8 +522,8 @@ test("with no known last activity the hint only asks for the correction", () => 
   assert.deepEqual(
     notification({ type: "day-end-closed", date: "2026-09-22", lastActivity: null }, wednesday, morningAfter()),
     {
-      headline: "Schicht vom Vortag beendet",
-      body: "Die Schicht vom 22.09. lief bis zum Tagesende, Calamari hat sie um 23:59 beendet. Bitte die Endzeit dort korrigieren.",
+      headline: "Yesterday's shift ended",
+      body: "The shift of 09/22 ran to the day's end, Calamari ended it at 23:59. Please correct the end time there.",
       click: "calamari",
     },
   )
@@ -536,7 +536,7 @@ test("the correction hint after the auto-close names the last activity", () => {
   assert.deepEqual(close, { type: "auto-close", lastActivity: "2026-09-22T18:40" })
   assert.deepEqual(
     notification({ type: "auto-closed", at: "19:15", lastActivity: close.lastActivity }, workday, state).body,
-    "Um 19:15 ausgestempelt, letzte Aktivität 18:40. Bitte die Endzeit in Calamari darauf korrigieren.",
+    "Clocked out at 19:15, last activity 18:40. Please correct the end time in Calamari to that.",
   )
 })
 
@@ -596,8 +596,8 @@ test("the break reminder of a break started elsewhere counts from first seeing i
 
 test("the break reminder of a break started elsewhere says its start is not known", () => {
   assert.deepEqual(notification({ type: "break-reminder" }, workday, seenBreak("12:10")), {
-    headline: "Pause läuft noch",
-    body: "Die Pause läuft seit spätestens 12:10.",
+    headline: "The break is still running",
+    body: "The break has been running since 12:10 at the latest.",
     click: "panel",
   })
 })
@@ -654,8 +654,8 @@ test("the final warning in a break offers the end of day", () => {
   const state = pausedAt("18:30")
   const warning = decide(at("19:00"), workday, state, eveningConfig).actions.find((a) => a.type === "final-warning")
   assert.deepEqual(notification(warning, workday, state), {
-    headline: "Letzte Warnung",
-    body: "Auto-Abschluss um 19:15. Im Panel: +1 h weiterarbeiten oder Feierabend.",
+    headline: "Final warning",
+    body: "Auto-close at 19:15. In the panel: +1 h more work or end of day.",
     click: "panel",
   })
 })

@@ -40,7 +40,7 @@ test("the colour that has given way meets the ratio required", () => {
     for (const target of [TEXT, CONTROL]) {
       const got = reached(theme, target)
       assert.ok(got >= target, `${got} < ${target}`)
-      assert.ok(got < target + 0.1, `${got} weit über ${target}`)
+      assert.ok(got < target + 0.1, `${got} far above ${target}`)
     }
 })
 

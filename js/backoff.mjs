@@ -5,6 +5,8 @@
 
 // The failures that waiting helps with. Others (login needed, API key)
 // wait for the user, so the interval stays as it is.
+import { t as defaultT } from "./i18n.mjs"
+
 const BACKOFF_CODES = ["NETWORK", "RATE_LIMITED"]
 // The longest wait between two polls; a set interval above it stays.
 const MAX_MINUTES = 30
@@ -28,18 +30,18 @@ export function pollMinutes(baseMinutes, failures) {
 // sentence, because the bar has no failed action to put in front of them.
 // AUTH_REQUIRED is missing on purpose: it turns authState to "required",
 // so the bar shows the view "auth" and never gets here.
-const USER_ACTION_HINTS = {
-  API_URL_REQUIRED: "Calamari: REST-API-URL fehlt, bitte in den Einstellungen setzen",
-  API_KEY_REQUIRED: "Calamari: API-Key fehlt, bitte bin/calamari api-key ausführen",
-  API_KEY_REJECTED: "Calamari lehnt den API-Key ab, bitte bin/calamari api-key erneut ausführen",
-  API_TERMINAL_MISSING: "Calamari: API Terminal fehlt in Clockin",
-  API_SCOPE_MISSING: "Calamari: dem API-Key fehlt eine Berechtigung",
+const USER_ACTION_IDS = {
+  API_URL_REQUIRED: "backoff.apiUrlRequired",
+  API_KEY_REQUIRED: "backoff.apiKeyRequired",
+  API_KEY_REJECTED: "backoff.apiKeyRejected",
+  API_TERMINAL_MISSING: "backoff.apiTerminalMissing",
+  API_SCOPE_MISSING: "backoff.apiScopeMissing",
 }
 
 // The bar's tooltip for a failed poll with the error code.
-export function errorTooltip(code, retryMinutes) {
-  const retry = `nächster Versuch in ${retryMinutes} Min`
-  if (code === "NETWORK") return `Calamari nicht erreichbar, ${retry}`
-  if (code === "RATE_LIMITED") return `Calamari: zu viele Anfragen, ${retry}`
-  return USER_ACTION_HINTS[code] || "Calamari: Fehler"
+export function errorTooltip(code, retryMinutes, t = defaultT) {
+  const retry = t("backoff.retryIn", { minutes: retryMinutes })
+  if (code === "NETWORK") return t("backoff.network", { retry })
+  if (code === "RATE_LIMITED") return t("backoff.rateLimited", { retry })
+  return t(USER_ACTION_IDS[code] || "backoff.error")
 }

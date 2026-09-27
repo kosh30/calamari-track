@@ -56,11 +56,11 @@ test("invalid input names what is expected", () => {
   )
   assert.equal(r.settings, null)
   assert.deepEqual(r.errors, {
-    stampReminderMinutes: "Eine ganze Zahl von 1 bis 60",
-    pollIntervalMinutes: "Eine ganze Zahl von 1 bis 60",
-    finalWarningTime: "Eine Uhrzeit wie 19:00",
-    coreFriday: "Leer, „frei“ oder eine Kernzeit wie 09:00-16:45",
-    webUrl: "Leer oder eine Adresse wie https://firma.calamari.io",
+    stampReminderMinutes: "A whole number from 1 to 60",
+    pollIntervalMinutes: "A whole number from 1 to 60",
+    finalWarningTime: "A time of day like 19:00",
+    coreFriday: "Empty, “off” or a core time like 09:00-16:45",
+    webUrl: "Empty or an address like https://company.calamari.io",
   })
 })
 
@@ -73,7 +73,7 @@ const grouped = [
 ]
 const groups = [
   { key: "first", title: "Erste" },
-  { key: "second", title: "Zweite", description: "Gilt für alle drei" },
+  { key: "second", title: "Second", description: "Applies to all three" },
   { key: "empty", title: "Leer" },
 ]
 
@@ -91,8 +91,8 @@ test("the groups stand in the manifest's order, with their fields", () => {
 
 test("a group carries its title and its shared explanation", () => {
   const [, second] = formCards(grouped, groups, {})
-  assert.equal(second.title, "Zweite")
-  assert.equal(second.description, "Gilt für alle drei")
+  assert.equal(second.title, "Second")
+  assert.equal(second.description, "Applies to all three")
 })
 
 test("a group without fields does not appear", () => {

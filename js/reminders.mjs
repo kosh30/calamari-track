@@ -15,6 +15,7 @@ import { lastActivity } from "./activity.mjs"
 import { coreTime } from "./daycalendar.mjs"
 import { fromMoment, minuteOfDay, pad, toHhmm, toMinutes, ymd } from "./daytime.mjs"
 import { breakSinceText, inPause } from "./shiftclock.mjs"
+import { t as defaultT } from "./i18n.mjs"
 
 // A failed auto-close is tried again after this many minutes.
 const AUTO_CLOSE_RETRY = 5
@@ -220,53 +221,63 @@ export function markSent(state, type, now) {
 // { type: "auto-closed", at: "HH:MM", lastActivity } once the auto-close
 // stamped out, or for { type: "day-end-closed", date, lastActivity }, the
 // hint about a day Calamari itself ended (js/shiftclock.mjs applyDayEnd).
-export function notification(action, day, state, settings) {
+export function notification(action, day, state, settings, t = defaultT) {
   const panel = (headline, body) => ({ headline, body, click: "panel" })
-  if (action.type === "soft-hint") return panel("Schicht läuft noch", `Die Kernzeit endete um ${action.coreEnd}.`)
+  if (action.type === "soft-hint")
+    return panel(t("notify.softHint.headline"), t("notify.softHint.body", { coreEnd: action.coreEnd }))
   if (action.type === "final-warning")
     return panel(
-      "Letzte Warnung",
-      `Auto-Abschluss um ${action.autoCloseAt}. Im Panel: ${extendLabel(settings)} oder ${inPause(state) ? "Feierabend" : "jetzt ausstempeln"}.`,
+      t("notify.finalWarning.headline"),
+      t("notify.finalWarning.body", {
+        at: action.autoCloseAt,
+        extend: extendLabel(settings, t),
+        alt: inPause(state) ? t("notify.finalWarning.altEndOfDay") : t("notify.finalWarning.altClockOut"),
+      }),
     )
   if (action.type === "auto-closed") {
     const body = action.lastActivity
-      ? `Um ${action.at} ausgestempelt, letzte Aktivität ${clockOf(action.lastActivity)}. Bitte die Endzeit in Calamari darauf korrigieren.`
-      : `Um ${action.at} ausgestempelt. Bitte die Endzeit in Calamari korrigieren.`
-    return { headline: "Schicht automatisch beendet", body, click: "calamari" }
+      ? t("notify.autoClosed.bodyWithActivity", { at: action.at, lastActivity: clockOf(action.lastActivity) })
+      : t("notify.autoClosed.body", { at: action.at })
+    return { headline: t("notify.autoClosed.headline"), body, click: "calamari" }
   }
   if (action.type === "day-end-closed") {
-    const intro = `Die Schicht vom ${dayOf(action.date)} lief bis zum Tagesende, Calamari hat sie um 23:59 beendet.`
+    const date = dayOf(action.date, t)
     const body = action.lastActivity
-      ? `${intro} Bitte die Endzeit dort auf ${clockOf(action.lastActivity)} korrigieren (letzte Aktivität).`
-      : `${intro} Bitte die Endzeit dort korrigieren.`
-    return { headline: "Schicht vom Vortag beendet", body, click: "calamari" }
+      ? t("notify.dayEndClosed.bodyWithActivity", { date, lastActivity: clockOf(action.lastActivity) })
+      : t("notify.dayEndClosed.body", { date })
+    return { headline: t("notify.dayEndClosed.headline"), body, click: "calamari" }
   }
   if (action.type === "break-reminder")
-    return panel("Pause läuft noch", `Die Pause läuft seit ${breakSinceText(state)}.`)
-  return panel("Noch nicht eingestempelt", `Die Kernzeit läuft seit ${day.coreStart}.`)
+    return panel(
+      t("notify.breakReminder.headline"),
+      t("notify.breakReminder.body", { since: breakSinceText(state, t) }),
+    )
+  return panel(t("notify.stampReminder.headline"), t("notify.stampReminder.body", { coreStart: day.coreStart }))
 }
 
 function clockOf(stamp) {
   return toHhmm(minuteOfDay(fromMoment(stamp)))
 }
 
-// "DD.MM." of a "YYYY-MM-DD" date or a "YYYY-MM-DDTHH:MM" moment.
-function dayOf(stamp) {
+// A day without a year, of a "YYYY-MM-DD" date or a "YYYY-MM-DDTHH:MM"
+// moment. The order is the locale's own: day first in de, pl and ru, month
+// first in en.
+function dayOf(stamp, t) {
   const d = fromMoment(`${String(stamp).slice(0, 10)}T00:00`)
-  return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.`
+  return t("date.dayMonth", { day: pad(d.getDate()), month: pad(d.getMonth() + 1) })
 }
 
 // The panel's countdown line for a decision with a pending auto-close.
-export function countdownText(decision, now) {
+export function countdownText(decision, now, t = defaultT) {
   if (!decision.autoCloseAt) return ""
   const left = Math.max(Math.ceil((decision.autoCloseAt - now) / 60000), 0)
-  return `Auto-Abschluss um ${toHhmm(minuteOfDay(decision.autoCloseAt))}, noch ${left} Min`
+  return t("panel.countdown", { at: toHhmm(minuteOfDay(decision.autoCloseAt)), left })
 }
 
-// The text of the "+1 h weiterarbeiten" button for the configured shift.
-export function extendLabel(settings) {
+// The text of the panel's "work on" button for the configured shift.
+export function extendLabel(settings, t = defaultT) {
   const minutes = withDefaults(settings).extendMinutes
-  return minutes === 60 ? "+1 h weiterarbeiten" : `+${minutes} Min weiterarbeiten`
+  return minutes === 60 ? t("panel.extendHour") : t("panel.extendMinutes", { minutes })
 }
 
 // For the closing actions of decide(): the stamp action to run and the

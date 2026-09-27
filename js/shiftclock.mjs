@@ -26,7 +26,7 @@
 //   pendingEnd HH:MM start of a shift that ended outside the plugin and
 //              whose end `end-time` still has to find
 //   stampedToday  true once a shift of today was seen running
-//   dayOff     true after the panel switch "Heute frei" (today only)
+//   dayOff     true after the panel's day-off switch (today only)
 //   postponedTo  HH:MM the next final warning was moved to by "+1 h"
 //              (js/reminders.mjs postpone)
 //   sent       { reminder type: HH:MM last sent today }, see js/reminders.mjs
@@ -41,6 +41,7 @@
 
 import { awayCovers, lastActivity } from "./activity.mjs"
 import { minuteOfDay, toHhmm, toMinutes, toSpan, ymd } from "./daytime.mjs"
+import { t as defaultT } from "./i18n.mjs"
 
 export function emptyState() {
   return {
@@ -143,9 +144,9 @@ function addShift(state, start, end) {
 }
 
 // The panel's line for the observed total of today ("" before any).
-export function workedText(state, now) {
+export function workedText(state, now, t = defaultT) {
   const minutes = workedMinutes(state, now)
-  return minutes > 0 ? `Heute gearbeitet (beobachtet): ${toSpan(minutes)}` : ""
+  return minutes > 0 ? t("shift.workedToday", { span: toSpan(minutes) }) : ""
 }
 
 // Minutes worked today as far as the plugin saw: its ended shifts plus
@@ -253,13 +254,13 @@ function applyBreakStart(state, now) {
   })
 }
 
-// The panel switch "Heute frei". Like everything in the state it belongs
+// The panel's day-off switch. Like everything in the state it belongs
 // to today and is gone tomorrow.
 export function setDayOff(state, on, now) {
   return Object.assign(forToday(state, now), { dayOff: on })
 }
 
-// Whether "Heute frei" is on for the day of now; a switch from yesterday
+// Whether the day-off switch is on for the day of now; one from yesterday
 // no longer counts, even before the first poll of the new day.
 export function dayOffToday(state, now) {
   return state.dayOff === true && state.date === ymd(now)
@@ -284,8 +285,8 @@ export function barView({ state, now, authState, failed, reminding }) {
 }
 
 // When the running break began, as far as the plugin knows.
-export function breakSinceText(state) {
-  return `${state.breakStartUnknown ? "spätestens " : ""}${state.breakSince}`
+export function breakSinceText(state, t = defaultT) {
+  return state.breakStartUnknown ? t("break.sinceAtLatest", { time: state.breakSince }) : state.breakSince
 }
 
 // Whether the running shift is in a break.
@@ -297,17 +298,19 @@ function duration(since, now) {
   return toSpan(Math.max(minuteOfDay(now) - toMinutes(since), 0))
 }
 
-const STAMP_ACTIONS = {
-  "clock-in": "Einstempeln",
-  "clock-out": "Ausstempeln",
-  "break-start": "Pause beginnen",
-  "break-end": "Pause beenden",
-  "break-clock-out": "Feierabend",
+const STAMP_LABEL_IDS = {
+  "clock-in": "stamp.clockIn",
+  "clock-out": "stamp.clockOut",
+  "break-start": "stamp.breakStart",
+  "break-end": "stamp.breakEnd",
+  "break-clock-out": "stamp.endOfDay",
 }
 
-// The panel's button text for a stamp action.
-export function stampLabel(action) {
-  return STAMP_ACTIONS[action]
+// The panel's button text for a stamp action; undefined for an action that has
+// none, which is how the panel asks whether to show a button at all.
+export function stampLabel(action, t = defaultT) {
+  const id = STAMP_LABEL_IDS[action]
+  return id ? t(id) : undefined
 }
 
 // The helper command behind a stamp action, with the names from the
@@ -325,26 +328,30 @@ export function helperCommand(action, settings) {
   if (action === "break-clock-out") return ["clock-out-break"]
   return [action]
 }
-const STAMP_CAUSES = {
-  NETWORK: "Calamari nicht erreichbar",
-  RATE_LIMITED: "zu viele Anfragen, bitte gleich erneut versuchen",
-  AUTH_REQUIRED: "Anmeldung nötig",
+const CAUSE_IDS = {
+  NETWORK: "cause.network",
+  RATE_LIMITED: "cause.rateLimited",
+  AUTH_REQUIRED: "cause.authRequired",
   // The REST API of the clock-in (ADR 0003).
-  API_TERMINAL_MISSING: "API Terminal fehlt in Calamari Clockin",
-  API_SCOPE_MISSING: "keine Berechtigung für den API-Key",
-  API_KEY_REQUIRED: "kein API-Key, bitte bin/calamari api-key ausführen",
-  API_KEY_REJECTED: "Calamari lehnt den API-Key ab",
-  API_URL_REQUIRED: "keine REST-API-URL, bitte in den Einstellungen setzen",
+  API_TERMINAL_MISSING: "cause.apiTerminalMissing",
+  API_SCOPE_MISSING: "cause.apiScopeMissing",
+  API_KEY_REQUIRED: "cause.apiKeyRequired",
+  API_KEY_REJECTED: "cause.apiKeyRejected",
+  API_URL_REQUIRED: "cause.apiUrlRequired",
 }
 
-function stampErrorText(action, error) {
+function stampErrorText(action, error, t) {
+  // A code we do not know falls back to whatever Calamari said, untranslated:
+  // its own words beat a message of ours that guesses at what happened.
   const cause =
     error.code === "PROJECT_UNKNOWN"
-      ? `Projekt „${error.project}“ gibt es in Calamari nicht`
+      ? t("cause.projectUnknown", { project: error.project })
       : error.code === "BREAK_TYPE_UNKNOWN"
-        ? `Pausentyp „${error.breakType}“ gibt es in Calamari nicht`
-        : STAMP_CAUSES[error.code] || error.message || error.code
-  return `${STAMP_ACTIONS[action]} fehlgeschlagen: ${cause}. Es wird nichts nachgereicht.`
+        ? t("cause.breakTypeUnknown", { breakType: error.breakType })
+        : CAUSE_IDS[error.code]
+          ? t(CAUSE_IDS[error.code])
+          : error.message || error.code
+  return t("stamp.failed", { action: stampLabel(action, t), cause })
 }
 
 // The stamp action the panel offers for a bar view: "clock-out" while a
@@ -375,13 +382,13 @@ export function endOfDayAction(view) {
 // stamped anyway), so pollNow asks Calamari right away, unless it is
 // throttling us. endTimeKnown: the clock-out ended the shift at its
 // break's start, so the end time needs no correction.
-export function applyStamp(state, action, out, now) {
-  return Object.assign({ endTimeKnown: false }, stampResult(state, action, out, now))
+export function applyStamp(state, action, out, now, t = defaultT) {
+  return Object.assign({ endTimeKnown: false }, stampResult(state, action, out, now, t))
 }
 
-function stampResult(state, action, out, now) {
+function stampResult(state, action, out, now, t) {
   if (!out.ok) {
-    return { state, error: stampErrorText(action, out.error), pollNow: out.error.code !== "RATE_LIMITED" }
+    return { state, error: stampErrorText(action, out.error, t), pollNow: out.error.code !== "RATE_LIMITED" }
   }
   // A break answers with Calamari's break status; one it does not confirm
   // is left as it was, and the panel says so.
@@ -391,15 +398,15 @@ function stampResult(state, action, out, now) {
       const next = begin ? applyBreakStart(state, now) : endPause(forToday(state, now), minuteOfDay(now))
       return { state: next, error: "", pollNow: false }
     }
-    const says = begin ? "keine Pause" : "weiter eine Pause"
-    return { state, error: `${STAMP_ACTIONS[action]}: Calamari meldet ${says}. Bitte im Web prüfen.`, pollNow: true }
+    const says = begin ? t("stamp.saysNoBreak") : t("stamp.saysStillBreak")
+    return { state, error: t("stamp.mismatch", { action: stampLabel(action, t), says }), pollNow: true }
   }
   if ((action === "clock-out" || action === "break-clock-out") && out.stamped === false) {
     // No shift ran, so nothing was stamped: no end of day, and nothing to
     // correct; look again.
     return {
       state: stopShift(Object.assign({}, state, { running: false }), now),
-      error: `${STAMP_ACTIONS[action]}: Calamari meldet keine laufende Schicht.`,
+      error: t("stamp.noShift", { action: stampLabel(action, t) }),
       pollNow: true,
     }
   }
@@ -412,7 +419,7 @@ function stampResult(state, action, out, now) {
   // Calamari took the clock-in but shows no shift: say so, and look again.
   return {
     state: applyStatus(state, "stopped", now).state,
-    error: `${STAMP_ACTIONS[action]}: Calamari meldet keine laufende Schicht. Bitte im Web prüfen.`,
+    error: t("stamp.noShiftCheck", { action: stampLabel(action, t) }),
     pollNow: true,
   }
 }
