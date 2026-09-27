@@ -8,9 +8,10 @@ import "js/activity.mjs" as Activity
 import "js/backoff.mjs" as Backoff
 
 // Headless singleton for the plugin. Owns the runtime state, the poll timer
-// and the calls to bin/calamari (keepLoaded: code changes here need a shell
-// restart). Decisions live in js/shiftclock.mjs and js/reminders.mjs; this
-// file only wires them.
+// and the calls to bin/calamari. Decisions live in js/shiftclock.mjs and
+// js/reminders.mjs; this file only wires them. Like every file of the plugin
+// this one needs omarchy-restart-shell to take effect, and being keepLoaded
+// there is no other way to reload it either.
 Item {
     id: root
 

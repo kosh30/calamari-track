@@ -40,8 +40,11 @@ ln -s "$PWD" ~/.config/omarchy/plugins/kosh.calamari-tracker
 omarchy plugin enable kosh.calamari-tracker --section right
 ```
 
-The widget and the panel reload on save. The service (`Service.qml`) stays
-loaded and needs `omarchy-restart-shell` after a change.
+No plugin file reloads on save. The shell watches no QML of the plugin —
+neither `~/.config/omarchy/plugins` nor anything in it, nor the checkout the
+symlink points at — so every change becomes live only after
+`omarchy-restart-shell`. The service (`Service.qml`) is `keepLoaded` on top of
+that, so it could not be reloaded any other way.
 
 ## Login
 

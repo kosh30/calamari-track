@@ -32,7 +32,7 @@ Der Plan besteht aus vertikalen Scheiben. Jede Scheibe endet mit etwas, das man 
 - qmllint-Importkontext in `lint/`: wörtliche Snapshots von omarchy-shell (`lint/refresh.sh`) plus Quickshell-Stubs aus dem Screen-Time-Plugin.
 - Testbefehle: `node --test js/` und `python3 -m unittest`.
 
-**Fertig, wenn** das Icon in der Bar erscheint und Hot-Reload beim Speichern funktioniert.
+**Fertig, wenn** das Icon in der Bar erscheint und eine Änderung daran nach `omarchy-restart-shell` zu sehen ist (beim Speichern lädt nichts neu, siehe `CLAUDE.md`).
 
 ## Scheibe 1: OAuth-Login (größtes Risiko)
 

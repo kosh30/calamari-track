@@ -13,7 +13,16 @@ Dieses Repo liegt auf **GitHub** (`kosh30/calamari-track`), ausdrücklich abweic
 - Formatieren: `tools/format` (`--check` prüft nur)
 - Log des Helpers (Fehler, gesendete REST-Anfragen, Stempelungen): `journalctl -t calamari-tracker`
 - Lint: `/usr/lib/qt6/bin/qmllint -I lint *.qml` (Snapshots auffrischen: `lint/refresh.sh`)
-- Installiert per Symlink `~/.config/omarchy/plugins/kosh.calamari-tracker`. Widget und Panel laden beim Speichern neu. `Service.qml` ist `keepLoaded` und braucht `omarchy-restart-shell`.
+- Installiert per Symlink `~/.config/omarchy/plugins/kosh.calamari-tracker`.
+- Eine Änderung wirksam machen: `omarchy-restart-shell` (beim Speichern lädt nichts neu, siehe „Neu laden“)
+
+## Neu laden
+
+**Keine Datei des Plugins lädt beim Speichern neu.** Die Shell überwacht kein QML des Plugins — weder `~/.config/omarchy/plugins` selbst noch irgendetwas darin, und auch nicht das Repo, in das der Symlink zeigt. Sie setzt kein `Quickshell.watchFiles`, und Quickshell hat dafür keinen Schalter auf der Kommandozeile. Ein echtes Verzeichnis statt des Symlinks ändert daran nichts.
+
+Jede Änderung — `Widget.qml`, `Panel.qml`, `SettingsForm.qml`, `ActionButton.qml`, `Service.qml` — wird also erst nach `omarchy-restart-shell` wirksam. `Service.qml` ist zusätzlich `keepLoaded` und wäre auch auf keinem anderen Weg neu zu laden.
+
+Darum vor jeder Messung neu starten: eine Änderung, die nicht neu geladen wurde, sieht genauso aus wie eine, die nicht wirkt — und dann wird im Code gesucht, der längst stimmt.
 
 ## Manuelle Tests
 
@@ -24,6 +33,7 @@ Zum Testen der Oberfläche sind Eingabe-Automatisierung und Bildschirmaufnahmen 
 - `wf-recorder -g "$(slurp)" -f <datei>.mp4` für Bildschirmaufnahmen (Stop per SIGINT)
 - Screenshots und Aufnahmen dürfen zur Analyse gelesen werden
 - Artefakte gehören ins Scratchpad, nicht ins Repo
+- Vor jeder Messung `omarchy-restart-shell`, siehe „Neu laden“
 
 ## Agent skills
 
