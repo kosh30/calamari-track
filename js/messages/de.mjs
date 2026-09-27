@@ -1,0 +1,117 @@
+// German. Until the language setting landed, this was the plugin's only
+// language, so these are the literals as they stood in the code — moved, not
+// rewritten. Where a German word is also a stored value („frei“) or one of
+// Calamari's own („Check-in“), it stays what it was.
+
+export const de = {
+  "bar.name": "Calamari Tracker",
+  "bar.authRequired": "Calamari: Anmeldung nötig",
+  "bar.running": "Calamari: Schicht läuft",
+  "bar.reminder": "Calamari: noch nicht eingestempelt",
+  "bar.break": "Calamari: Pause",
+  "bar.idle": "Calamari: keine laufende Schicht",
+
+  "stamp.clockIn": "Einstempeln",
+  "stamp.clockOut": "Ausstempeln",
+  "stamp.breakStart": "Pause beginnen",
+  "stamp.breakEnd": "Pause beenden",
+  "stamp.endOfDay": "Feierabend",
+  "stamp.clockOutNow": "Jetzt ausstempeln",
+
+  "cause.network": "Calamari nicht erreichbar",
+  "cause.rateLimited": "zu viele Anfragen, bitte gleich erneut versuchen",
+  "cause.authRequired": "Anmeldung nötig",
+  "cause.apiTerminalMissing": "API Terminal fehlt in Calamari Clockin",
+  "cause.apiScopeMissing": "keine Berechtigung für den API-Key",
+  "cause.apiKeyRequired": "kein API-Key, bitte bin/calamari api-key ausführen",
+  "cause.apiKeyRejected": "Calamari lehnt den API-Key ab",
+  "cause.apiUrlRequired": "keine REST-API-URL, bitte in den Einstellungen setzen",
+  "cause.projectUnknown": (p) => `Projekt „${p.project}“ gibt es in Calamari nicht`,
+  "cause.breakTypeUnknown": (p) => `Pausentyp „${p.breakType}“ gibt es in Calamari nicht`,
+
+  "stamp.failed": (p) => `${p.action} fehlgeschlagen: ${p.cause}. Es wird nichts nachgereicht.`,
+  "stamp.saysNoBreak": "keine Pause",
+  "stamp.saysStillBreak": "weiter eine Pause",
+  "stamp.mismatch": (p) => `${p.action}: Calamari meldet ${p.says}. Bitte im Web prüfen.`,
+  "stamp.noShift": (p) => `${p.action}: Calamari meldet keine laufende Schicht.`,
+  "stamp.noShiftCheck": (p) => `${p.action}: Calamari meldet keine laufende Schicht. Bitte im Web prüfen.`,
+
+  "shift.workedToday": (p) => `Heute gearbeitet (beobachtet): ${p.span}`,
+  "break.sinceAtLatest": (p) => `spätestens ${p.time}`,
+
+  "header.statusPolling": "Schichtstatus wird abgefragt …",
+  "header.statusUnknown": "Schichtstatus unbekannt",
+  "header.authRequired": "Anmeldung nötig",
+  "header.reminder": "Noch nicht eingestempelt, die Kernzeit läuft",
+  "header.breakSince": (p) => `Pause seit ${p.since}`,
+  "header.endOfDaySince": (p) => `Feierabend seit ${p.time}`,
+  "header.noShift": "Keine laufende Schicht",
+  "header.runningSince": (p) => `Schicht läuft seit ${p.time}`,
+  "header.running": "Schicht läuft",
+  "header.coreDone": "Kernzeit beendet",
+  "header.coreLeft": (p) => `noch ${p.span} bis Ende der Kernzeit`,
+
+  "backoff.retryIn": (p) => `nächster Versuch in ${p.minutes} Min`,
+  "backoff.network": (p) => `Calamari nicht erreichbar, ${p.retry}`,
+  "backoff.rateLimited": (p) => `Calamari: zu viele Anfragen, ${p.retry}`,
+  "backoff.apiUrlRequired": "Calamari: REST-API-URL fehlt, bitte in den Einstellungen setzen",
+  "backoff.apiKeyRequired": "Calamari: API-Key fehlt, bitte bin/calamari api-key ausführen",
+  "backoff.apiKeyRejected": "Calamari lehnt den API-Key ab, bitte bin/calamari api-key erneut ausführen",
+  "backoff.apiTerminalMissing": "Calamari: API Terminal fehlt in Clockin",
+  "backoff.apiScopeMissing": "Calamari: dem API-Key fehlt eine Berechtigung",
+  "backoff.error": "Calamari: Fehler",
+
+  "timeline.coreTime": (p) => `Kernzeit ${p.from}–${p.to}`,
+  "timeline.shiftSince": (p) => `Schicht seit ${p.from} (läuft)`,
+  "timeline.shiftRange": (p) => `Schicht ${p.from}–${p.to}`,
+  "timeline.breakSince": (p) => `Pause seit ${p.since}`,
+  "timeline.endedBreaks": (p) => `Beendete Pausen: ${p.span} (in den Schichten enthalten)`,
+
+  "notify.softHint.headline": "Schicht läuft noch",
+  "notify.softHint.body": (p) => `Die Kernzeit endete um ${p.coreEnd}.`,
+  "notify.finalWarning.headline": "Letzte Warnung",
+  "notify.finalWarning.body": (p) => `Auto-Abschluss um ${p.at}. Im Panel: ${p.extend} oder ${p.alt}.`,
+  "notify.finalWarning.altEndOfDay": "Feierabend",
+  "notify.finalWarning.altClockOut": "jetzt ausstempeln",
+  "notify.autoClosed.headline": "Schicht automatisch beendet",
+  "notify.autoClosed.body": (p) => `Um ${p.at} ausgestempelt. Bitte die Endzeit in Calamari korrigieren.`,
+  "notify.autoClosed.bodyWithActivity": (p) =>
+    `Um ${p.at} ausgestempelt, letzte Aktivität ${p.lastActivity}. Bitte die Endzeit in Calamari darauf korrigieren.`,
+  "notify.dayEndClosed.headline": "Schicht vom Vortag beendet",
+  "notify.dayEndClosed.body": (p) =>
+    `Die Schicht vom ${p.date} lief bis zum Tagesende, Calamari hat sie um 23:59 beendet. Bitte die Endzeit dort korrigieren.`,
+  "notify.dayEndClosed.bodyWithActivity": (p) =>
+    `Die Schicht vom ${p.date} lief bis zum Tagesende, Calamari hat sie um 23:59 beendet. Bitte die Endzeit dort auf ${p.lastActivity} korrigieren (letzte Aktivität).`,
+  "notify.breakReminder.headline": "Pause läuft noch",
+  "notify.breakReminder.body": (p) => `Die Pause läuft seit ${p.since}.`,
+  "notify.stampReminder.headline": "Noch nicht eingestempelt",
+  "notify.stampReminder.body": (p) => `Die Kernzeit läuft seit ${p.coreStart}.`,
+
+  "panel.countdown": (p) => `Auto-Abschluss um ${p.at}, noch ${p.left} Min`,
+  "panel.extendHour": "+1 h weiterarbeiten",
+  "panel.extendMinutes": (p) => `+${p.minutes} Min weiterarbeiten`,
+  "panel.settings": "Einstellungen",
+  "panel.dayOff": "Heute frei",
+  "panel.dayOffUndo": "Heute frei (zurücknehmen)",
+  "login.inBrowser": "Anmeldung im Browser läuft …",
+  "login.asUser": (p) => `Angemeldet als ${p.name}`,
+  "login.signedIn": "Angemeldet",
+  "login.required": "Anmeldung nötig",
+  "login.unreachable": "Calamari nicht erreichbar",
+  "login.connecting": "Verbinde …",
+  "login.signInAgain": "Neu anmelden",
+
+  "settings.title": "Einstellungen",
+  "settings.cancel": "Abbrechen",
+  "settings.save": "Speichern",
+  "settings.saveFailed": "Speichern nicht möglich: die Shell hat die Einstellungen nicht übernommen.",
+  "group.other": "Weitere",
+  "validate.integer": (p) => `Eine ganze Zahl von ${p.min} bis ${p.max}`,
+  "validate.time": "Eine Uhrzeit wie 19:00",
+  "validate.coreTime": (p) => `Leer, „${p.off}“ oder eine Kernzeit wie 09:00-16:45`,
+  "validate.url": "Leer oder eine Adresse wie https://firma.calamari.io",
+
+  "coreTime.off": "frei",
+
+  "date.dayMonth": (p) => `${p.day}.${p.month}.`,
+}
