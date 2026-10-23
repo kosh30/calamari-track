@@ -145,7 +145,7 @@ class ManifestTest(unittest.TestCase):
 
 class QtPinTest(unittest.TestCase):
     def test_the_pin_is_read_from_the_install_qt_step(self):
-        self.assertEqual(release.qt_pin((ROOT / ".github" / "workflows" / "ci.yml").read_text()), "6.11.2")
+        self.assertEqual(release.qt_pin((ROOT / ".github" / "workflows" / "ci.yml").read_text()), "6.12.0")
 
     def test_jobs_that_pin_different_qt_versions_are_refused(self):
         ci = "".join(
