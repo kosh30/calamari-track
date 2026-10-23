@@ -163,7 +163,7 @@ branch `stable` only moves at a release. Checks, commit and changelog rules
 and how to release: [CONTRIBUTING.md](CONTRIBUTING.md). Changes per
 release: [CHANGELOG.md](CHANGELOG.md). Security issues: [SECURITY.md](SECURITY.md).
 
-- Terms: [CONTEXT.md](CONTEXT.md), decisions: [docs/adr/](docs/adr/),
+- Terms: [GLOSSARY.md](GLOSSARY.md), decisions: [docs/adr/](docs/adr/),
   order of the work: [docs/PLAN.md](docs/PLAN.md)
 - Lint snapshots of omarchy-shell: refresh with `lint/refresh.sh`
 

@@ -1,6 +1,6 @@
 # Calamari Tracker
 
-An Omarchy shell plugin (Quickshell) that tracks your own working time in Calamari through the official MCP server and reminds you of a forgotten clock-in or clock-out. Terminology: `CONTEXT.md`. Architecture decisions: `docs/adr/`. Order of work: `docs/PLAN.md`.
+An Omarchy shell plugin (Quickshell) that tracks your own working time in Calamari through the official MCP server and reminds you of a forgotten clock-in or clock-out. Terminology: `GLOSSARY.md`. Architecture decisions: `docs/adr/`. Order of work: `docs/PLAN.md`.
 
 ## Hosting
 
@@ -12,7 +12,7 @@ Docs, code, comments, commit messages and changelog entries are English. The int
 
 Three things stay untranslated on purpose. Calamari's own values — the project name, the break type — are quoted inside a message, never looked up as one. `"frei"` is the stored token for a weekday without a core time: the form shows the locale's word for it and always saves `frei`. And `manifest.description` with `barWidget.displayName` cannot be translated at all, because the shell reads them from the file before any plugin code runs.
 
-Where a doc quotes on-screen text it is quoting one language, usually German, and `CONTEXT.md` says which.
+Where a doc quotes on-screen text it is quoting one language, usually German, and `GLOSSARY.md` says which.
 
 ## Commands
 
@@ -55,4 +55,4 @@ Standard vocabulary (needs-triage, needs-info, ready-for-agent, ready-for-human,
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` + `docs/adr/` in the root. See `docs/agents/domain.md`.
+Single-context: `GLOSSARY.md` + `docs/adr/` in the root. See `docs/agents/domain.md`.

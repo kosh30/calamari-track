@@ -19,7 +19,7 @@ The plugin spoke German only, with the text written at the place it was used. Th
 - **Counted messages avoid plural forms.** `min`, `h`, `мин`, `ч` are invariant abbreviations in all four languages, so the two messages that carry a count need no plural rules. Russian would otherwise want three forms and Polish three, and a plural engine for two messages is not worth its own bugs.
 - **Calamari's own values are never translated.** The project name and the break type are what the user typed into the settings and what Calamari stores. They are quoted inside a message, never looked up in it.
 - **`manifest.description` and `barWidget.displayName` stay in one language.** The shell reads them from the file before any plugin code runs (`/usr/share/omarchy/shell/shell.qml:1400`), so no translator can reach them. The schema's field labels *are* reachable, because only our own `SettingsForm.qml` renders them — the shell merely parks the schema in its registry.
-- **The docs quote on-screen text, which is now locale-dependent.** `CONTEXT.md` names the German label beside each English headword. Those quotes are the German UI, and the glossary says so rather than pretending there is one label per term.
+- **The docs quote on-screen text, which is now locale-dependent.** `GLOSSARY.md` names the German label beside each English headword. Those quotes are the German UI, and the glossary says so rather than pretending there is one label per term.
 
 ## The core-time token
 

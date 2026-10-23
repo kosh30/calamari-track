@@ -169,7 +169,7 @@ months and an everlasting day store per year. We keep none. `emptyState()` and `
 fields and the `unclosed` marker. Everything in the other plugin that goes beyond today — the week
 chart, the month rows, the year overview, streaks, "vs Yesterday", the trophy for the best week — has
 simply no data basis with us. That could be retrofitted, but it would be a project of its own
-(writing history, tidying it, migrating it) and would contradict the line from `CONTEXT.md` that
+(writing history, tidying it, migrating it) and would contradict the line from `GLOSSARY.md` that
 Calamari is the single source of truth. These displays are therefore not "expensive" but moot, as
 long as we keep no history.
 
