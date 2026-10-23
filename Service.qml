@@ -167,8 +167,8 @@ Item {
 
     function runReminders() {
         var actions = root.decision.actions
-        for (var i = 0; i < actions.length; i++) {
-            var close = Reminders.closeFor(actions[i])
+        for (let i = 0; i < actions.length; i++) {
+            let close = Reminders.closeFor(actions[i])
             // A clock-out waits for a free helper; recorded once it starts.
             if (close && root.busy)
                 continue
@@ -289,7 +289,7 @@ Item {
         })
         root.setShiftState(result.state)
         if (result.startTimeQuery) {
-            var after = result.startTimeQuery.after
+            let after = result.startTimeQuery.after
             startTimeProc.command = after ? [root.helper, "start-time", "--after", after] : [root.helper, "start-time"]
             startTimeProc.running = true
         }
@@ -458,7 +458,7 @@ Item {
             onStreamFinished: {
                 var id = parseInt(text, 10)
                 if (id > 0) {
-                    var ids = Object.assign({}, root.notificationIds)
+                    let ids = Object.assign({}, root.notificationIds)
                     ids[notifyProc.type] = id
                     root.notificationIds = ids
                 }
