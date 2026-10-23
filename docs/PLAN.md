@@ -1,6 +1,6 @@
 # Implementation plan: Calamari Tracker
 
-Basis: [CONTEXT.md](../CONTEXT.md) (terminology) and [ADR 0001](adr/0001-calamari-mcp-instead-of-rest-api.md) (access through the MCP server).
+Basis: [GLOSSARY.md](../GLOSSARY.md) (terminology) and [ADR 0001](adr/0001-calamari-mcp-instead-of-rest-api.md) (access through the MCP server).
 The plan consists of vertical slices. Every slice ends with something you can try out. The order takes the risks down first.
 
 ## Architecture
@@ -94,7 +94,7 @@ The plan consists of vertical slices. Every slice ends with something you can tr
   - final warning at 19:00, auto-close 15 min later, „+1 h“ shifts both, upper limit 23:00.
   - weekend with a running shift: no stamp hint, but a final warning and an auto-close.
   - a shift from the previous day ran to the day's end: a correction hint, no stamping (ADR 0002).
-- All times come from the config (for the values see the summary in CONTEXT/grilling).
+- All times come from the config (for the values see the summary in GLOSSARY/grilling).
 
 **Done when** all tests are green and the module has no Qt dependency.
 

@@ -26,6 +26,8 @@ class CalamariCliTest(unittest.TestCase):
         self.addCleanup(tmp.cleanup)
         self.keyring = Path(tmp.name) / "keyring.json"
         self.log = Path(tmp.name) / "journal.log"
+        # The helper falls back to the omarchy shell settings; never the real ones.
+        self.config_home = Path(tmp.name) / "config"
 
     def start_helper(self, *args, base_url=None, api_url=None, helper=HELPER):
         env = dict(
@@ -35,6 +37,7 @@ class CalamariCliTest(unittest.TestCase):
             CALAMARI_KEYRING_FILE=str(self.keyring),
             CALAMARI_LOG_FILE=str(self.log),
             CALAMARI_NOW=self.fake.now,
+            XDG_CONFIG_HOME=str(self.config_home),
             BROWSER="%s %s %%s" % (sys.executable, FAKE_BROWSER),
         )
         return subprocess.Popen(
@@ -842,6 +845,20 @@ class CalamariCliTest(unittest.TestCase):
             with self.subTest(command):
                 self.assert_error(self.run_helper(command, api_url=""), "API_URL_REQUIRED")
         self.assertEqual(self.fake.rest_calls, [])
+
+    def test_rest_without_api_url_reads_the_widget_setting(self):
+        # Run from a shell, the helper finds the apiUrl saved in the settings.
+        self.login()
+        self.store_api_key()
+        self.fake.shifts = [("2026-09-22", "09:40:30", None)]
+        shell_json = self.config_home / "omarchy" / "shell.json"
+        shell_json.parent.mkdir(parents=True)
+        entry = {"id": "kosh.calamari-tracker", "apiUrl": self.fake.api_url + "/"}
+        shell_json.write_text(json.dumps({"bar": {"layout": {"left": ["clock"], "right": ["tray", entry]}}}))
+
+        code, out = self.run_helper("status", api_url="")
+
+        self.assertEqual((code, out["ok"], out.get("shift")), (0, True, "running"), out)
 
     def test_lookup_without_api_key_asks_for_one(self):
         self.login()

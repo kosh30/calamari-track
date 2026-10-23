@@ -11,7 +11,8 @@ with a non-zero exit code.
 Environment:
   CALAMARI_BASE_URL      gateway base URL (tests point it at a fake)
   CALAMARI_API_URL       REST API base URL, e.g. https://<company>.calamari.io/api
-                         (the widget setting apiUrl; no default)
+                         (the widget passes its setting apiUrl; unset, the
+                         helper reads it from omarchy/shell.json; no default)
   CALAMARI_KEYRING_FILE  keep secrets in this JSON file instead of the
                          Secret Service keyring (tests only)
   CALAMARI_LOG_FILE      append log lines to this file instead of the
@@ -48,6 +49,7 @@ DEFAULT_PROJECT = "Check-in"
 # The break type of the own Pauses, the only one Calamari offers (widget setting breakType).
 DEFAULT_BREAK_TYPE = "Break"
 MCP_PATH = "/mcp-server/mcp"
+PLUGIN_ID = "kosh.calamari-tracker"
 SCOPE = "mcp"
 KEYRING_SERVICE = "kosh.calamari-tracker"
 LOG_IDENT = "calamari-tracker"
@@ -93,9 +95,24 @@ def mcp_url():
     return base_url() + MCP_PATH
 
 
+def widget_setting(name):
+    """A setting of the plugin's bar entry in shell.json, for runs from a shell."""
+    config = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    try:
+        with open(os.path.join(config, "omarchy", "shell.json")) as f:
+            layout = json.load(f)["bar"]["layout"]
+        for entry in (e for section in layout.values() for e in section):
+            if isinstance(entry, dict) and entry.get("id") == PLUGIN_ID:
+                return entry.get(name)
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        pass
+    return None
+
+
 def api_url():
     """The REST API lives under the company's own address, so there is no default."""
-    url = os.environ.get("CALAMARI_API_URL", "").strip().rstrip("/")
+    url = os.environ.get("CALAMARI_API_URL") or widget_setting("apiUrl") or ""
+    url = str(url).strip().rstrip("/")
     if not url:
         raise HelperError("API_URL_REQUIRED", "no REST API URL, set apiUrl (e.g. https://<company>.calamari.io/api)")
     return url

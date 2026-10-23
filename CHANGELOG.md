@@ -6,6 +6,10 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- `bin/calamari status`, `bin/calamari lookup` and the other commands that use the REST API now work from a terminal: they take the API address from the settings instead of failing with `API_URL_REQUIRED`.
+
 ## [0.3.0] - 2026-09-27
 
 ### Added
