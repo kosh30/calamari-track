@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "js/shiftclock.mjs" as ShiftClock
 import "js/reminders.mjs" as Reminders
@@ -171,7 +172,7 @@ Panel {
 
                         Text {
                             visible: text !== ""
-                            color: Color.foreground
+                            color: Commons.Color.foreground
                             font.family: Style.font.family
                             font.pixelSize: Style.fontPx(1.5)
                             font.bold: true
@@ -181,7 +182,7 @@ Panel {
                         Text {
                             width: parent.width
                             wrapMode: Text.Wrap
-                            color: Qt.darker(Color.foreground, 1.4)
+                            color: Qt.darker(Commons.Color.foreground, 1.4)
                             font.family: Style.font.family
                             font.pixelSize: Style.font.bodySmall
                             text: root.headerModel ? root.headerModel.caption : ""
@@ -196,14 +197,14 @@ Panel {
                             width: parent.width
                             height: Style.space(4)
                             radius: height / 2
-                            color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.15)
+                            color: Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.15)
 
                             Rectangle {
                                 anchors.left: parent.left
                                 anchors.verticalCenter: parent.verticalCenter
                                 height: parent.height
                                 radius: parent.radius
-                                color: Color.accent
+                                color: Commons.Color.accent
                                 width: parent.width * (root.progress ? root.progress.fraction : 0)
 
                                 Behavior on width {
@@ -219,7 +220,7 @@ Panel {
                             width: parent.width
                             visible: root.progress !== null
                             wrapMode: Text.Wrap
-                            color: Qt.darker(Color.foreground, 1.4)
+                            color: Qt.darker(Commons.Color.foreground, 1.4)
                             font.family: Style.font.family
                             font.pixelSize: Style.font.caption
                             text: root.progress ? root.progress.text : ""
@@ -251,7 +252,7 @@ Panel {
                                         width: place.width
                                         height: Style.space(6)
                                         radius: Style.space(2)
-                                        color: modelData.running ? Color.accent : Qt.darker(Color.foreground, 1.2)
+                                        color: modelData.running ? Commons.Color.accent : Qt.darker(Commons.Color.foreground, 1.2)
                                     }
                                 }
 
@@ -264,7 +265,7 @@ Panel {
                                     x: place.x
                                     width: place.width
                                     height: parent.height
-                                    color: Color.foreground
+                                    color: Commons.Color.foreground
 
                                     Behavior on x {
                                         NumberAnimation {
@@ -296,7 +297,7 @@ Panel {
                                 Text {
                                     id: spanStart
                                     anchors.left: parent.left
-                                    color: Qt.darker(Color.foreground, 1.4)
+                                    color: Qt.darker(Commons.Color.foreground, 1.4)
                                     font.family: Style.font.family
                                     font.pixelSize: Style.font.caption
                                     text: root.timeline ? root.timeline.startText : ""
@@ -304,7 +305,7 @@ Panel {
 
                                 Text {
                                     anchors.right: parent.right
-                                    color: Qt.darker(Color.foreground, 1.4)
+                                    color: Qt.darker(Commons.Color.foreground, 1.4)
                                     font.family: Style.font.family
                                     font.pixelSize: Style.font.caption
                                     text: root.timeline ? root.timeline.endText : ""
@@ -316,7 +317,7 @@ Panel {
                     Text {
                         width: parent.width
                         wrapMode: Text.Wrap
-                        color: Color.foreground
+                        color: Commons.Color.foreground
                         font.family: Style.font.family
                         font.pixelSize: Style.font.body
                         text: root.loginText()
@@ -326,7 +327,7 @@ Panel {
                         width: parent.width
                         visible: root.countdown !== ""
                         wrapMode: Text.Wrap
-                        color: Color.urgent
+                        color: Commons.Color.urgent
                         font.family: Style.font.family
                         font.pixelSize: Style.font.body
                         font.bold: true
@@ -343,7 +344,7 @@ Panel {
                         width: parent.width
                         visible: text !== "" && root.authState === "ok"
                         wrapMode: Text.Wrap
-                        color: Color.foreground
+                        color: Commons.Color.foreground
                         font.family: Style.font.family
                         font.pixelSize: Style.font.body
                         text: root.service ? ShiftClock.workedText(root.service.shiftState, root.service.now, root.t) : ""
@@ -385,7 +386,7 @@ Panel {
                         width: parent.width
                         visible: root.service !== null && root.service.stampError !== ""
                         wrapMode: Text.Wrap
-                        color: Color.urgent
+                        color: Commons.Color.urgent
                         font.family: Style.font.family
                         font.pixelSize: Style.font.body
                         text: root.service ? root.service.stampError : ""
@@ -395,7 +396,7 @@ Panel {
                         width: parent.width
                         visible: root.service !== null && root.service.errorMessage !== "" && !root.loggingIn
                         wrapMode: Text.Wrap
-                        color: Color.urgent
+                        color: Commons.Color.urgent
                         font.family: Style.font.family
                         font.pixelSize: Style.font.body
                         text: root.service ? root.service.errorMessage : ""

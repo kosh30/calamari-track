@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "js/contrast.mjs" as Contrast
 import "js/scrollindicator.mjs" as ScrollIndicator
@@ -37,7 +38,7 @@ Column {
     // How far the quiet things on this page may step back (js/contrast.mjs),
     // measured against the panel's own card rather than the desktop behind it
     // — see ActionButton.qml.
-    readonly property var strength: Contrast.strengths(Color.foreground, Color.popups.background)
+    readonly property var strength: Contrast.strengths(Commons.Color.foreground, Commons.Color.popups.background)
 
     function load() {
         var settings = root.service ? root.service.settings : null
@@ -62,7 +63,7 @@ Column {
 
     Text {
         text: root.t("settings.title")
-        color: Color.foreground
+        color: Commons.Color.foreground
         font.family: Style.font.family
         font.pixelSize: Style.font.body
         font.bold: true
@@ -109,7 +110,7 @@ Column {
                         radius: Style.cornerRadius
                         color: Style.normalFill
                         border.width: Style.spacing.hairline
-                        border.color: Util.alpha(Color.foreground, 0.1)
+                        border.color: Util.alpha(Commons.Color.foreground, 0.1)
 
                         Column {
                             id: cardColumn
@@ -122,7 +123,7 @@ Column {
                             Text {
                                 width: parent.width
                                 wrapMode: Text.Wrap
-                                color: Util.alpha(Color.foreground, root.strength.quiet)
+                                color: Util.alpha(Commons.Color.foreground, root.strength.quiet)
                                 font.family: Style.font.family
                                 font.pixelSize: Style.font.caption
                                 // The shell's own spacing for capitals
@@ -138,7 +139,7 @@ Column {
                                 width: parent.width
                                 visible: text !== ""
                                 wrapMode: Text.Wrap
-                                color: Util.alpha(Color.foreground, root.strength.quiet)
+                                color: Util.alpha(Commons.Color.foreground, root.strength.quiet)
                                 font.family: Style.font.family
                                 font.pixelSize: Style.font.bodySmall
                                 text: card.modelData.description
@@ -161,7 +162,7 @@ Column {
                                     Text {
                                         width: parent.width
                                         wrapMode: Text.Wrap
-                                        color: Color.foreground
+                                        color: Commons.Color.foreground
                                         font.family: Style.font.family
                                         font.pixelSize: Style.font.body
                                         text: row.modelData.label
@@ -206,7 +207,7 @@ Column {
                                         width: parent.width
                                         visible: root.errors[row.modelData.key] !== undefined
                                         wrapMode: Text.Wrap
-                                        color: Color.urgent
+                                        color: Commons.Color.urgent
                                         font.family: Style.font.family
                                         font.pixelSize: Style.font.body
                                         text: root.errors[row.modelData.key] || ""
@@ -242,7 +243,7 @@ Column {
             width: Style.space(3)
             height: place.height
             radius: width / 2
-            color: Util.alpha(Color.foreground, root.strength.mark)
+            color: Util.alpha(Commons.Color.foreground, root.strength.mark)
         }
     }
 
@@ -250,7 +251,7 @@ Column {
         width: parent.width
         visible: root.saveError !== ""
         wrapMode: Text.Wrap
-        color: Color.urgent
+        color: Commons.Color.urgent
         font.family: Style.font.family
         font.pixelSize: Style.font.body
         text: root.saveError
@@ -278,7 +279,7 @@ Column {
     Text {
         width: parent.width
         visible: text !== ""
-        color: Util.alpha(Color.foreground, root.strength.quiet)
+        color: Util.alpha(Commons.Color.foreground, root.strength.quiet)
         font.family: Style.font.family
         font.pixelSize: Style.font.bodySmall
         text: root.version ? "Calamari Tracker " + root.version : ""

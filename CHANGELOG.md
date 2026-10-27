@@ -6,6 +6,10 @@ All notable changes to this plugin are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The panel, its buttons and the settings follow the Omarchy theme again. Since Qt 6.12 they lost the theme's colours and drew near-black text, unreadable on a dark theme.
+
 ## [0.3.1] - 2026-10-23
 
 ### Fixed

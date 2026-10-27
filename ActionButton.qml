@@ -5,6 +5,7 @@
 
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "js/contrast.mjs" as Contrast
 
@@ -82,16 +83,16 @@ BorderSurface {
     // a surface the text never sits on is no floor. The rank survives a theme
     // that leaves little room — the frame, the size and the capitals carry
     // it, the colour only seconds them.
-    readonly property var _strength: Contrast.strengths(Color.foreground, Color.popups.background)
+    readonly property var _strength: Contrast.strengths(Commons.Color.foreground, Commons.Color.popups.background)
 
     // Full strength for the main action and for whatever the pointer is on.
     // Switched on beats both, so the theme's own selected colour still shows;
     // disabled beats everything, so a button that cannot be pressed never
     // renders at full strength.
-    readonly property color _labelColor: !root.enabled ? Util.alpha(Color.foreground, root._strength.inert) : root.selected ? Style.selectedStateColor(Color.foreground, Color.accent) : root.primary || root._hot ? Color.foreground : Util.alpha(Color.foreground, root._strength.quiet)
+    readonly property color _labelColor: !root.enabled ? Util.alpha(Commons.Color.foreground, root._strength.inert) : root.selected ? Style.selectedStateColor(Commons.Color.foreground, Commons.Color.accent) : root.primary || root._hot ? Commons.Color.foreground : Util.alpha(Commons.Color.foreground, root._strength.quiet)
 
-    readonly property var _hoverBorder: Border.controlSpec("hover-cursor", Color.foreground, Color.accent)
-    readonly property var _normalBorder: Border.controlSpec("normal", Color.foreground, Color.accent)
+    readonly property var _hoverBorder: Border.controlSpec("hover-cursor", Commons.Color.foreground, Commons.Color.accent)
+    readonly property var _normalBorder: Border.controlSpec("normal", Commons.Color.foreground, Commons.Color.accent)
 
     // The spec whose widths and gradient are in force. A frame on its way out
     // keeps the shape it is fading from, which is the pointer's.
@@ -126,7 +127,7 @@ BorderSurface {
         widths: root._frameShape.widths,
         gradient: root._frameShape.gradient
     } : root._frameHard
-    color: mouse.pressed ? Style.pressedFillFor(Color.foreground, Color.accent) : root._hot ? Style.hoverFillFor(Color.foreground, Color.accent) : root.selected ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
+    color: mouse.pressed ? Style.pressedFillFor(Commons.Color.foreground, Commons.Color.accent) : root._hot ? Style.hoverFillFor(Commons.Color.foreground, Commons.Color.accent) : root.selected ? Style.selectedFillFor(Commons.Color.foreground, Commons.Color.accent) : "transparent"
 
     Behavior on color {
         ColorAnimation {

@@ -1,6 +1,6 @@
 import QtQuick
 import Quickshell.Io
-import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "js/i18n.mjs" as I18n
 
@@ -21,7 +21,7 @@ BarWidget {
     // The service's translator, English while there is no service yet.
     readonly property var t: service && service.t ? service.t : I18n.t
     readonly property bool alerting: view.kind === "auth" || view.kind === "error"
-    readonly property color barForeground: bar ? bar.barForeground : Color.foreground
+    readonly property color barForeground: bar ? bar.barForeground : Commons.Color.foreground
 
     function viewForeground() {
         switch (root.view.kind) {
@@ -30,9 +30,9 @@ BarWidget {
         case "break":
             return root.themeYellow
         case "reminder":
-            return Color.urgent
+            return Commons.Color.urgent
         case "idle":
-            return Color.muted
+            return Commons.Color.muted
         }
         return root.barForeground
     }
@@ -60,7 +60,7 @@ BarWidget {
     property color themeYellow: "#d7af5f"
 
     FileView {
-        path: Color.currentThemePath + "/colors.toml"
+        path: Commons.Color.currentThemePath + "/colors.toml"
         printErrors: false
         onLoaded: {
             root.themeGreen = root.themeColor(text(), "green", root.themeGreen)
