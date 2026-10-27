@@ -22,3 +22,8 @@ copies here change.
 
 `.qmllint.ini` disables only `MissingProperty` (members of the shell's
 `QtObject`-typed objects) and fails on any remaining warning.
+
+One gap `qmllint` cannot close: a name that both a Qt module and the shell
+export (QtQuick 6.12's `Color`) resolves to the shell in the linter but to Qt
+at runtime. `tests/test_qml_shadowing.py` (run by `python3 -m unittest`)
+fails on any such name used unqualified; write `Commons.Color`.
