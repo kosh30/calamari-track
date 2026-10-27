@@ -1,0 +1,84 @@
+# Local mirror of CI (CONTRIBUTING.md, "Checks"), plus what CI cannot see:
+# secrets and the commit message. `pre-commit install` sets up all stages.
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
+default_stages: [pre-commit]
+# Verbatim snapshots of omarchy-shell; never touched by hand (lint/README.md).
+exclude: ^lint/qs/
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: check-added-large-files
+      - id: detect-private-key
+
+  # Login tokens and the API key live in the keyring, never in the repo.
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1-1
+    hooks:
+      - id: shellcheck
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+
+  # Subject at most 72 characters, no trailing period, blank second line.
+  - repo: https://github.com/jorisroovers/gitlint
+    rev: v0.19.1
+    hooks:
+      - id: gitlint
+
+  - repo: local
+    hooks:
+      # tools/format pins the formatter versions; it is their only copy.
+      - id: format
+        name: tools/format
+        entry: tools/format
+        language: system
+        files: ^(js/|tests/|bin/calamari$|tools/release$|[^/]+\.qml$)
+        pass_filenames: false
+      - id: qmllint
+        name: qmllint -I lint *.qml
+        entry: bash -c '"$(command -v qmllint || echo /usr/lib/qt6/bin/qmllint)" -I lint *.qml'
+        language: system
+        files: (\.qml|qmldir|\.qmllint\.ini)$
+        pass_filenames: false
+      # The one check qmllint cannot make (lint/README.md); fast, unlike the
+      # rest of the Python suite.
+      - id: qml-shadowing
+        name: QML names Qt shadows at runtime
+        entry: python3 -m unittest tests.test_qml_shadowing
+        language: system
+        files: (\.qml|qmldir)$
+        pass_filenames: false
+      - id: node-tests
+        name: node --test js/*.test.mjs
+        entry: bash -c 'node --test js/*.test.mjs'
+        language: system
+        files: ^js/
+        pass_filenames: false
+      # About a minute, so on push and only when Python changed.
+      - id: python-tests
+        name: python3 -m unittest
+        entry: python3 -m unittest
+        language: system
+        files: ^(bin/|tools/release$|tests/)
+        pass_filenames: false
+        stages: [pre-push]

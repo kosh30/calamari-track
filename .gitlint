@@ -1,0 +1,4 @@
+# Commit message rules from CONTRIBUTING.md. Release commits made by
+# tools/release carry no body, so a missing or short body is allowed.
+[general]
+ignore=body-is-missing,body-min-length

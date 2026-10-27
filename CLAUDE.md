@@ -19,6 +19,7 @@ Where a doc quotes on-screen text it is quoting one language, usually German, an
 - Contribution, commit, changelog and release rules: `CONTRIBUTING.md` (binding, for agents too)
 - Tests: `node --test js/*.test.mjs` and `python3 -m unittest`
 - Format: `tools/format` (`--check` only checks)
+- Git hooks: `pre-commit install`; all checks at once: `pre-commit run --all-files`
 - Log of the helper (errors, REST requests sent, stampings): `journalctl -t calamari-tracker`
 - Lint: `/usr/lib/qt6/bin/qmllint -I lint *.qml` (refresh the snapshots: `lint/refresh.sh`)
 - Installed by symlink `~/.config/omarchy/plugins/kosh.calamari-tracker`.

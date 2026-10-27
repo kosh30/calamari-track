@@ -25,6 +25,13 @@ qmllint -I lint *.qml        # Arch: /usr/lib/qt6/bin/qmllint
 tools/format                 # tools/format --check only checks
 ```
 
+`pre-commit install` (once per clone) runs the same checks as Git hooks,
+each only when its files changed: formatting, `qmllint` and the Node tests
+on commit, the Python tests (about a minute) on push. On top of CI it scans
+for secrets (gitleaks), lints shell scripts and workflows, and checks the
+commit message against the rules below (gitlint, `.gitlint`).
+`pre-commit run --all-files` runs them over the whole tree.
+
 `tools/format` pins the formatter versions (Prettier, Ruff; qmlformat comes
 with Qt). It needs `npx` and `uvx`. To hide the formatting commits from
 `git blame`, run once:
